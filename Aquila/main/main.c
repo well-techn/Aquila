@@ -751,7 +751,7 @@ static void read_and_process_data_from_gps(void * pvParameters)
                           if (asteriks_place == 0) XOR = XOR^incoming_message_buffer_gps[i];                          //calculating XOR of the message until * is found 
                           i++;               
                                           }
-                      
+                      //
                       if (incoming_message_buffer_gps[asteriks_place+1] <= 0x39) XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] & 0x0F) << 4;  //discovering if digit or letter
                       else XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] - 55) << 4;
                       if (incoming_message_buffer_gps[asteriks_place+2] <= 0x39) XOR_ch |= (incoming_message_buffer_gps[asteriks_place+2] & 0x0F);
