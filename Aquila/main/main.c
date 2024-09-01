@@ -166,12 +166,12 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
 }
 
-static void IRAM_ATTR RC_timer_interrupt_handler(void *args)
+/*static void IRAM_ATTR RC_timer_interrupt_handler(void *args)
 {
   //uint8_t RC_suspend_flag = 1;
   //xQueueSendFromISR(RC_lost_comm_queue, &RC_suspend_flag, NULL);
 }
-
+*/
 static void IRAM_ATTR Suspension_timer_interrupt_handler(void *args)
 {
   //gpio_set_level(BLINK_GPIO_green, 1); 
