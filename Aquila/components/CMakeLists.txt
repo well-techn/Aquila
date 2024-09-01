@@ -1,0 +1,16 @@
+idf_component_register(SRCS 
+"ve_i2c.c"
+"ve_spi.c"
+#"VL53L1x.c"
+"winbondW25N.c"
+"madgwick.c"
+"HMC5983.c"
+"MPU6000.c"
+"PMW3901.c"
+"MCP23017.c"
+"PCA9685.c"
+#"TfminiS.c"
+"INA219.c"
+
+INCLUDE_DIRS "." "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/i2c/include/" "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/spi/include/"
+"C:/Users/VVE/esp/v5.2/esp-idf/components/driver/gpio/include/" "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/uart/include/")
