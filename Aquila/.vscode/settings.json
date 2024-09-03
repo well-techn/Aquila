@@ -117,7 +117,7 @@
     "iomanip": "c"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM17",
+  "idf.portWin": "COM19",
   "idf.adapterTargetName": "esp32s3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"

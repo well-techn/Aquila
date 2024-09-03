@@ -159,7 +159,7 @@ struct data_from_gps_to_main_struct {                             //structure to
 
 //defining general SW parameters
 #define SUSPENSION_TIMER_DELAY_SEC              (1)          //in seconds
-#define IMU_1_SUSPENSION_TIMER_DELAY_MS         (2)          //in mseconds
+#define IMU_SUSPENSION_TIMER_DELAY_MS           (100)          //in mseconds
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)  
 #ifdef USING_MAG_DATA                                      
   #define NUMBER_OF_MAGNETOMETER_CALIBRATION_COUNTS        (15000)  

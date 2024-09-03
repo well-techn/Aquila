@@ -69,8 +69,9 @@ SemaphoreHandle_t Semaphore_to_read_mag;
 //timer handles
 gptimer_handle_t GP_timer;
 gptimer_handle_t RC_timer;
-gptimer_handle_t Suspension_timer;
+gptimer_handle_t general_suspension_timer;
 gptimer_handle_t IMU_1_suspension_timer;
+gptimer_handle_t IMU_2_suspension_timer;
 
 //ADC handles
 adc_oneshot_unit_handle_t adc1_handle;
@@ -150,8 +151,8 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   
   //gpio_intr_status = gpio_intr_status_1 | gpio_intr_status_2;  
   
-  if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN)) imu_1_interrupt_flag = 1; 
-  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN)) imu_2_interrupt_flag = 1;
+  if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN)) {imu_1_interrupt_flag = 1; gptimer_set_raw_count(IMU_1_suspension_timer, 0);} 
+  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN)) {imu_2_interrupt_flag = 1; gptimer_set_raw_count(IMU_2_suspension_timer, 0); }
 
   if (imu_1_interrupt_flag) {  // && imu_2_interrupt_flag
     imu_1_interrupt_flag = 0;
@@ -166,21 +167,30 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
 }
 
-/*static void IRAM_ATTR RC_timer_interrupt_handler(void *args)
+static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    //motor control emergency disable
 {
-  //uint8_t RC_suspend_flag = 1;
-  //xQueueSendFromISR(RC_lost_comm_queue, &RC_suspend_flag, NULL);
-}
-*/
-static void IRAM_ATTR Suspension_timer_interrupt_handler(void *args)
-{
-  //gpio_set_level(BLINK_GPIO_green, 1); 
+   
+   ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
+
+
+  //WRITE_PERI_REG((DR_REG_LEDC_BASE + 0x00),0);                    эти регистры переписываются на update_duty
+
+  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x00),4);  //LEDC_CH0_CONF0_REG
+  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x14),4);  //LEDC_CH1_CONF0_REG
+  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x28),4);  //LEDC_CH2_CONF0_REG
+  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x3C),4);  //LEDC_CH3_CONF0_REG
 }
 
 static void IRAM_ATTR IMU_1_suspension_timer_interrupt_handler(void *args)
 {
-  //gpio_set_level(BLINK_GPIO_green, 1); 
+  gpio_set_level(LED_BLUE, 0);
 }
+
+static void IRAM_ATTR IMU_2_suspension_timer_interrupt_handler(void *args)
+{
+  gpio_set_level(LED_GREEN, 0); 
+}
+
 //main pins configuration
 static void configure_IOs()
 {
@@ -413,41 +423,41 @@ static void Create_and_start_test_timer()                    //timer for Madgwic
   ESP_ERROR_CHECK(gptimer_start(test_timer));
 }
 */
-static void Create_and_start_suspension_Timer(void * pvParameters)                    //timer to control absense of control signal from RC
+static void create_and_start_general_suspension_timer()                    //timer to control suspension of main cycle
 {
   gptimer_config_t timer_config = {
       .clk_src = GPTIMER_CLK_SRC_DEFAULT,
       .direction = GPTIMER_COUNT_UP,
       .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
   };
-  ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &Suspension_timer));
+  ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &general_suspension_timer));
 
   gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
-      .alarm_count = SUSPENSION_TIMER_DELAY_SEC * 1000 * 1000,   //1 seconds
+      .alarm_count = SUSPENSION_TIMER_DELAY_SEC * 1000 * 1000,   //10 seconds
       //.reload_count = NULL,
   };
-  ESP_ERROR_CHECK(gptimer_set_alarm_action(Suspension_timer, &alarm_config));
+  ESP_ERROR_CHECK(gptimer_set_alarm_action(general_suspension_timer, &alarm_config));
 
   gptimer_event_callbacks_t  Suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
-      .on_alarm = Suspension_timer_interrupt_handler, // register user callback
+      .on_alarm = general_suspension_timer_interrupt_handler, // register user callback
   };
-  ESP_ERROR_CHECK(gptimer_register_event_callbacks(Suspension_timer, &Suspension_timer_interrupt, NULL));
+  ESP_ERROR_CHECK(gptimer_register_event_callbacks(general_suspension_timer, &Suspension_timer_interrupt, NULL));
 
-  ESP_ERROR_CHECK(gptimer_enable(Suspension_timer));
-  ESP_ERROR_CHECK(gptimer_start(Suspension_timer));
+  ESP_ERROR_CHECK(gptimer_enable(general_suspension_timer));
+  ESP_ERROR_CHECK(gptimer_start(general_suspension_timer));
 }
 
-static void Create_and_start_IMU_1_suspension_Timer(void * pvParameters)                    //timer to control absense of control signal from RC
+static void Create_and_start_IMU_1_suspension_Timer()                    //timer to control absense of control signal from RC
 {
-  gptimer_config_t timer_config = {
+  gptimer_config_t IMU_1_timer_config = {
       .clk_src = GPTIMER_CLK_SRC_DEFAULT,
       .direction = GPTIMER_COUNT_UP,
       .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
   };
-  ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &IMU_1_suspension_timer));
+  ESP_ERROR_CHECK(gptimer_new_timer(&IMU_1_timer_config, &IMU_1_suspension_timer));
 
   gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
-      .alarm_count = IMU_1_SUSPENSION_TIMER_DELAY_MS * 1000,   //in ms
+      .alarm_count = IMU_SUSPENSION_TIMER_DELAY_MS * 1000,   //in ms
       .reload_count = 0,
   };
   ESP_ERROR_CHECK(gptimer_set_alarm_action(IMU_1_suspension_timer, &alarm_config));
@@ -461,10 +471,33 @@ static void Create_and_start_IMU_1_suspension_Timer(void * pvParameters)        
   ESP_ERROR_CHECK(gptimer_start(IMU_1_suspension_timer));
 }
 
+static void Create_and_start_IMU_2_suspension_Timer()                    //timer to control absense of control signal from RC
+{
+  gptimer_config_t IMU_2_timer_config = {
+      .clk_src = GPTIMER_CLK_SRC_DEFAULT,
+      .direction = GPTIMER_COUNT_UP,
+      .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
+  };
+  ESP_ERROR_CHECK(gptimer_new_timer(&IMU_2_timer_config, &IMU_2_suspension_timer));
+
+  gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
+      .alarm_count = IMU_SUSPENSION_TIMER_DELAY_MS * 1000,   //in ms
+      .reload_count = 0,
+  };
+  ESP_ERROR_CHECK(gptimer_set_alarm_action(IMU_2_suspension_timer, &alarm_config));
+
+  gptimer_event_callbacks_t  IMU_2_suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
+      .on_alarm = IMU_2_suspension_timer_interrupt_handler, // register user callback
+  };
+  ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_2_suspension_timer, &IMU_2_suspension_timer_interrupt, NULL));
+
+  ESP_ERROR_CHECK(gptimer_enable(IMU_2_suspension_timer));
+  ESP_ERROR_CHECK(gptimer_start(IMU_2_suspension_timer));
+}
+
 static void configuring_timer_for_PWM()
 {
-  // Prepare and then apply the LEDC PWM timer configuration
-  ledc_timer_config_t engine_pwm_timer = {
+    ledc_timer_config_t engine_pwm_timer = {
       .speed_mode       = ENGINE_PWM_MODE,
       .timer_num        = ENGINE_PWM_TIMER,
       .duty_resolution  = ENGINE_PWM_DUTY_RESOLUTION,
@@ -1991,9 +2024,19 @@ else
 
 vTaskDelay(100/portTICK_PERIOD_MS);       //without these delay assertion fails
 
-ESP_LOGI(TAG_INIT,"Activating interrupts at IMUs and MCP pins.....");
+ESP_LOGI(TAG_FLY,"creating and starting IMU#1 suspension timer.....");
+Create_and_start_IMU_1_suspension_Timer();
+ESP_LOGI(TAG_FLY,"IMU#1 suspension timer is created and started\n");
+
+ESP_LOGI(TAG_FLY,"creating and starting IMU#2 suspension timer.....");
+Create_and_start_IMU_2_suspension_Timer();
+ESP_LOGI(TAG_FLY,"IMU#2 suspension timer is created and started\n");
+
+ESP_LOGI(TAG_FLY,"Activating interrupts at IMUs and MCP pins.....");
 configure_pins_for_interrupt();
-ESP_LOGI(TAG_INIT,"GPIO interrupt pins configured\n");   
+ESP_LOGI(TAG_FLY,"GPIO interrupt pins configured\n");
+
+
    
 
 while(1) {
@@ -2136,6 +2179,7 @@ if (!(calibration_flag))
       }
 //***********************************************************************************************************************************************************        
         large_counter++;
+
         if ((large_counter % 1000) == 0) {
         
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
@@ -2279,7 +2323,7 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0)) {
         //if ((cycle_end_time - cycle_start_time) > 800) ESP_LOGW(TAG_FLY,"%lld", (cycle_end_time - cycle_start_time));
         gpio_set_level(LED_RED, 1);
         
-        
+        ESP_ERROR_CHECK(gptimer_set_raw_count(general_suspension_timer, 0));    //resetting general_suspension timer at this point
       }
     } 
   }
@@ -2768,6 +2812,11 @@ static void init(void * pvParameters)
           xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
           while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
         }
+
+        ESP_LOGI(TAG_INIT,"creating and starting general suspension timer.....");
+        create_and_start_general_suspension_timer();
+        ESP_LOGI(TAG_INIT,"general suspension timer is created and started\n");
+        
 
   vTaskDelete(NULL);
   
