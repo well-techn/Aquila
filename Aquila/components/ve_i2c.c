@@ -4,12 +4,15 @@
 #include "PCA9685.h"
 #include "MCP23017.h"
 #include "INA219.h"
+#include "IST8310.h"
 
 i2c_master_bus_handle_t i2c_internal_bus_handle;
+i2c_master_bus_handle_t i2c_external_bus_handle;
 
 i2c_master_dev_handle_t PCA9685_dev_handle;
 i2c_master_dev_handle_t MCP23017_dev_handle;
 i2c_master_dev_handle_t INA219_dev_handle;
+i2c_master_dev_handle_t IST8310_dev_handle;
 
 
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
@@ -26,7 +29,7 @@ void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
 
   ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_configuration, &i2c_internal_bus_handle));
 
-  i2c_device_config_t PCA9685_dev_config = {
+    i2c_device_config_t PCA9685_dev_config = {
     .dev_addr_length = I2C_ADDR_BIT_LEN_7,
     .device_address = PCA9685_address,
     .scl_speed_hz = I2C_PCA9685_FREQ_HZ,
@@ -48,6 +51,30 @@ void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &PCA9685_dev_config, &PCA9685_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &MCP23017_dev_config, &MCP23017_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &INA219_dev_config, &INA219_dev_handle));
+}
+
+void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
+{
+   i2c_master_bus_config_t i2c_configuration = {
+    .clk_source = I2C_CLK_SRC_DEFAULT,
+    .i2c_port = i2c_port,
+    .scl_io_num = scl_pin,
+    .sda_io_num = sda_pin,
+    .glitch_ignore_cnt = 7,
+    .intr_priority = 0,                         //I2C interrupt priority, if set to 0, driver will select the default priority (1,2,3).
+    .flags.enable_internal_pullup = true,
+  };
+
+  ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_configuration, &i2c_external_bus_handle));
+
+  i2c_device_config_t IST8310_dev_config = {
+    .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+    .device_address = IST8310_ADDR,
+    .scl_speed_hz = I2C_IST8310_FREQ_HZ,
+    };
+
+    
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_external_bus_handle, &IST8310_dev_config, &IST8310_dev_handle));
 }
 
 

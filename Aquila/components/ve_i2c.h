@@ -15,6 +15,7 @@
 //uint8_t i2c_read_byte_from_address(uint8_t i2c_port, uint8_t device_address, uint8_t reg_address);
 //uint8_t i2c_read_byte_from_address_x16(uint8_t i2c_port, uint8_t device_address, uint16_t reg_address_x16);
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port);
+void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port);
 esp_err_t i2c_write_byte_to_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address, uint8_t data_to_write);
 esp_err_t i2c_write_2_bytes_to_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address, uint8_t MSB, uint8_t LSB);
 esp_err_t i2c_write_bytes_to_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address, uint8_t number_of_bytes, uint8_t *data_to_write);

@@ -3,7 +3,8 @@
 
 //#define USING_W25N 
 //#define USING_GPS 
-//#define USING_MAG_DATA
+//#define USING_MAG_DATA_HMC5983
+//#define USING_MAG_DATA_IST8310
 #define USING_LIDAR_UART
 //#define USING_TFS_I2C
 //#define USING_PERFORMANCE_MESUREMENT
@@ -43,7 +44,8 @@
 
   #define I2C_EXT_SDA                       (47) 
   #define I2C_EXT_SCL                       (33)
-  #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)                           
+  #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)     
+  #define I2C_IST8310_FREQ_HZ               (400000)                      
   #define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)                                               
   #define I2C_EXT_PORT                      (1)
 
@@ -159,7 +161,7 @@ struct data_from_gps_to_main_struct {                             //structure to
 
 //defining general SW parameters
 #define SUSPENSION_TIMER_DELAY_SEC              (1)          //in seconds
-#define IMU_SUSPENSION_TIMER_DELAY_MS           (100)          //in mseconds
+#define IMU_SUSPENSION_TIMER_DELAY_MS           (2)          //in mseconds
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)  
 #ifdef USING_MAG_DATA                                      
   #define NUMBER_OF_MAGNETOMETER_CALIBRATION_COUNTS        (15000)  

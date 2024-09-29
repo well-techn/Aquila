@@ -39,6 +39,7 @@
 #include "MPU6000.h"
 #include "TfminiS.h"
 #include "INA219.h"
+#include "IST8310.h"
 
 
 //ESP32 logging labels
@@ -55,6 +56,8 @@ const char *TAG_PCA9685 = "PCA9685";
 const char *TAG_HMC5983 = "HMC5983";
 const char *TAG_LIDAR = "TFSmini";
 const char *TAG_INA219 = "INA219";
+const char *TAG_IST8310 = "IST8310";
+
 
 //spi devices handles
 extern spi_device_handle_t HMC5983;
@@ -62,6 +65,9 @@ extern spi_device_handle_t W25N01;
 extern spi_device_handle_t MPU6000_1;
 extern spi_device_handle_t MPU6000_2;
 extern spi_device_handle_t PMW3901;
+
+//i2c devices handlwe
+extern i2c_master_dev_handle_t IST8310_dev_handle;
 
 //semaphores
 SemaphoreHandle_t Semaphore_to_read_mag;
@@ -88,8 +94,9 @@ static QueueHandle_t HMC5983_queue; //queue to transfer data from mag read task 
 static QueueHandle_t main_to_rc_queue; //queue to transfer data from main to rc_send task 
 static QueueHandle_t W25N01_queue;  //queue to transfer data from main to logging task
 static QueueHandle_t lidar_to_main_queue; //queue to transfer data from lidar to main
-static QueueHandle_t INA219_to_main_queue; //queue to transfer data from lidar to main
-static QueueHandle_t any_to_blinking_queue; //queue to transfer data from lidar to main
+static QueueHandle_t INA219_to_main_queue; //queue to transfer data from INA219 to main
+static QueueHandle_t any_to_blinking_queue; //queue to transfer data from any task to blinking
+static QueueHandle_t IMU_monitoring_timer_to_main_queue; //queue which is used to transfer data about any of 2 IMUs suspension (no interrupt signal at a time)
 
 //static tasks parameters 
 StaticTask_t MCP23017_monitoring_and_control_TCB_buffer;
@@ -141,7 +148,12 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
 
   uint8_t imu_1_interrupt_flag = 0;
   uint8_t imu_2_interrupt_flag = 0;
-  BaseType_t xHigherPriorityTaskWoken;  //needed for task notification
+
+  uint64_t IMU_1_timer_value = 0;
+  uint64_t IMU_2_timer_value = 0;
+
+  BaseType_t xHigherPriorityTaskWoken;
+
   xHigherPriorityTaskWoken = pdFALSE;
 
   gpio_intr_status_1 = READ_PERI_REG(GPIO_STATUS_REG);     // Чтение регистров статуса прерывания для GPIO0-31
@@ -151,20 +163,46 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   
   //gpio_intr_status = gpio_intr_status_1 | gpio_intr_status_2;  
   
-  if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN)) {imu_1_interrupt_flag = 1; gptimer_set_raw_count(IMU_1_suspension_timer, 0);} 
-  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN)) {imu_2_interrupt_flag = 1; gptimer_set_raw_count(IMU_2_suspension_timer, 0); }
+  if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //IMU_1 routine 
+  {
+    imu_1_interrupt_flag = 1; 
+    gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
+    gptimer_set_raw_count(IMU_1_suspension_timer, 0);
+    gptimer_get_raw_count (IMU_2_suspension_timer,&IMU_2_timer_value);
+  } 
+  
+  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN))   //IMU_2 routine  
+  {
+    imu_2_interrupt_flag = 1;
+    gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
+    gptimer_get_raw_count (IMU_2_suspension_timer,&IMU_2_timer_value); 
+    gptimer_set_raw_count(IMU_2_suspension_timer, 0);
+  }
 
-  if (imu_1_interrupt_flag) {  // && imu_2_interrupt_flag
+  if (imu_1_interrupt_flag && (IMU_1_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000) && (IMU_2_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000)) //all is ok
+  {
+    //gpio_set_level(LED_GREEN,0);
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
-    
-    //vTaskNotifyGiveFromISR(task_handle_main_flying_cycle, &xHigherPriorityTaskWoken);
-    vTaskNotifyGiveFromISR(task_handle_main_flying_cycle, NULL);
+    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 14, eSetValueWithOverwrite, NULL,  &xHigherPriorityTaskWoken);
+    //gpio_set_level(LED_GREEN,1);
   }
-  //ets_printf ("%ld ",gpio_intr_status_1);
-  //ets_printf ("%ld ",gpio_intr_status_2);
-  //ets_printf ("%lld\n",gpio_intr_status);
-  portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
+
+ else if (IMU_2_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //2nd failed
+  {
+    imu_1_interrupt_flag = 0;
+    imu_2_interrupt_flag = 0;
+    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 15, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);
+  }
+
+  else if ( IMU_1_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //1st failed
+  {
+    imu_1_interrupt_flag = 0;
+    imu_2_interrupt_flag = 0;
+    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 16, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);
+  }
+
+  portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
 
 static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    //motor control emergency disable
@@ -183,12 +221,18 @@ static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    
 
 static void IRAM_ATTR IMU_1_suspension_timer_interrupt_handler(void *args)
 {
-  gpio_set_level(LED_BLUE, 0);
+  uint8_t flag = 1;
+ 
+  //gpio_set_level(LED_BLUE, 0);
+  //xQueueSendFromISR(IMU_monitoring_timer_to_main_queue, &flag, NULL);
+  
 }
 
 static void IRAM_ATTR IMU_2_suspension_timer_interrupt_handler(void *args)
 {
-  gpio_set_level(LED_GREEN, 0); 
+  uint8_t flag = 2;
+  //gpio_set_level(LED_GREEN, 0); 
+  //xQueueSendFromISR(IMU_monitoring_timer_to_main_queue, &flag, NULL);
 }
 
 //main pins configuration
@@ -465,7 +509,7 @@ static void Create_and_start_IMU_1_suspension_Timer()                    //timer
   gptimer_event_callbacks_t  IMU_1_suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
       .on_alarm = IMU_1_suspension_timer_interrupt_handler, // register user callback
   };
-  ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_1_suspension_timer, &IMU_1_suspension_timer_interrupt, NULL));
+  //ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_1_suspension_timer, &IMU_1_suspension_timer_interrupt, NULL));
 
   ESP_ERROR_CHECK(gptimer_enable(IMU_1_suspension_timer));
   ESP_ERROR_CHECK(gptimer_start(IMU_1_suspension_timer));
@@ -489,7 +533,7 @@ static void Create_and_start_IMU_2_suspension_Timer()                    //timer
   gptimer_event_callbacks_t  IMU_2_suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
       .on_alarm = IMU_2_suspension_timer_interrupt_handler, // register user callback
   };
-  ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_2_suspension_timer, &IMU_2_suspension_timer_interrupt, NULL));
+  //ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_2_suspension_timer, &IMU_2_suspension_timer_interrupt, NULL));
 
   ESP_ERROR_CHECK(gptimer_enable(IMU_2_suspension_timer));
   ESP_ERROR_CHECK(gptimer_start(IMU_2_suspension_timer));
@@ -692,10 +736,7 @@ static void error_code_LED_blinking(void * pvParameters)
   uint8_t *error_code = pvParameters;
   while(1) 
   {
-    gpio_set_level(LED_RED, 0);
-    gpio_set_level(LED_BLUE, 0);
-    gpio_set_level(LED_GREEN, 0);
-    vTaskDelay(2000/portTICK_PERIOD_MS);
+    
     gpio_set_level(LED_RED, 1);
     gpio_set_level(LED_BLUE, 1);
     gpio_set_level(LED_GREEN, 1);
@@ -710,12 +751,34 @@ static void error_code_LED_blinking(void * pvParameters)
       gpio_set_level(LED_GREEN, 1);
       vTaskDelay(250/portTICK_PERIOD_MS);
     }
-    gpio_set_level(LED_RED, 1);
-    gpio_set_level(LED_BLUE, 1);
-    gpio_set_level(LED_GREEN, 1);
-    vTaskDelay(2000/portTICK_PERIOD_MS);
   }
 }
+
+static void IST8310_read_and_process(void * pvParameters)
+{
+  uint8_t i = 0;
+  uint8_t mag_raw_values[6] = {0,0,0,0,0,0};
+  int16_t magn_data[3]= {0,0,0};    
+    
+  while(1) {
+    
+    if( xSemaphoreTake(Semaphore_to_read_mag, portMAX_DELAY ) == pdTRUE)
+    {
+      i2c_write_byte_to_address_NEW(IST8310_dev_handle, IST8310_CNTL1_REG, IST8310_CNTL1_VAL_SINGLE_MEASUREMENT_MODE);      //enabling single measurenebt mode
+      vTaskDelay(5/portTICK_PERIOD_MS);
+
+      i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 6, mag_raw_values);     //read_normal values
+      for (i = 0; i < 6; i++) printf("%d",mag_raw_values[i]);
+          magn_data[0] = mag_raw_values[0] << 8 | mag_raw_values[1]; //X
+          magn_data[1] = mag_raw_values[4] << 8 | mag_raw_values[5]; //Y
+          magn_data[2] = mag_raw_values[2] << 8 | mag_raw_values[3]; //Z
+                
+          xQueueSend(HMC5983_queue, magn_data, NULL);
+    }
+  }
+ 
+}
+
 //GPS UART processing
 static void read_and_process_data_from_gps(void * pvParameters)
 {
@@ -886,7 +949,6 @@ static void read_and_process_data_from_RC(void * pvParameters)
   uint16_t mode_old = 0;
   uint8_t LED_status = 0;
 
-  //char statbuf[512];
   remote_control_data.altitude_hold_flag = 0;
   
   ESP_LOGI(TAG_RC,"Configuring RC UART.....");
@@ -1365,6 +1427,9 @@ static void main_flying_cycle(void * pvParameters)
   
   uint8_t sensor_data_1[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
   uint8_t sensor_data_2[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+
+  uint8_t sensor_data_1_old[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+  uint8_t sensor_data_2_old[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
   
   int16_t accel_raw_1[3] = {31562,13,7613};  //0x7B4A 0x000D 0x1DBD
   int16_t gyro_raw_1[3] = {9568,28999,-31444}; //0x2560 0x7147 0x852C
@@ -1530,6 +1595,11 @@ static void main_flying_cycle(void * pvParameters)
 
   float INA219_fresh_data[4];
   uint8_t calibration_flag = 0;
+
+  uint8_t IMU_suspention_event[5] = {0,0,0,0,0};
+  uint32_t IMU_interrupt_status = 0;
+  uint8_t test_0 = 0;
+  uint8_t test_1 = 0xFF;
 
 
   void Convert_Q_to_degrees(void) {
@@ -2041,16 +2111,60 @@ ESP_LOGI(TAG_FLY,"GPIO interrupt pins configured\n");
 
 while(1) {
     
-    if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0) {  
+      IMU_interrupt_status = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+      
+      if (IMU_interrupt_status != 0) {
+      
       gpio_set_level(LED_RED, 0);
-      
-      
+
       //cycle_start_time = get_time();
       cycle_counter++;
-            
-      SPI_read_bytes(MPU6000_1, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_1, 14);
-      SPI_read_bytes(MPU6000_2, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_2, 14);
-            
+
+      if (IMU_interrupt_status == 14) //all is ok
+      {
+        SPI_read_bytes(MPU6000_1, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_1, 14);
+        SPI_read_bytes(MPU6000_2, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_2, 14);
+      }
+
+      else if (IMU_interrupt_status == 15)  //2nd failed
+      {
+        SPI_read_bytes(MPU6000_1, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_1, 14);
+        for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i];
+      }
+
+      else if (IMU_interrupt_status == 16) //1st failed
+      {
+        SPI_read_bytes(MPU6000_2, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_2, 14);
+        for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i];
+      } 
+      
+      else ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0); //motors emergency stop
+
+//testing data from sensor_1
+      for (i=0;i<14;i++) 
+      test_0 = 0;
+      test_1 = 0xFF;
+      {
+        test_0 = test_0 | sensor_data_1[i]; //bitwise operations 
+        test_1 = test_1 & sensor_data_1[i];
+      }
+      if ((test_0 == 0) || (test_1 == 0xFF)) 
+      {
+        for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i]; //if yes - replaceing with sensor 2 values
+      }
+//testing data from sensor_2
+      test_0 = 0;
+      test_1 = 0xFF;
+      for (i=0;i<14;i++) 
+      {
+        test_0 = test_0 | sensor_data_2[i]; //bitwise operations 
+        test_1 = test_1 & sensor_data_2[i];
+      }
+      if ((test_0 == 0) || (test_1 == 0xFF)) 
+      {
+        for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i]; //if yes - replaceing with sensor 2 values
+      }
+
       //mpu_temp_1 = (sensor_data_1[6] << 8) | sensor_data_1[7];
       //mpu_temp_1 = (mpu_temp_1 / 340.0) + 36.53;
       
@@ -2059,15 +2173,16 @@ while(1) {
       accel_raw_1[2] = (sensor_data_1[4] << 8) | sensor_data_1[5];           //Z
       gyro_raw_1[0] = (sensor_data_1[8] << 8) | sensor_data_1[9];            //X                  
       gyro_raw_1[1] = (sensor_data_1[10] << 8) | sensor_data_1[11];          //Y
-      gyro_raw_1[2] = (sensor_data_1[12] << 8) | sensor_data_1[13];
+      gyro_raw_1[2] = (sensor_data_1[12] << 8) | sensor_data_1[13];          //Z
       
       accel_raw_2[0] = (sensor_data_2[0] << 8) | sensor_data_2[1];           //X
       accel_raw_2[1] = (sensor_data_2[2] << 8) | sensor_data_2[3];           //Y
       accel_raw_2[2] = (sensor_data_2[4] << 8) | sensor_data_2[5];           //Z
       gyro_raw_2[0] = (sensor_data_2[8] << 8) | sensor_data_2[9];            //X                  
       gyro_raw_2[1] = (sensor_data_2[10] << 8) | sensor_data_2[11];          //Y
-      gyro_raw_2[2] = (sensor_data_2[12] << 8) | sensor_data_2[13]; 
-      
+      gyro_raw_2[2] = (sensor_data_2[12] << 8) | sensor_data_2[13];          //Z
+
+         
       if ((calibration_flag) && (cycle_counter < NUMBER_OF_IMU_CALIBRATION_COUNTS))
       { 
         Gyro_X_cal_1 += gyro_raw_1[0];
@@ -2108,7 +2223,6 @@ while(1) {
         for (i=0;i<3;i++) ESP_LOGI(TAG_INIT,"MPU#1 gyro offset value is %d",gyro_1_offset[i] );
         for (i=0;i<3;i++) ESP_LOGI(TAG_INIT,"MPU#1 accel offset value is %d",accel_1_offset[i] );
         printf("\n");
-
         
         NVS_writing_calibration_values(accel_1_offset, gyro_1_offset, accel_2_offset, gyro_2_offset);
 
@@ -2129,6 +2243,8 @@ while(1) {
    
 if (!(calibration_flag))
 {
+
+      //if(xQueueReceive(IMU_monitoring_timer_to_main_queue, IMU_suspention_event, 0)) {printf("%d", IMU_suspention_event[0]); gpio_set_level(LED_BLUE, 0);}
 
       for (i=0;i<3;i++) 
         {
@@ -2182,9 +2298,11 @@ if (!(calibration_flag))
 
         if ((large_counter % 1000) == 0) {
         
+        //ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
+        //printf ("%ld\n", IMU_interrupt_status); 
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
         //printf("%d\n", data_to_send_to_rc.power_voltage_value);
-  xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+        xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
         //printf("%0.1f, %0.1f, %0.1f\n", gyro_converted_1[1],(-1)*gyro_converted_2[0], (gyro_converted_1[1] - gyro_converted_2[0]) / 2.0 );  
         //ESP_LOGI(TAG_FLY,"%0.1f", rc_fresh_data.received_yaw);
          
@@ -2209,6 +2327,8 @@ if (!(calibration_flag))
           //ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
         //printf("%0.1f\n", rc_pitch_filtered);
         }
+
+        //if (large_counter == 3000) ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
 
         
         if (xQueueReceive(remote_control_to_main_queue, &rc_fresh_data, 0)) 
@@ -2321,7 +2441,9 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0)) {
 #endif
         //cycle_end_time = get_time();
         //if ((cycle_end_time - cycle_start_time) > 800) ESP_LOGW(TAG_FLY,"%lld", (cycle_end_time - cycle_start_time));
-        gpio_set_level(LED_RED, 1);
+      gpio_set_level(LED_RED, 1);
+
+      IMU_interrupt_status = 0;
         
         ESP_ERROR_CHECK(gptimer_set_raw_count(general_suspension_timer, 0));    //resetting general_suspension timer at this point
       }
@@ -2357,6 +2479,10 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Configuring internal i2c.....");
   i2c_init_internal(I2C_INT_SDA, I2C_INT_SCL, I2C_INT_PORT);
   ESP_LOGI(TAG_INIT,"internal i2c is configured\n");
+
+  ESP_LOGI(TAG_INIT,"Configuring external i2c.....");
+  i2c_init_external(I2C_EXT_SDA, I2C_EXT_SCL, I2C_EXT_PORT);
+  ESP_LOGI(TAG_INIT,"external i2c is configured\n");
 
   ESP_LOGI(TAG_INIT,"Checking communication with MCP23017.....");
  if (MCP23017_communication_check() != ESP_OK) {
@@ -2429,7 +2555,8 @@ static void init(void * pvParameters)
 
   if (!(MCP23017_get_inputs_state() & 0b00001000))  //DI3 - checking engines
     { 
-      ESP_LOGI(TAG_INIT,"Starting engines test .....");
+      ESP_LOGI(TAG_INIT,"Starting engines test.....");
+      printf ("%d", MCP23017_get_inputs_state() );
       vTaskDelay(2000/portTICK_PERIOD_MS);
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY * 1.5));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
@@ -2459,7 +2586,7 @@ static void init(void * pvParameters)
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_PWM_MIN_DUTY));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
       
-      ESP_LOGI(TAG_INIT,"Calibrating engines is finished. Please remove jumper and reset the vehicle.");
+      ESP_LOGI(TAG_INIT,"Engines test is finished. Please remove jumper and reset the vehicle.");
 
       while (1) 
       {
@@ -2602,6 +2729,7 @@ static void init(void * pvParameters)
     else ESP_LOGI(TAG_INIT,"Queue for PCA9685 created\n");
 
 #ifdef USING_MAG_DATA
+
   ESP_LOGI(TAG_INIT,"checking communication with HMC5983L.....");
   if (HMC5983L_SPI_communication_check () != ESP_OK) {
     error_code = 12;
@@ -2637,14 +2765,31 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Creating semaphore to start mag data reading.....");
   Semaphore_to_read_mag = xSemaphoreCreateBinary();
   if (Semaphore_to_read_mag == NULL) {
-    ESP_LOGE(TAG_INIT,"qSemaphore_to_read_mag could not be created\n");
+    ESP_LOGE(TAG_INIT,"Semaphore_to_read_mag could not be created\n");
     error_code = 1;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
   else ESP_LOGI(TAG_INIT,"Semaphore to read mag data created\n");
 #endif 
- 
+
+#ifdef USING_MAG_DATA_IST8310
+  ESP_LOGI(TAG_INIT,"checking communication with IST8310.....");
+    if (IST8310_communication_check() != ESP_OK) {
+      error_code = 12;
+      xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+      while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}  
+    }
+    
+    ESP_LOGI(TAG_INIT,"running IST8310 self test.....");
+
+    if (IST8310_selftest() != ESP_OK) {
+      error_code = 13;
+      xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+      while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+    }
+
+#endif
   ESP_LOGI(TAG_INIT,"Creating queue to send data from remote control to main task");
   remote_control_to_main_queue = xQueueCreate(10, sizeof(struct data_from_rc_to_main_struct));
   if (remote_control_to_main_queue == NULL) {
@@ -2704,11 +2849,21 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-    else ESP_LOGI(TAG_INIT,"any_to_blinking_queue created\n"); 
+    else ESP_LOGI(TAG_INIT,"any_to_blinking_queue is created\n"); 
 
   ESP_LOGI(TAG_INIT,"creating and starting GP timer.....");
   Create_and_start_GP_Timer ();
   ESP_LOGI(TAG_INIT,"GP timer created and started\n");
+
+  ESP_LOGI(TAG_INIT,"Creating queue to monitor IMU suspention.....");
+  IMU_monitoring_timer_to_main_queue = xQueueCreate(2, sizeof(uint8_t));
+  if (IMU_monitoring_timer_to_main_queue == NULL) {
+    ESP_LOGE(TAG_INIT,"IMU_monitoring_timer_to_main_queue could not be created\n");
+    error_code = 1;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+    else ESP_LOGI(TAG_INIT,"IMU_monitoring_timer_to_main_queue is created\n"); 
 /*
   ESP_LOGI(TAG_INIT,"creating and starting test timer.....");
   Create_and_start_test_timer();
