@@ -8,12 +8,12 @@
 #define IST8310_WAI_REG 0x0
 #define IST8310_DEVICE_ID 0x10
 
-#define IST8310_OUTPUT_X_L_REG 0x3
-#define IST8310_OUTPUT_X_H_REG 0x4
-#define IST8310_OUTPUT_Y_L_REG 0x5
-#define IST8310_OUTPUT_Y_H_REG 0x6
-#define IST8310_OUTPUT_Z_L_REG 0x7
-#define IST8310_OUTPUT_Z_H_REG 0x8
+#define IST8310_OUTPUT_X_L_REG 0x03
+#define IST8310_OUTPUT_X_H_REG 0x04
+#define IST8310_OUTPUT_Y_L_REG 0x05
+#define IST8310_OUTPUT_Y_H_REG 0x06
+#define IST8310_OUTPUT_Z_L_REG 0x07
+#define IST8310_OUTPUT_Z_H_REG 0x08
 
 #define IST8310_CNTL1_REG 0x0A
 #define IST8310_CNTL1_VAL_SINGLE_MEASUREMENT_MODE 0x01
@@ -46,6 +46,10 @@
 
 esp_err_t IST8310_selftest();
 esp_err_t IST8310_communication_check();
+esp_err_t IST8310_configuration();
+void IST8310_request_data();
+void IST8310_read_data(uint8_t *buffer);
+
 
 
 /*

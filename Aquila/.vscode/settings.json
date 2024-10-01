@@ -114,10 +114,11 @@
     "string.h": "c",
     "mpu6000.h": "c",
     "format": "c",
-    "iomanip": "c"
+    "iomanip": "c",
+    "ist8310.h": "c"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM19",
+  "idf.portWin": "COM10",
   "idf.adapterTargetName": "esp32s3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"

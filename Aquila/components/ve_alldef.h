@@ -2,11 +2,9 @@
 #define VE_ALLDEFS_H
 
 //#define USING_W25N 
-//#define USING_GPS 
-//#define USING_MAG_DATA_HMC5983
-//#define USING_MAG_DATA_IST8310
+#define USING_GPS 
+#define USING_MAG_DATA
 #define USING_LIDAR_UART
-//#define USING_TFS_I2C
 //#define USING_PERFORMANCE_MESUREMENT
 
 
@@ -21,7 +19,6 @@
 #define GP_SPI_MOSI             (39)
 #define GP_SPI_MISO             (42)
 #define GP_SPI_SCLK             (40)
-#define GPIO_CS_HMC5983         (46)
 #define GPIO_CS_W25N01          (41) 
 #define GPIO_CS_PMW3901         (7)
 #define SPI_READ_FLAG           (0x80)
@@ -32,6 +29,7 @@
 #define I2C_PCA9685_FREQ_HZ               (400000)
 #define I2C_MCP23017_FREQ_HZ              (400000)
 #define I2C_INA219_FREQ_HZ                (400000)
+#define I2C_FL3195_FREQ_HZ                (400000)
 #define I2C_INT_MASTER_TX_BUF_DISABLE     (0)                           
 #define I2C_INT_MASTER_RX_BUF_DISABLE     (0)                                           
 #define ACK_CHECK_EN                      (0x01)                       
@@ -42,10 +40,10 @@
 
 //defining external i2c pins and parameters
 
-  #define I2C_EXT_SDA                       (47) 
-  #define I2C_EXT_SCL                       (33)
+  #define I2C_EXT_SDA                       (33) 
+  #define I2C_EXT_SCL                       (47)
   #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)     
-  #define I2C_IST8310_FREQ_HZ               (400000)                      
+  #define I2C_IST8310_FREQ_HZ               (100000)                      
   #define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)                                               
   #define I2C_EXT_PORT                      (1)
 
@@ -86,17 +84,18 @@ struct data_from_main_to_rc_struct {                   //structure to pass data 
 
 //defining GPS UART pins and parameters
 #define GPS_UART                                (0)
-#define GPS_UART_BAUD_RATE                      (9600)
+#define GPS_UART_BAUD_RATE                      (38400)
 #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_GPS     (140)
 #define GPS_UART_BUF_SIZE                       (512)
-#define GPS_UART_TX_PIN                         (6) //A2
-#define GPS_UART_RX_PIN                         (5) //A1
+#define GPS_UART_TX_PIN                         (5) //A1
+#define GPS_UART_RX_PIN                         (4) //A0
 #define GPS_UART_RTS_PIN                        (UART_PIN_NO_CHANGE)
 #define GPS_UART_CTS_PIN                        (UART_PIN_NO_CHANGE)
 #define GPS_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)
 struct data_from_gps_to_main_struct {                             //structure to pass values from GPS processing task to main
     uint64_t latitude_d;
     uint64_t longtitude_d;
+    uint8_t status;
   };
 #ifdef USING_LIDAR_UART
 //defining tfsmini UART pins and parameters
@@ -136,7 +135,6 @@ struct data_from_gps_to_main_struct {                             //structure to
 #define LED_BLUE                                (0)
 #define LED_GREEN                               (3)   
 #define MCP23017_INTERRUPT_PIN                  (37)
-#define HMC5983_INTERRUPT_PIN                   (4)
 #define GREEN_FLIGHT_LIGHTS                     (8)
 #define RED_FLIGHT_LIGHTS                       (36)
 
@@ -180,15 +178,16 @@ struct data_from_gps_to_main_struct {                             //structure to
 //tasks' stack sizes
 #define MCP23017_MONITORING_AND_CONTROL_STACK_SIZE    (4096)
 #define PCA9685_CONTROL_STACK_SIZE                    (4096)
-#define HMC5983_READ_DATA_AND_SEND_TO_MAIN_STACK_SIZE (4096)
+#define MAG_READ_DATA_AND_SEND_TO_MAIN_STACK_SIZE     (4096)
 #define MAIN_FLYING_CYCLE_STACK_SIZE                  (8192)
 #define MONITORING_PINS_INTERRUPT_QUEUE_STACK_SIZE    (4096)
 #define READ_AND_PROCESS_DATA_FROM_GPS_STACK_SIZE     (4096)
 #define READ_AND_PROCESS_DATA_FROM_RC_STACK_SIZE      (4096)
 #define SEND_DATA_TO_RC_STACK_SIZE                    (4096)
 #define BLINKING_FLIGHT_LIGHTS_STACK_SIZE             (2048)
-#define read_and_process_data_from_lidar_STACK_SIZE     (4096)
-#define READ_AND_PROCESS_DATA_FROM_INA219_STACK_SIZE  (4096)  
+#define read_and_process_data_from_lidar_STACK_SIZE   (4096)
+#define READ_AND_PROCESS_DATA_FROM_INA219_STACK_SIZE  (4096) 
+#define READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE     (4096)
 
 
 

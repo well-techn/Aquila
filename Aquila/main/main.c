@@ -31,7 +31,6 @@
 #include "PCA9685.h"
 #include "VL53L1X.h"
 #include "MCP23017.h"
-#include "HMC5983.h"
 #include "ve_spi.h"
 #include "winbondW25N.h"
 #include "madgwick.h"
@@ -40,6 +39,7 @@
 #include "TfminiS.h"
 #include "INA219.h"
 #include "IST8310.h"
+#include "FL3195.h"
 
 
 //ESP32 logging labels
@@ -53,24 +53,24 @@ const char *TAG_W25N = "W25N";
 const char *TAG_MPU6000 = "MPU6000";
 const char *TAG_MCP23017 = "MCP23017";
 const char *TAG_PCA9685 = "PCA9685";
-const char *TAG_HMC5983 = "HMC5983";
 const char *TAG_LIDAR = "TFSmini";
 const char *TAG_INA219 = "INA219";
 const char *TAG_IST8310 = "IST8310";
+const char *TAG_FL3195 = "RGB_LED";
 
 
 //spi devices handles
-extern spi_device_handle_t HMC5983;
 extern spi_device_handle_t W25N01;
 extern spi_device_handle_t MPU6000_1;
 extern spi_device_handle_t MPU6000_2;
-extern spi_device_handle_t PMW3901;
+extern i2c_master_bus_handle_t i2c_internal_bus_handle;
+extern i2c_master_bus_handle_t i2c_external_bus_handle;
 
 //i2c devices handlwe
 extern i2c_master_dev_handle_t IST8310_dev_handle;
 
 //semaphores
-SemaphoreHandle_t Semaphore_to_read_mag;
+SemaphoreHandle_t semaphore_to_read_mag;
 
 //timer handles
 gptimer_handle_t GP_timer;
@@ -90,7 +90,7 @@ static QueueHandle_t remote_control_to_main_queue; //queue to transfer remote co
 static QueueHandle_t lidar_queue_for_events; //queue to handle lidar uart events (pattern detection)
 static QueueHandle_t MCP23017_queue; //queue to handle any deals with MCP23017
 static QueueHandle_t PCA9685_queue; //queue to handle any deals with PCA9685
-static QueueHandle_t HMC5983_queue; //queue to transfer data from mag read task to main flying task
+static QueueHandle_t magnetometer_queue; //queue to transfer data from mag read task to main flying task
 static QueueHandle_t main_to_rc_queue; //queue to transfer data from main to rc_send task 
 static QueueHandle_t W25N01_queue;  //queue to transfer data from main to logging task
 static QueueHandle_t lidar_to_main_queue; //queue to transfer data from lidar to main
@@ -105,8 +105,8 @@ StackType_t MCP23017_monitoring_and_control_stack[MCP23017_MONITORING_AND_CONTRO
 StaticTask_t PCA9685_control_TCB_buffer;
 StackType_t PCA9685_control_stack[PCA9685_CONTROL_STACK_SIZE];
 
-StaticTask_t HMC5983_read_data_and_send_to_main_TCB_buffer;
-StackType_t HMC5983_read_data_and_send_to_main_stack[HMC5983_READ_DATA_AND_SEND_TO_MAIN_STACK_SIZE];
+StaticTask_t read_and_process_data_from_mag_TCB_buffer;
+StackType_t read_and_process_data_from_mag_stack[READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE];
 
 StaticTask_t main_flying_cycle_TCB_buffer;
 StackType_t main_flying_cycle_stack[MAIN_FLYING_CYCLE_STACK_SIZE];
@@ -139,6 +139,7 @@ TaskHandle_t task_handle_send_data_to_RC;
 TaskHandle_t task_handle_init;
 TaskHandle_t task_handle_performace_measurement;
 TaskHandle_t task_handle_read_and_process_data_from_INA219;
+TaskHandle_t task_handle_read_and_process_data_from_mag;
 
 
 static void IRAM_ATTR gpio_interrupt_handler(void *args)
@@ -258,10 +259,6 @@ static void configure_IOs()
   gpio_set_direction(RED_FLIGHT_LIGHTS , GPIO_MODE_OUTPUT);
   gpio_set_level(RED_FLIGHT_LIGHTS, 0);
 
-  gpio_reset_pin(GPIO_CS_HMC5983);
-  gpio_set_direction(GPIO_CS_HMC5983, GPIO_MODE_OUTPUT);
-  gpio_set_pull_mode(GPIO_CS_HMC5983, GPIO_PULLUP_ENABLE);
-
   gpio_reset_pin(GPIO_CS_W25N01);
   gpio_set_direction(GPIO_CS_W25N01, GPIO_MODE_OUTPUT);
   gpio_set_pull_mode(GPIO_CS_W25N01, GPIO_PULLUP_ENABLE);
@@ -312,20 +309,10 @@ static void configure_pins_for_interrupt()
     .intr_type = GPIO_INTR_POSEDGE
   }; 
 
-  ESP_ERROR_CHECK(gpio_reset_pin(HMC5983_INTERRUPT_PIN));
-  gpio_config_t INT_4 = {
-    .pin_bit_mask = 1ULL << HMC5983_INTERRUPT_PIN,
-    .mode = GPIO_MODE_INPUT,
-    .pull_up_en = GPIO_PULLUP_DISABLE,
-    .pull_down_en = GPIO_PULLDOWN_DISABLE,
-    .intr_type = GPIO_INTR_POSEDGE
-  }; 
-
-  
   ESP_ERROR_CHECK(gpio_config(&INT_1));
   ESP_ERROR_CHECK(gpio_config(&INT_2));
   ESP_ERROR_CHECK(gpio_config(&INT_3));
-  ESP_ERROR_CHECK(gpio_config(&INT_4));
+
 
   ESP_ERROR_CHECK(gpio_isr_register(gpio_interrupt_handler, 0, 0, NULL)); 
 }
@@ -620,9 +607,6 @@ static void NVS_read_write_test(void * pvParameters)
                 ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
         }
 
-        
-
-        // Close
         nvs_close(my_handle);
     }
 }
@@ -690,44 +674,6 @@ void NVS_writing_calibration_values(int16_t accel_1_offset[], int16_t gyro_1_off
   }
 }
 
-
-
-
-
-
-
-static void read_data_from_PMW(void * pvParameters)
-{
-  uint8_t PWM_motion_data[12];
-  uint8_t PMW_motion;
-  uint8_t PMW_observation;
-  int16_t PMW_deltaX;
-  int16_t PMW_deltaY;
-  uint8_t PMW_SQUAL;
-  uint8_t PMW_Raw_Data_Sum;
-  uint8_t PMW_max_Raw_data;
-  uint8_t PMW_min_Raw_data;
-  uint8_t PMW_shutter_upper;
-  uint8_t PMW_shutter_lower;
-  uint8_t PMW_raw_image[1225];
-
-  PMW3901_read_motion_burst (PWM_motion_data);
-  PMW_motion = PWM_motion_data[0];
-  PMW_observation  = PWM_motion_data[1];
-  PMW_deltaX  = (PWM_motion_data[3] << 8) + PWM_motion_data[2];
-  PMW_deltaY = (PWM_motion_data[5] << 8) + PWM_motion_data[4];
-  PMW_SQUAL  = PWM_motion_data[6];
-  PMW_Raw_Data_Sum  = PWM_motion_data[7];
-  PMW_max_Raw_data  = PWM_motion_data[8];
-  PMW_min_Raw_data  = PWM_motion_data[9];
-  PMW_shutter_upper  = PWM_motion_data[10];
-  PMW_shutter_lower  = PWM_motion_data[11];
-
-  if ((PMW_SQUAL < 0x19) && (PMW_shutter_upper == 0x1F)) ESP_LOGW(TAG_PMW, "PMW3901 data is bad, SQUAL is 0x%02x, upper_shutter is 0x%02x",PMW_SQUAL,PMW_shutter_upper);
-  ESP_LOGI(TAG_PMW, "deltaX is %d, deltaY is %d",PMW_deltaX, PMW_deltaY);
-  ESP_LOGD(TAG_PMW, "max_raw_data is %d, min_raw_data is %d",PMW_max_Raw_data, PMW_min_Raw_data);
-}
-
 /*******************************TASKS*************************************/
 //displaying error codes at LED
 static void error_code_LED_blinking(void * pvParameters)
@@ -754,29 +700,31 @@ static void error_code_LED_blinking(void * pvParameters)
   }
 }
 
-static void IST8310_read_and_process(void * pvParameters)
+static void read_and_process_data_from_mag(void * pvParameters)
 {
   uint8_t i = 0;
   uint8_t mag_raw_values[6] = {0,0,0,0,0,0};
-  int16_t magn_data[3]= {0,0,0};    
+  int16_t magn_data[3]= {0,0,0};
+  uint16_t total_vector = 0;    
     
   while(1) {
     
-    if( xSemaphoreTake(Semaphore_to_read_mag, portMAX_DELAY ) == pdTRUE)
+    if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0)
     {
-      i2c_write_byte_to_address_NEW(IST8310_dev_handle, IST8310_CNTL1_REG, IST8310_CNTL1_VAL_SINGLE_MEASUREMENT_MODE);      //enabling single measurenebt mode
-      vTaskDelay(5/portTICK_PERIOD_MS);
+      IST8310_request_data();
+      vTaskDelay(10/portTICK_PERIOD_MS);
+      IST8310_read_data(mag_raw_values);
+  
+      magn_data[0] = mag_raw_values[1] << 8 | mag_raw_values[0]; //X
+      magn_data[1] = mag_raw_values[3] << 8 | mag_raw_values[2]; //Y
+      magn_data[2] = mag_raw_values[5] << 8 | mag_raw_values[4]; //Z
+      total_vector = sqrt(magn_data[0]*magn_data[0] + magn_data[1] * magn_data[1] + magn_data[2] * magn_data[2]);
 
-      i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 6, mag_raw_values);     //read_normal values
-      for (i = 0; i < 6; i++) printf("%d",mag_raw_values[i]);
-          magn_data[0] = mag_raw_values[0] << 8 | mag_raw_values[1]; //X
-          magn_data[1] = mag_raw_values[4] << 8 | mag_raw_values[5]; //Y
-          magn_data[2] = mag_raw_values[2] << 8 | mag_raw_values[3]; //Z
+      ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d    %d",magn_data[0],magn_data[1],magn_data[2],total_vector);
                 
-          xQueueSend(HMC5983_queue, magn_data, NULL);
+      xQueueSend(magnetometer_queue, magn_data, NULL);
     }
   }
- 
 }
 
 //GPS UART processing
@@ -799,6 +747,7 @@ static void read_and_process_data_from_gps(void * pvParameters)
   bool gps_ok = 0;
 
   struct data_from_gps_to_main_struct gps_data;
+  uint8_t gps_status_old = 0;
 
   ESP_LOGI(TAG_GPS,"Configuring GPS UART.....");
   gps_uart_config();
@@ -807,20 +756,11 @@ static void read_and_process_data_from_gps(void * pvParameters)
   while(1) {
   if(xQueueReceive(gps_queue_for_events, (void * )&gps_uart_event, (TickType_t)portMAX_DELAY))
   {
-
-//    if (toggle == 0) {gpio_set_level(LED_BLUE, 1); toggle = 1;}
-//        else {gpio_set_level(LED_BLUE, 0); toggle = 0;}
-        
     switch (gps_uart_event.type) {
             case UART_PATTERN_DET:
                 pos = uart_pattern_pop_pos(GPS_UART);
                 ESP_LOGD(TAG_GPS, "[UART PATTERN DETECTED] pos: %d", pos);
-                //if (pos == -1) {
-                //  uart_flush_input(GPS_UART); 
-                //  xQueueReset(gps_queue_for_events);
-                //  ESP_LOGW(TAG_GPS, "Pattern Queue Size too small");      
-                //               }
-                /*else*/ if (pos > 130) {
+                if (pos > 130) {
                   uart_flush_input(GPS_UART); 
                   xQueueReset(gps_queue_for_events);
                   }
@@ -848,15 +788,17 @@ static void read_and_process_data_from_gps(void * pvParameters)
                           if (incoming_message_buffer_gps[i] == '*') asteriks_place = i;
                           if (asteriks_place == 0) XOR = XOR^incoming_message_buffer_gps[i];                          //calculating XOR of the message until * is found 
                           i++;               
-                                          }
-                      ////
+                      }
+                      
                       if (incoming_message_buffer_gps[asteriks_place+1] <= 0x39) XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] & 0x0F) << 4;  //discovering if digit or letter
                       else XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] - 55) << 4;
                       if (incoming_message_buffer_gps[asteriks_place+2] <= 0x39) XOR_ch |= (incoming_message_buffer_gps[asteriks_place+2] & 0x0F);
                       else XOR_ch |= (incoming_message_buffer_gps[asteriks_place+2] - 55);
                   
                       if (XOR == XOR_ch) {
-                        if  ((incoming_message_buffer_gps[asteriks_place-1] == 'A')||(incoming_message_buffer_gps[asteriks_place-1] == 'D')) //if mode A or D
+                        //for (i=0;i<90;i++) printf("%c",incoming_message_buffer_gps[i] );
+                        //printf("\n");
+                        if  ((incoming_message_buffer_gps[asteriks_place-3] == 'A')||(incoming_message_buffer_gps[asteriks_place-3] == 'D')) //if mode A or D
                         { 
                         //Latitude, the format is ddmm.mmmmmmm
                         //Longitude, the format is dddmm.mmmmmmm
@@ -869,18 +811,27 @@ static void read_and_process_data_from_gps(void * pvParameters)
 
                         gps_data.longtitude_d = ((incoming_message_buffer_gps[coma_places[4]+4] & 0x0F)*1000000 + (incoming_message_buffer_gps[coma_places[4]+5] & 0x0F)*100000 + (incoming_message_buffer_gps[coma_places[4]+7] & 0x0F)*(long)10000 + (incoming_message_buffer_gps[coma_places[4]+8] & 0x0F)*1000 + (incoming_message_buffer_gps[coma_places[4]+9] & 0x0F)*100 + (incoming_message_buffer_gps[coma_places[4]+10] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[4]+11] & 0x0F)) *10 / 6;
                         gps_data.longtitude_d += longtitude * 10000000;
-                        //ESP_LOGI(TAG_GPS,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_data.latitude_d, gps_data.longtitude_d);
+                        ESP_LOGI(TAG_GPS,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_data.latitude_d, gps_data.longtitude_d);
+
+                        gps_data.status = 1;
 
                         xQueueSend(gps_to_main_queue, (void *) &gps_data, NULL);
 
                         for (i=1;i<67;i++) incoming_message_buffer_gps[i] = 0;
                         //uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
                         //ESP_LOGD(TAG_GPS,"High watermark %d",  uxHighWaterMark);
-                        gps_ok ^= 1;
                         }
-                        else {ESP_LOGW(TAG_GPS,"Mode mismatch"); gps_ok = 0;}
-                      } else {ESP_LOGW(TAG_GPS, "CRC mismatch"); gps_ok = 0;}
-                    } else {ESP_LOGW(TAG_GPS,"Message out of phase"); gps_ok = 0;}
+                        else {ESP_LOGW(TAG_GPS,"Mode mismatch"); gps_data.status = 0;}
+                      } else {ESP_LOGW(TAG_GPS, "CRC mismatch"); gps_data.status = 0;}
+                    } else {ESP_LOGW(TAG_GPS,"Message out of phase"); gps_data.status = 0;}
+                  
+                  if (gps_data.status != gps_status_old )
+                  {
+                    if (gps_data.status) FL3195_set_pattern(4, 0,255,0);
+                    else FL3195_set_pattern(4, 255,0,0);
+                  }
+                  gps_status_old = gps_data.status;
+                  
                   }
                 uart_flush(GPS_UART);
                 xQueueReset(gps_queue_for_events);
@@ -994,8 +945,6 @@ static void read_and_process_data_from_RC(void * pvParameters)
               received_pitch = ((incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6]);                
               received_yaw = ((incoming_message_buffer_remote[7] << 8) | incoming_message_buffer_remote[8]);
               remote_control_data.mode = ~incoming_message_buffer_remote[10];
-
-              printf ("%d\n", received_throttle);
 
               remote_control_data.received_throttle = 7836.0f + 48.97f * sqrt((double)received_throttle); //7836.0f + 81.86248443f * sqrt((double)received_throttle);
 
@@ -1308,24 +1257,6 @@ static void writing_logs_to_flash(void * pvParameters)
   }
 }
 //reading mag data and sending them to main via queue
-static void HMC5983_read_data_and_send_to_main(void * pvParameters)
-{
-    uint8_t mag_raw_value[6];
-    int16_t magn_data[3];    
-    
-  while(1) {
-    if( xSemaphoreTake(Semaphore_to_read_mag, portMAX_DELAY ) == pdTRUE)
-    {
-      HMC5983L_SPI_data_read(mag_raw_value);
-      magn_data[0] = mag_raw_value[0] << 8 | mag_raw_value[1]; //X
-      magn_data[1] = mag_raw_value[4] << 8 | mag_raw_value[5]; //Y
-      magn_data[2] = mag_raw_value[2] << 8 | mag_raw_value[3]; //Z
-            
-      xQueueSend(HMC5983_queue, magn_data, NULL);
-    }
-  }
-}
-//blinking flight lights
 static void blinking_flight_lights(void * pvParameters)
 {
   uint32_t blinking_mode = 0;
@@ -2303,6 +2234,9 @@ if (!(calibration_flag))
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
         //printf("%d\n", data_to_send_to_rc.power_voltage_value);
         xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+#ifdef USING_MAG_DATA
+        xTaskNotifyGive(task_handle_read_and_process_data_from_mag);
+#endif
         //printf("%0.1f, %0.1f, %0.1f\n", gyro_converted_1[1],(-1)*gyro_converted_2[0], (gyro_converted_1[1] - gyro_converted_2[0]) / 2.0 );  
         //ESP_LOGI(TAG_FLY,"%0.1f", rc_fresh_data.received_yaw);
          
@@ -2328,9 +2262,8 @@ if (!(calibration_flag))
         //printf("%0.1f\n", rc_pitch_filtered);
         }
 
-        //if (large_counter == 3000) ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
 
-        
+
         if (xQueueReceive(remote_control_to_main_queue, &rc_fresh_data, 0)) 
         {
           remote_control_lost_comm_counter = 0;
@@ -2349,19 +2282,13 @@ if (!(calibration_flag))
               rc_fresh_data.received_roll = 0;
               rc_fresh_data.received_yaw = 0;
               }
-            //gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
-            //gpio_set_level(RED_FLIGHT_LIGHTS, 1);
             xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
         }
 
-        if (xQueueReceive(gps_to_main_queue, &gps_fresh_data, 0)) {
+        if (xQueueReceive(gps_to_main_queue, &gps_fresh_data, 0)) 
+        {
           //ESP_LOGI(TAG_FLY,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_fresh_data.latitude_d, gps_fresh_data.longtitude_d);
-          //blink_gps = ~blink_gps;
-          //if (blink_gps == 0) command_for_MCP23017 = MCP23017_SET_OUTPUT_COMMAND | 2;
-          //  else command_for_MCP23017 = MCP23017_CLEAR_OUTPUT_COMMAND | 2;
-            
-          //xQueueSend(MCP23017_queue, &command_for_MCP23017, NULL);
-          }; 
+        }; 
  
 #ifdef USING_LIDAR_UART        
         if (xQueueReceive(lidar_to_main_queue, &lidar_fresh_data, 0)) {
@@ -2374,11 +2301,8 @@ if (!(calibration_flag))
 #endif
 
 if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0)) {
-
-
         //ESP_LOGE(TAG_FLY, "V: %0.4fV, I: %0.4fA, P: %0.4fW, A: %0.8f",INA219_fresh_data[0], INA219_fresh_data[1], INA219_fresh_data[2], INA219_fresh_data[3]);
-          
-          };
+      };
     
         if (rc_fresh_data.engines_start_flag)
         {
@@ -2457,7 +2381,7 @@ static void init(void * pvParameters)
 
   esp_log_level_set(TAG_INIT,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FLY,ESP_LOG_INFO);  //WARN ERROR
-  esp_log_level_set(TAG_GPS,ESP_LOG_INFO);  //WARN ERROR
+  esp_log_level_set(TAG_GPS,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_NVS,ESP_LOG_INFO);   //WARN ERROR
   esp_log_level_set(TAG_RC,ESP_LOG_INFO);    //WARN ERROR
   esp_log_level_set(TAG_PMW,ESP_LOG_WARN);   //WARN ERROR
@@ -2467,6 +2391,7 @@ static void init(void * pvParameters)
   esp_log_level_set(TAG_MCP23017,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_LIDAR,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
+  esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
 
   printf("\n");
   ESP_LOGI(TAG_INIT,"System starts\n");  
@@ -2485,7 +2410,7 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"external i2c is configured\n");
 
   ESP_LOGI(TAG_INIT,"Checking communication with MCP23017.....");
- if (MCP23017_communication_check() != ESP_OK) {
+  if (MCP23017_communication_check() != ESP_OK) {
     error_code = 10;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
@@ -2625,6 +2550,46 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
+#ifdef USING_MAG_DATA
+  ESP_LOGI(TAG_INIT,"Checking communicaion with FL3195.....");
+  if (FL3195_communication_check() != ESP_OK) {
+    error_code = 10;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  ESP_LOGI(TAG_INIT,"Configuring FL3195.....");
+  if (FL3195_configuration() != ESP_OK) {
+    error_code = 8;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  FL3195_set_pattern(3, 255,0,0);
+
+  ESP_LOGI(TAG_INIT,"Checking communicaion with IST8310.....");
+  if (IST8310_communication_check() != ESP_OK) {
+    error_code = 10;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  ESP_LOGI(TAG_INIT,"Configuring IST8310.....");
+    if (IST8310_configuration() != ESP_OK) {
+    error_code = 11;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+
+  ESP_LOGI(TAG_INIT,"Performing self-test of IST8310.....");
+  if (IST8310_selftest() != ESP_OK) {
+    error_code = 4;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  } 
+
+#endif
 
   ESP_LOGI(TAG_INIT,"Configuring both SPIs.....");
   SPI_init();
@@ -2729,67 +2694,29 @@ static void init(void * pvParameters)
     else ESP_LOGI(TAG_INIT,"Queue for PCA9685 created\n");
 
 #ifdef USING_MAG_DATA
-
-  ESP_LOGI(TAG_INIT,"checking communication with HMC5983L.....");
-  if (HMC5983L_SPI_communication_check () != ESP_OK) {
-    error_code = 12;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}  
-  }
   
-  ESP_LOGI(TAG_INIT,"running HMC5983L self test.....");
-
-  if (HMC5983L_SPI_selftest() != ESP_OK) {
-    error_code = 13;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  } 
-      
-  ESP_LOGI(TAG_INIT,"configuring HMC5985.....");
-  if (HMC5983L_SPI_init () != ESP_OK) {
-    error_code = 14;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-   
-  ESP_LOGI(TAG_INIT,"Creating queue to transfer mag data from HMC5983 to main.....");
-  HMC5983_queue = xQueueCreate(9, 6);       //9 values 6 bytes each (3 x 2)
-  if (HMC5983_queue == NULL) {
-    ESP_LOGE(TAG_INIT,"queue to transfer mag data from HMC5983 to main could not be created\n");
+  ESP_LOGI(TAG_INIT,"Creating queue to transfer data from magnetometer to main.....");
+  magnetometer_queue = xQueueCreate(9, 6);       //9 values 6 bytes each (3 x 2)
+  if (magnetometer_queue == NULL) {
+    ESP_LOGE(TAG_INIT,"queue to transfer data from magnetometer to main could not be created\n");
     error_code = 1;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-    else ESP_LOGI(TAG_INIT,"queue to transfer mag data from HMC5983 to main created\n");
+    else ESP_LOGI(TAG_INIT,"queue to transfer data from magnetometer to main created\n");
   
   ESP_LOGI(TAG_INIT,"Creating semaphore to start mag data reading.....");
-  Semaphore_to_read_mag = xSemaphoreCreateBinary();
-  if (Semaphore_to_read_mag == NULL) {
+  semaphore_to_read_mag = xSemaphoreCreateBinary();
+  if (semaphore_to_read_mag == NULL) {
     ESP_LOGE(TAG_INIT,"Semaphore_to_read_mag could not be created\n");
     error_code = 1;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
   else ESP_LOGI(TAG_INIT,"Semaphore to read mag data created\n");
+
 #endif 
 
-#ifdef USING_MAG_DATA_IST8310
-  ESP_LOGI(TAG_INIT,"checking communication with IST8310.....");
-    if (IST8310_communication_check() != ESP_OK) {
-      error_code = 12;
-      xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-      while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}  
-    }
-    
-    ESP_LOGI(TAG_INIT,"running IST8310 self test.....");
-
-    if (IST8310_selftest() != ESP_OK) {
-      error_code = 13;
-      xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-      while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-    }
-
-#endif
   ESP_LOGI(TAG_INIT,"Creating queue to send data from remote control to main task");
   remote_control_to_main_queue = xQueueCreate(10, sizeof(struct data_from_rc_to_main_struct));
   if (remote_control_to_main_queue == NULL) {
@@ -2904,6 +2831,15 @@ static void init(void * pvParameters)
         if (xTaskCreateStaticPinnedToCore(read_and_process_data_from_gps, "read_and_process_data_from_gps", READ_AND_PROCESS_DATA_FROM_GPS_STACK_SIZE, NULL, 3, read_and_process_data_from_gps_stack, &read_and_process_data_from_gps_TCB_buffer, 0) != NULL)
           ESP_LOGI(TAG_INIT,"read_and_process_data_from_GPS task is created at core 0");
 #endif        
+        vTaskDelay(50/portTICK_PERIOD_MS);
+
+#ifdef USING_MAG_DATA               
+        ESP_LOGI(TAG_INIT,"Creating read_and_process_data_from_magnetometer task.....");
+        task_handle_read_and_process_data_from_mag = xTaskCreateStaticPinnedToCore(read_and_process_data_from_mag, "read_and_process_data_from_mag", READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE, NULL, 3, read_and_process_data_from_mag_stack, &read_and_process_data_from_mag_TCB_buffer, 0);
+        if (task_handle_read_and_process_data_from_mag != NULL)
+          ESP_LOGI(TAG_INIT,"read_and_process_data_from_mag task is created at core 0");
+#endif        
+        
         vTaskDelay(50/portTICK_PERIOD_MS);
          
         ESP_LOGI(TAG_INIT,"Creating read_and_process_data_from_RC task.....");

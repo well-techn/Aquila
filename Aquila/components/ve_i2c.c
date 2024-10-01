@@ -5,6 +5,7 @@
 #include "MCP23017.h"
 #include "INA219.h"
 #include "IST8310.h"
+#include "FL3195.h"
 
 i2c_master_bus_handle_t i2c_internal_bus_handle;
 i2c_master_bus_handle_t i2c_external_bus_handle;
@@ -13,6 +14,7 @@ i2c_master_dev_handle_t PCA9685_dev_handle;
 i2c_master_dev_handle_t MCP23017_dev_handle;
 i2c_master_dev_handle_t INA219_dev_handle;
 i2c_master_dev_handle_t IST8310_dev_handle;
+i2c_master_dev_handle_t FL3195_dev_handle;
 
 
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
@@ -47,7 +49,6 @@ void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
     .scl_speed_hz = I2C_INA219_FREQ_HZ,
     };
 
-
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &PCA9685_dev_config, &PCA9685_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &MCP23017_dev_config, &MCP23017_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &INA219_dev_config, &INA219_dev_handle));
@@ -65,15 +66,21 @@ void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
     .flags.enable_internal_pullup = true,
   };
 
-  ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_configuration, &i2c_external_bus_handle));
+   ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_configuration, &i2c_external_bus_handle));
 
-  i2c_device_config_t IST8310_dev_config = {
+    i2c_device_config_t FL3195_dev_config = {
+    .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+    .device_address = FL3195_ADDR,
+    .scl_speed_hz = I2C_FL3195_FREQ_HZ,
+    };
+
+    i2c_device_config_t IST8310_dev_config = {
     .dev_addr_length = I2C_ADDR_BIT_LEN_7,
     .device_address = IST8310_ADDR,
     .scl_speed_hz = I2C_IST8310_FREQ_HZ,
     };
 
-    
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_external_bus_handle, &FL3195_dev_config, &FL3195_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_external_bus_handle, &IST8310_dev_config, &IST8310_dev_handle));
 }
 
@@ -147,6 +154,15 @@ uint16_t i2c_read_2_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint
 void i2c_read_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t read_start_address, uint8_t number_of_bytes_to_read, uint8_t* where_to_put_to)
 { 
     i2c_master_transmit_receive(i2c_dev, &read_start_address, 1, where_to_put_to, number_of_bytes_to_read, 0);
+}
+
+
+void checking_address_at_the_bus(i2c_master_bus_handle_t bus_handle, uint8_t device_address)
+{
+    esp_err_t ret = ESP_FAIL;
+    ret = i2c_master_probe(bus_handle, device_address, -1);
+    if (ret == ESP_OK) printf ("device with address 0x%02x is discovered\n", device_address);
+    else printf ("device with address 0x%02x is not discovered\n", device_address);
 }
 /*
 esp_err_t i2c_write_byte_to_address(uint8_t i2c_port, uint8_t device_address, uint8_t reg_address, uint8_t data_to_write)

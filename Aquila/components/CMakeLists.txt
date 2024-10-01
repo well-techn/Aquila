@@ -12,6 +12,7 @@ idf_component_register(SRCS
 #"TfminiS.c"
 "INA219.c"
 "IST8310.c"
+"FL3195.c"
 
 INCLUDE_DIRS "." "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/i2c/include/" "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/spi/include/"
 "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/gpio/include/" "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/uart/include/")
