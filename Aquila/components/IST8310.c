@@ -106,3 +106,8 @@ void IST8310_read_data(uint8_t *buffer)
   i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 6, buffer);
 }
 
+void IST8310_read_all_data(uint8_t *buffer)
+{
+  i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 24, buffer);
+}
+

@@ -43,13 +43,13 @@
   #define I2C_EXT_SDA                       (33) 
   #define I2C_EXT_SCL                       (47)
   #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)     
-  #define I2C_IST8310_FREQ_HZ               (100000)                      
+  #define I2C_IST8310_FREQ_HZ               (400000)                      
   #define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)                                               
   #define I2C_EXT_PORT                      (1)
 
 //defining remote control UART pins and parameters
 #define REMOTE_CONTROL_UART                           (2)
-#define RC_UART_BAUD_RATE                             (57600)
+#define RC_UART_BAUD_RATE                             (57600) 
 #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC            (13)
 #define NUMBER_OF_BYTES_TO_SEND_TO_RC                 (15)
 #define RC_UART_BUFF_SIZE                             (512)
@@ -100,7 +100,7 @@ struct data_from_gps_to_main_struct {                             //structure to
 #ifdef USING_LIDAR_UART
 //defining tfsmini UART pins and parameters
   #define LIDAR_UART                                (1)
-  #define LIDAR_UART_BAUD_RATE                      (115200)
+  #define LIDAR_UART_BAUD_RATE                      (9600)    //115200
   #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR     (140)
   #define LIDAR_UART_BUF_SIZE                       (256)
   #define LIDAR_UART_TX_PIN                         (43) 

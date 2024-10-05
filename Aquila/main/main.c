@@ -703,9 +703,19 @@ static void error_code_LED_blinking(void * pvParameters)
 static void read_and_process_data_from_mag(void * pvParameters)
 {
   uint8_t i = 0;
-  uint8_t mag_raw_values[6] = {0,0,0,0,0,0};
+  //uint8_t mag_raw_values[6] = {0,0,0,0,0,0};
+  uint8_t mag_raw_values[24];
   int16_t magn_data[3]= {0,0,0};
-  uint16_t total_vector = 0;    
+  //uint16_t total_vector = 0;   
+  char M[22] = "-100,200,4";
+  float A_inv[3][3] = {{1.008855, -0.001238,  -0.02848 },
+                       {-0.001238,  1.052124,   0.045491},
+                       {-0.02848,  0.045491,   1.063718}};
+  float hard_bias[3] = {-137.331066, 35.718311, 79.163463};
+  float magn_wo_hb[3] = {0,0,0};
+  float magn_data_calibrated[3] = {0,0,0};
+  int16_t y11,y12,y13,y21,y22,y23,y31,y32,y33;
+  //float heading = 0;
     
   while(1) {
     
@@ -718,11 +728,45 @@ static void read_and_process_data_from_mag(void * pvParameters)
       magn_data[0] = mag_raw_values[1] << 8 | mag_raw_values[0]; //X
       magn_data[1] = mag_raw_values[3] << 8 | mag_raw_values[2]; //Y
       magn_data[2] = mag_raw_values[5] << 8 | mag_raw_values[4]; //Z
-      total_vector = sqrt(magn_data[0]*magn_data[0] + magn_data[1] * magn_data[1] + magn_data[2] * magn_data[2]);
+      y11 = mag_raw_values[7] << 8 | mag_raw_values[6];
+      y12 = mag_raw_values[9] << 8 | mag_raw_values[8];
+      y13 = mag_raw_values[11] << 8 | mag_raw_values[10];
+      y21 = mag_raw_values[13] << 8 | mag_raw_values[12];
+      y22 = mag_raw_values[15] << 8 | mag_raw_values[14];
+      y23 = mag_raw_values[17] << 8 | mag_raw_values[16];
+      y31 = mag_raw_values[19] << 8 | mag_raw_values[18];
+      y32 = mag_raw_values[21] << 8 | mag_raw_values[20];
+      y33 = mag_raw_values[23] << 8 | mag_raw_values[22];
 
-      ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d    %d",magn_data[0],magn_data[1],magn_data[2],total_vector);
-                
-      xQueueSend(magnetometer_queue, magn_data, NULL);
+      printf ("%d,%d,%d\n",y11,y12,y13);
+      printf ("%d,%d,%d\n",y21,y22,y23);
+      printf ("%d,%d,%d\n",y31,y32,y33);
+      printf("\n");
+
+
+      //total_vector = sqrt(magn_data[0]*magn_data[0] + magn_data[1] * magn_data[1] + magn_data[2] * magn_data[2]);
+     
+      //ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d    %d",magn_data[0],magn_data[1],magn_data[2],total_vector);
+      //printf ("%d,%d,%d\n",magn_data[0],magn_data[1],magn_data[2]);
+
+      for (i=0;i<3;i++) magn_wo_hb[i] = (float)magn_data[i] - hard_bias[i];
+      //printf ("%0.4f,%0.4f,%0.4f\n",magn_wo_hb[0], magn_wo_hb[1], magn_wo_hb[2]);
+
+      magn_data_calibrated[0] = A_inv[0][0]*magn_wo_hb[0] + A_inv[0][1]*magn_wo_hb[1] + A_inv[0][2]*magn_wo_hb[2];
+      magn_data_calibrated[1] = A_inv[1][0]*magn_wo_hb[0] + A_inv[1][1]*magn_wo_hb[1] + A_inv[1][2]*magn_wo_hb[2];
+      magn_data_calibrated[2] = A_inv[2][0]*magn_wo_hb[0] + A_inv[2][1]*magn_wo_hb[1] + A_inv[2][2]*magn_wo_hb[2];
+
+      ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d",(int16_t)magn_data_calibrated[0],(int16_t)magn_data_calibrated[1],(int16_t)magn_data_calibrated[2]);
+      //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_calibrated[0], magn_data_calibrated[1], magn_data_calibrated[2]);
+      //heading = atan2(magn_data_calibrated[1],magn_data_calibrated[0]) * (180/PI);
+      //heading -=90.0;
+      //if (heading<0) heading+=360.0;
+      //printf ("%d\n",(int16_t) heading);
+      //uart_write_bytes(REMOTE_CONTROL_UART, magn_data, NUMBER_OF_BYTES_TO_SEND_TO_RC);
+      //length = sprintf(M,"%i,%i,%i\n",magn_data[0],magn_data[1],magn_data[2]);
+      //uart_write_bytes(LIDAR_UART, M, length);
+                   
+      xQueueSend(magnetometer_queue, magn_data_calibrated, NULL);
     }
   }
 }
@@ -1526,6 +1570,7 @@ static void main_flying_cycle(void * pvParameters)
 
   float INA219_fresh_data[4];
   uint8_t calibration_flag = 0;
+  float mag_fresh_data[3];
 
   uint8_t IMU_suspention_event[5] = {0,0,0,0,0};
   uint32_t IMU_interrupt_status = 0;
@@ -2201,8 +2246,6 @@ if (!(calibration_flag))
           ESP_ERROR_CHECK(gptimer_get_raw_count(GP_timer, &timer_value));
           ESP_ERROR_CHECK(gptimer_set_raw_count(GP_timer, 0));
 
-
-
           MadgwickAHRSupdateIMU((gyro_converted_accumulated_1[1] - gyro_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO) , 
                                 (gyro_converted_accumulated_1[0] + gyro_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO) ,
                                 ((gyro_converted_accumulated_1[2] * (-1.0)) - gyro_converted_accumulated_2[2]) / (2.0 * PID_LOOPS_RATIO) , 
@@ -2233,7 +2276,7 @@ if (!(calibration_flag))
         //printf ("%ld\n", IMU_interrupt_status); 
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
         //printf("%d\n", data_to_send_to_rc.power_voltage_value);
-        xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+        //xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
 #ifdef USING_MAG_DATA
         xTaskNotifyGive(task_handle_read_and_process_data_from_mag);
 #endif
@@ -2303,9 +2346,16 @@ if (!(calibration_flag))
 if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0)) {
         //ESP_LOGE(TAG_FLY, "V: %0.4fV, I: %0.4fA, P: %0.4fW, A: %0.8f",INA219_fresh_data[0], INA219_fresh_data[1], INA219_fresh_data[2], INA219_fresh_data[3]);
       };
+
+#ifdef USING_MAG_DATA
+if (xQueueReceive(magnetometer_queue, mag_fresh_data, 0)) {
+        //ESP_LOGW(TAG_FLY,"Mag values are %d, %d, %d",(int16_t)mag_fresh_data[0],(int16_t)mag_fresh_data[1],(int16_t)mag_fresh_data[2]);
+      };
+#endif
     
         if (rc_fresh_data.engines_start_flag)
         {
+#ifdef USING_LIDAR_UART
         if ((rc_fresh_data.altitude_hold_flag) && (lidar_fresh_data.height < 900)) 
           {
             if (altitude_hold_mode_enabled == 0)
@@ -2332,7 +2382,7 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0)) {
             altitude_hold_mode_enabled = 0; 
             previous_error_altitude = 0;
           }
-
+#endif
         calculate_pids_2();
         }
         else 
@@ -2391,7 +2441,7 @@ static void init(void * pvParameters)
   esp_log_level_set(TAG_MCP23017,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_LIDAR,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
-  esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
+  esp_log_level_set(TAG_IST8310,ESP_LOG_WARN);  //WARN ERROR
 
   printf("\n");
   ESP_LOGI(TAG_INIT,"System starts\n");  
@@ -2696,7 +2746,7 @@ static void init(void * pvParameters)
 #ifdef USING_MAG_DATA
   
   ESP_LOGI(TAG_INIT,"Creating queue to transfer data from magnetometer to main.....");
-  magnetometer_queue = xQueueCreate(9, 6);       //9 values 6 bytes each (3 x 2)
+  magnetometer_queue = xQueueCreate(9, 3 * sizeof(float));       //9 values 6 bytes each (3 x 2)
   if (magnetometer_queue == NULL) {
     ESP_LOGE(TAG_INIT,"queue to transfer data from magnetometer to main could not be created\n");
     error_code = 1;
