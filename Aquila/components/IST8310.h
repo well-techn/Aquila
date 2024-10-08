@@ -40,6 +40,8 @@
 
 #define IST8310_SELF_TEST_REG 0x0C
 
+#define IST8310_CROSS_AXIS_REG 0x9C
+
 
 
 #define IST8310_SAMPLING_PERIOD_USEC (10 * AP_USEC_PER_MSEC)
@@ -48,7 +50,9 @@ esp_err_t IST8310_selftest();
 esp_err_t IST8310_communication_check();
 esp_err_t IST8310_configuration();
 void IST8310_request_data();
-void IST8310_read_data(uint8_t *buffer);
+esp_err_t IST8310_read_data(uint8_t *buffer);
+esp_err_t IST8310_read_cross_axis_data();
+
 
 
 

@@ -127,6 +127,65 @@ void HMC5983L_SPI_data_read(uint8_t *buffer)
       SPI_read_bytes(HMC5983, 0, 0, 8, HMC5983_OUT_X_MSB | HMC5983_AUTOINC_FLAG | SPI_READ_FLAG, 0, buffer, 6);
 }
 
+
+
+/*
+
+esp_err_t HMC5883_I2C_communication_check()
+{
+  esp_err_t err = ESP_FAIL;
+
+  err = i2c_master_probe(i2c_internal_bus_handle, HMC5883L_I2C_ADDR, -1);
+  if (err == ESP_OK)  ESP_LOGI(TAG_HMC5883_I2C,"HMC5883 is online");
+  else ESP_LOGE(TAG_HMC5883_I2C,"HMC5883 is offline\n");
+
+  return err;
+}
+
+esp_err_t HMC5883_I2C_configuration()
+{
+  esp_err_t err = ESP_OK;
+  uint8_t i = 0;
+  uint16_t settings = HMC5883_I2C_CONFIG_BRNG_16V |
+                  HMC5883_I2C_CONFIG_GAIN_8_320MV |
+                  HMC5883_I2C_CONFIG_BADC_12BIT |
+                  HMC5883_I2C_CONFIG_SADC_12BIT_1S_532US |
+                  HMC5883_I2C_CONFIG_MODE_SANDBVOLT_CONTINUOUS;
+
+
+                                              //4096
+  uint8_t HMC5883_I2C_configuration_data[3][2] = {{HMC5983_CONF_A, 0b11111100}, // 0b11111100 config A register - temp sensor enabled, 8 samples averaging, sample rate = 220Hz, no bias
+                                                  {HMC5983_CONF_B, 0b00100000}, // config B register - +-1.3 Gauss
+                                                  {HMC5983_MODE,   0b00000000}};   //MSB goes first, 16V, PGA/4, 
+
+  for (i=0;i<2;i++) { i2c_write_2_bytes_to_address_NEW(HMC5883_I2C_dev_handle, HMC5883_I2C_configuration_data[i][0], HMC5883_I2C_configuration_data[i][1], HMC5883_I2C_configuration_data[i][2]);  //pointer to 2D massive
+                      ets_delay_us(100);
+                    }
+  
+  for (i=0;i<2;i++) 
+    { 
+      if ((i2c_read_2_bytes_from_address_NEW(HMC5883_I2C_dev_handle, HMC5883_I2C_configuration_data[i][0])) != ((HMC5883_I2C_configuration_data[i][1] << 8) + HMC5883_I2C_configuration_data[i][2])) 
+      {  
+        err = ESP_FAIL;
+        ESP_LOGE(TAG_HMC5883_I2C,"HMC5883_I2C configuration failed at register %x",HMC5883_I2C_configuration_data[i][0]);
+      }
+    }
+  
+  if (err == ESP_OK) ESP_LOGI(TAG_HMC5883_I2C,"HMC5883_I2C is configured\n");
+    else  ESP_LOGE(TAG_HMC5883_I2C,"HMC5883_I2C configuration failed\n");
+
+  return err;
+}
+
+esp_err_t IST8310_read_data(uint8_t *buffer)
+{
+  return i2c_read_bytes_from_address_NEW(HMC5883_I2C_dev_handle, HMC5983_OUT_X_MSB, 6, buffer);
+}
+*/
+
+
+
+
 /*
 if ((cycle_counter > (int)number_of_calibration_counts) && (cycle_counter < (int)(number_of_calibration_counts + number_of_magnetometer_calibration_reads)))  {
     for (i=0;i<3;i++) {

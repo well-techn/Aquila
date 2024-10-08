@@ -100,7 +100,7 @@ struct data_from_gps_to_main_struct {                             //structure to
 #ifdef USING_LIDAR_UART
 //defining tfsmini UART pins and parameters
   #define LIDAR_UART                                (1)
-  #define LIDAR_UART_BAUD_RATE                      (9600)    //115200
+  #define LIDAR_UART_BAUD_RATE                      (115200)    //115200
   #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR     (140)
   #define LIDAR_UART_BUF_SIZE                       (256)
   #define LIDAR_UART_TX_PIN                         (43) 
@@ -145,7 +145,7 @@ struct data_from_gps_to_main_struct {                             //structure to
 #define MCP23017_CLEAR_OUTPUT_COMMAND           (0b00100000)
 
 //defining madgwick and general math parameters
-#define SMPL                                    (0)                //sample rate = 1000Hz/ 1+SMPL
+#define SMPL                                    (0)                //IMU sample rate = 1000Hz/ 1+SMPL
 #define PI                                      (3.1415926536)
 #ifdef USING_MAG_DATA                                      
   #define MADGWICK_ITERATIONS                   (1)
@@ -166,14 +166,14 @@ struct data_from_gps_to_main_struct {                             //structure to
 #else
   #define NUMBER_OF_MAGNETOMETER_CALIBRATION_COUNTS         (1)
 #endif
-#define PID_LOOPS_RATIO                         (4)                       //relation between internal fast rate loop and external angle loop
+#define PID_LOOPS_RATIO                         (5)                       //relation between internal fast rate loop and external angle loop
 
 
-//ADC
-#define A0                                      (ADC_CHANNEL_3)
-#define A1                                      (ADC_CHANNEL_4)
-#define A2                                      (ADC_CHANNEL_5)
-#define A3                                      (ADC_CHANNEL_6)
+
+#define A0                                      (4)
+#define A1                                      (5)
+#define A2                                      (6)
+#define A3                                      (7)
 
 //tasks' stack sizes
 #define MCP23017_MONITORING_AND_CONTROL_STACK_SIZE    (4096)

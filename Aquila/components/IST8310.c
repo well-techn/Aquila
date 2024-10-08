@@ -101,13 +101,35 @@ void IST8310_request_data()
   i2c_write_byte_to_address_NEW(IST8310_dev_handle, IST8310_CNTL1_REG, IST8310_CNTL1_VAL_SINGLE_MEASUREMENT_MODE);      //enabling single measurenebt mode
 }
 
-void IST8310_read_data(uint8_t *buffer)
+esp_err_t IST8310_read_data(uint8_t *buffer)
 {
-  i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 6, buffer);
+  return i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 6, buffer);
 }
 
-void IST8310_read_all_data(uint8_t *buffer)
+esp_err_t IST8310_read_cross_axis_data()
 {
-  i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 24, buffer);
+  esp_err_t ret = ESP_FAIL;
+  uint8_t cross_axis_raw_values[18];              //cross axis coefficient, to be read once from new chip
+  int16_t Y_matrix[3][3] = {{0,  0,  0},    
+                            {0,  0,  0},
+                            {0,  0,  0}};
+  
+    ret = i2c_read_bytes_from_address_NEW(IST8310_dev_handle, IST8310_CROSS_AXIS_REG, 18, cross_axis_raw_values);
+
+    Y_matrix[1][1] = cross_axis_raw_values[1] << 8 | cross_axis_raw_values[0];
+    Y_matrix[1][2] = cross_axis_raw_values[3] << 8 | cross_axis_raw_values[2];
+    Y_matrix[1][3] = cross_axis_raw_values[5] << 8 | cross_axis_raw_values[4];
+    Y_matrix[2][1] = cross_axis_raw_values[7] << 8 | cross_axis_raw_values[6];
+    Y_matrix[2][2] = cross_axis_raw_values[9] << 8 | cross_axis_raw_values[8];
+    Y_matrix[2][3] = cross_axis_raw_values[11] << 8 | cross_axis_raw_values[10];
+    Y_matrix[3][1] = cross_axis_raw_values[13] << 8 | cross_axis_raw_values[12];
+    Y_matrix[3][2] = cross_axis_raw_values[15] << 8 | cross_axis_raw_values[14];
+    Y_matrix[3][3] = cross_axis_raw_values[17] << 8 | cross_axis_raw_values[16];
+
+    ESP_LOGW(TAG_IST8310,"%d,%d,%d",Y_matrix[1][1],Y_matrix[2][1],Y_matrix[3][1]);
+    ESP_LOGW(TAG_IST8310,"%d,%d,%d",Y_matrix[1][2],Y_matrix[2][2],Y_matrix[3][2]);
+    ESP_LOGW(TAG_IST8310,"%d,%d,%d",Y_matrix[1][3],Y_matrix[2][3],Y_matrix[3][3]);
+
+    return ret;    
 }
 

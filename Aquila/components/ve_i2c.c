@@ -151,9 +151,9 @@ uint16_t i2c_read_2_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint
     return result;
 }
 
-void i2c_read_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t read_start_address, uint8_t number_of_bytes_to_read, uint8_t* where_to_put_to)
+esp_err_t i2c_read_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t read_start_address, uint8_t number_of_bytes_to_read, uint8_t* where_to_put_to)
 { 
-    i2c_master_transmit_receive(i2c_dev, &read_start_address, 1, where_to_put_to, number_of_bytes_to_read, 0);
+    return i2c_master_transmit_receive(i2c_dev, &read_start_address, 1, where_to_put_to, number_of_bytes_to_read, 0);
 }
 
 

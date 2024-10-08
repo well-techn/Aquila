@@ -21,7 +21,7 @@ esp_err_t i2c_write_2_bytes_to_address_NEW(i2c_master_dev_handle_t i2c_dev, uint
 esp_err_t i2c_write_bytes_to_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address, uint8_t number_of_bytes, uint8_t *data_to_write);
 uint8_t i2c_read_byte_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address);
 uint16_t i2c_read_2_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address);
-void i2c_read_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t read_start_address, uint8_t number_of_bytes_to_read, uint8_t* where_to_put_to);
+esp_err_t i2c_read_bytes_from_address_NEW(i2c_master_dev_handle_t i2c_dev, uint8_t read_start_address, uint8_t number_of_bytes_to_read, uint8_t* where_to_put_to);
 void checking_address_at_the_bus(i2c_master_bus_handle_t bus_handle, uint8_t device_address);
 
 #endif

@@ -25,6 +25,8 @@ Address Location	Name 		Access
 0x32	Temperature Output LSB Register Read
 */
 
+#define HMC5883L_I2C_ADDR 0x1E 
+
 #define HMC5983_CONF_A		0x00
 #define HMC5983_CONF_B		0x01
 #define HMC5983_MODE		0x02

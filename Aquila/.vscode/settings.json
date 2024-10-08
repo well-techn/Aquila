@@ -118,7 +118,7 @@
     "ist8310.h": "c"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM10",
+  "idf.portWin": "COM16",
   "idf.adapterTargetName": "esp32s3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"

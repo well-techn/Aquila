@@ -180,6 +180,14 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gptimer_set_raw_count(IMU_2_suspension_timer, 0);
   }
 
+  if (gpio_intr_status_1 & (1ULL << A2))   //fail safe switch
+  {
+    ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
+    gpio_set_level(LED_GREEN,0);
+    gpio_set_level(LED_BLUE,0);
+   
+  } 
+
   if (imu_1_interrupt_flag && (IMU_1_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000) && (IMU_2_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000)) //all is ok
   {
     //gpio_set_level(LED_GREEN,0);
@@ -277,7 +285,8 @@ static void configure_IOs()
 
   gpio_reset_pin(GP_SPI_MOSI);
   gpio_set_direction(GP_SPI_MOSI, GPIO_MODE_OUTPUT);
-  gpio_set_pull_mode(GP_SPI_MOSI, GPIO_PULLUP_ENABLE);   
+  gpio_set_pull_mode(GP_SPI_MOSI, GPIO_PULLUP_ENABLE);
+    
 }
 //IO interrupts configuration
 static void configure_pins_for_interrupt()
@@ -307,11 +316,21 @@ static void configure_pins_for_interrupt()
     .pull_up_en = GPIO_PULLUP_DISABLE,
     .pull_down_en = GPIO_PULLDOWN_ENABLE,
     .intr_type = GPIO_INTR_POSEDGE
-  }; 
+  };
+
+  ESP_ERROR_CHECK(gpio_reset_pin(A2));
+  gpio_config_t INT_4 = {
+    .pin_bit_mask = 1ULL << A2,
+    .mode = GPIO_MODE_INPUT,
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLDOWN_ENABLE,
+    .intr_type = GPIO_INTR_POSEDGE
+  };  
 
   ESP_ERROR_CHECK(gpio_config(&INT_1));
   ESP_ERROR_CHECK(gpio_config(&INT_2));
   ESP_ERROR_CHECK(gpio_config(&INT_3));
+  ESP_ERROR_CHECK(gpio_config(&INT_4));
 
 
   ESP_ERROR_CHECK(gpio_isr_register(gpio_interrupt_handler, 0, 0, NULL)); 
@@ -399,6 +418,7 @@ static uint8_t dallas_crc8(uint8_t *input_data, unsigned int size)
   return crc;
 }
 //ADC
+/*
 static void configure_ADC(void) 
 {
   adc_oneshot_unit_init_cfg_t init_config1 = {
@@ -413,7 +433,7 @@ static void configure_ADC(void)
   };
   ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, A3, &config_ADC_channel));
 }
-
+*/
 static uint16_t read_ADC(adc_channel_t channel) 
 {
   static uint16_t adc_raw;
@@ -703,20 +723,21 @@ static void error_code_LED_blinking(void * pvParameters)
 static void read_and_process_data_from_mag(void * pvParameters)
 {
   uint8_t i = 0;
-  //uint8_t mag_raw_values[6] = {0,0,0,0,0,0};
-  uint8_t mag_raw_values[24];
+  float cross_axis[3][3] = {{0.9800471,  -0.0310357,   -0.0148492},    //calculated manually based on received once frmo new chip values
+                            {0.0304362,   1.0342328,   -0.0004612},
+                            {-0.0374089,  0.0419651,    1.0106678}};
+  uint8_t mag_raw_values[6] = {0,0,0,0,0,0}; 
   int16_t magn_data[3]= {0,0,0};
-  //uint16_t total_vector = 0;   
-  char M[22] = "-100,200,4";
-  float A_inv[3][3] = {{1.008855, -0.001238,  -0.02848 },
-                       {-0.001238,  1.052124,   0.045491},
-                       {-0.02848,  0.045491,   1.063718}};
-  float hard_bias[3] = {-137.331066, 35.718311, 79.163463};
+  float magn_data_axis_corrected[3]= {0,0,0};
+  float A_inv[3][3] = {{1.037165, 0.014685,    0.008656},    //calibration values with Magneto 1.2
+                       {0.014685,  1.050965,   0.005259},
+                       {0.008656,  0.005259,   1.134274}};
+  float hard_bias[3] = {-51.629844, 14.082741, -103.028427};   //calibration values with Magneto 1.2
   float magn_wo_hb[3] = {0,0,0};
   float magn_data_calibrated[3] = {0,0,0};
-  int16_t y11,y12,y13,y21,y22,y23,y31,y32,y33;
-  //float heading = 0;
-    
+
+  
+  
   while(1) {
     
     if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0)
@@ -728,36 +749,24 @@ static void read_and_process_data_from_mag(void * pvParameters)
       magn_data[0] = mag_raw_values[1] << 8 | mag_raw_values[0]; //X
       magn_data[1] = mag_raw_values[3] << 8 | mag_raw_values[2]; //Y
       magn_data[2] = mag_raw_values[5] << 8 | mag_raw_values[4]; //Z
-      y11 = mag_raw_values[7] << 8 | mag_raw_values[6];
-      y12 = mag_raw_values[9] << 8 | mag_raw_values[8];
-      y13 = mag_raw_values[11] << 8 | mag_raw_values[10];
-      y21 = mag_raw_values[13] << 8 | mag_raw_values[12];
-      y22 = mag_raw_values[15] << 8 | mag_raw_values[14];
-      y23 = mag_raw_values[17] << 8 | mag_raw_values[16];
-      y31 = mag_raw_values[19] << 8 | mag_raw_values[18];
-      y32 = mag_raw_values[21] << 8 | mag_raw_values[20];
-      y33 = mag_raw_values[23] << 8 | mag_raw_values[22];
+      //printf ("%d,%d,%d\n",magn_data[0], magn_data[1], magn_data[2]);
 
-      printf ("%d,%d,%d\n",y11,y12,y13);
-      printf ("%d,%d,%d\n",y21,y22,y23);
-      printf ("%d,%d,%d\n",y31,y32,y33);
-      printf("\n");
+      magn_data_axis_corrected[0] = cross_axis[0][0]*magn_data[0] + cross_axis[0][1]*magn_data[1] + cross_axis[0][2]*magn_data[2];
+      magn_data_axis_corrected[1] = cross_axis[1][0]*magn_data[0] + cross_axis[1][1]*magn_data[1] + cross_axis[1][2]*magn_data[2];
+      magn_data_axis_corrected[2] = cross_axis[2][0]*magn_data[0] + cross_axis[2][1]*magn_data[1] + cross_axis[2][2]*magn_data[2];
+    //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_axis_corrected[0], magn_data_axis_corrected[1], magn_data_axis_corrected[2]);
 
 
-      //total_vector = sqrt(magn_data[0]*magn_data[0] + magn_data[1] * magn_data[1] + magn_data[2] * magn_data[2]);
-     
-      //ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d    %d",magn_data[0],magn_data[1],magn_data[2],total_vector);
-      //printf ("%d,%d,%d\n",magn_data[0],magn_data[1],magn_data[2]);
-
-      for (i=0;i<3;i++) magn_wo_hb[i] = (float)magn_data[i] - hard_bias[i];
+      for (i=0;i<3;i++) magn_wo_hb[i] = (float)magn_data_axis_corrected[i] - hard_bias[i];
       //printf ("%0.4f,%0.4f,%0.4f\n",magn_wo_hb[0], magn_wo_hb[1], magn_wo_hb[2]);
 
       magn_data_calibrated[0] = A_inv[0][0]*magn_wo_hb[0] + A_inv[0][1]*magn_wo_hb[1] + A_inv[0][2]*magn_wo_hb[2];
       magn_data_calibrated[1] = A_inv[1][0]*magn_wo_hb[0] + A_inv[1][1]*magn_wo_hb[1] + A_inv[1][2]*magn_wo_hb[2];
       magn_data_calibrated[2] = A_inv[2][0]*magn_wo_hb[0] + A_inv[2][1]*magn_wo_hb[1] + A_inv[2][2]*magn_wo_hb[2];
 
-      ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d",(int16_t)magn_data_calibrated[0],(int16_t)magn_data_calibrated[1],(int16_t)magn_data_calibrated[2]);
-      //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_calibrated[0], magn_data_calibrated[1], magn_data_calibrated[2]);
+      //ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d, %0.2f",(int16_t)magn_data_calibrated[0],(int16_t)magn_data_calibrated[1],(int16_t)magn_data_calibrated[2], 
+      //sqrt(magn_data_calibrated[0]*magn_data_calibrated[0] + magn_data_calibrated[1]*magn_data_calibrated[1] + magn_data_calibrated[2]*magn_data_calibrated[2]));
+      //printf ("%0.2f,%0.2f,%0.2f,%0.2f\n",magn_data_calibrated[0], magn_data_calibrated[1], magn_data_calibrated[2], sqrt(magn_data_calibrated[0]*magn_data_calibrated[0] + magn_data_calibrated[1]*magn_data_calibrated[1] + magn_data_calibrated[2]*magn_data_calibrated[2]));
       //heading = atan2(magn_data_calibrated[1],magn_data_calibrated[0]) * (180/PI);
       //heading -=90.0;
       //if (heading<0) heading+=360.0;
@@ -1171,9 +1180,9 @@ static void read_and_process_data_from_lidar(void * pvParameters)
                 pos = uart_pattern_pop_pos(LIDAR_UART);
                 ESP_LOGD(TAG_LIDAR, "[UART PATTERN DETECTED] pos: %d", pos);
                     int read_len = uart_read_bytes(LIDAR_UART, incoming_message_buffer_lidar, pos+9, portMAX_DELAY);
-                    ESP_LOGD(TAG_LIDAR, "Received in total %d bytes", read_len);
+                    ESP_LOGI(TAG_LIDAR, "Received in total %d bytes", read_len);
                     xQueueReset(lidar_queue_for_events);
-                    uart_flush(LIDAR_UART); 
+                    uart_flush_input(LIDAR_UART); 
                     //for (i=0; i<read_len; i++) printf ("%02x", incoming_message_buffer_lidar[i]);
                     //printf("\n");
                     j = 0;
@@ -1597,8 +1606,11 @@ static void main_flying_cycle(void * pvParameters)
     if (roll > 90) roll -= 360.0;
     yaw   *= 57.29577951;             //yaw   *= 180.0 / (float)PI;
     //yaw   -= 9.4; // Declination at Moscow Russia 29.01.2019               9.4 for Smolensk
-    yaw   +=180.0;    //making [0..360] from [-180..180]
+    //yaw   +=180.0;    //making [0..360] from [-180..180]
     //if (yaw < 0) yaw   += 360.0;     
+
+
+
   }
 
   void calculate_pids_2(void) {
@@ -2049,11 +2061,7 @@ void NVS_reading_calibration_values(void)
 
  
 
-if (!(MCP23017_get_inputs_state() & 0b00010000))  //DI4 - IMUs calibration
-{
-  calibration_flag = 1;
-  ESP_LOGI(TAG_FLY,"Jumper #4 is set, starting IMUs calibration .....");
-  }
+if (!(MCP23017_get_inputs_state() & 0b00010000))  calibration_flag = 1; //DI4 - IMUs calibration
   
 else 
 {
@@ -2082,7 +2090,7 @@ ESP_LOGI(TAG_FLY,"Activating interrupts at IMUs and MCP pins.....");
 configure_pins_for_interrupt();
 ESP_LOGI(TAG_FLY,"GPIO interrupt pins configured\n");
 
-
+if (calibration_flag) ESP_LOGI(TAG_INIT,"Jumper DI4 is set, starting IMU calibration....");
    
 
 while(1) {
@@ -2158,7 +2166,7 @@ while(1) {
       gyro_raw_2[1] = (sensor_data_2[10] << 8) | sensor_data_2[11];          //Y
       gyro_raw_2[2] = (sensor_data_2[12] << 8) | sensor_data_2[13];          //Z
 
-         
+          
       if ((calibration_flag) && (cycle_counter < NUMBER_OF_IMU_CALIBRATION_COUNTS))
       { 
         Gyro_X_cal_1 += gyro_raw_1[0];
@@ -2246,13 +2254,28 @@ if (!(calibration_flag))
           ESP_ERROR_CHECK(gptimer_get_raw_count(GP_timer, &timer_value));
           ESP_ERROR_CHECK(gptimer_set_raw_count(GP_timer, 0));
 
+#ifdef USING_MAG_DATA
+
+        MadgwickAHRSupdate((gyro_converted_accumulated_1[1] - gyro_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO), 
+                              (gyro_converted_accumulated_1[0] + gyro_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO), 
+                              ((gyro_converted_accumulated_1[2] * (-1.0)) - gyro_converted_accumulated_2[2]) / (2.0 * PID_LOOPS_RATIO), 
+                              (accel_converted_accumulated_1[1] - accel_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO), 
+                              (accel_converted_accumulated_1[0] + accel_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO), 
+                              ((accel_converted_accumulated_1[2] * (-1.0)) - accel_converted_accumulated_2[2]) / (2.0 * PID_LOOPS_RATIO), 
+                              mag_fresh_data[1],            
+                              mag_fresh_data[0],            
+                              mag_fresh_data[2],   
+                              timer_value);
+#else
           MadgwickAHRSupdateIMU((gyro_converted_accumulated_1[1] - gyro_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO) , 
                                 (gyro_converted_accumulated_1[0] + gyro_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO) ,
                                 ((gyro_converted_accumulated_1[2] * (-1.0)) - gyro_converted_accumulated_2[2]) / (2.0 * PID_LOOPS_RATIO) , 
                                 (accel_converted_accumulated_1[1] - accel_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO) , 
                                 (accel_converted_accumulated_1[0] + accel_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO) ,
                                 ((accel_converted_accumulated_1[2] * (-1.0)) - accel_converted_accumulated_2[2]) / (2.0 * PID_LOOPS_RATIO), 
-                                timer_value);   
+                                timer_value);
+#endif
+             
         
         }
         
@@ -2270,16 +2293,17 @@ if (!(calibration_flag))
 //***********************************************************************************************************************************************************        
         large_counter++;
 
-        if ((large_counter % 1000) == 0) {
+#ifdef USING_MAG_DATA
+        if ((large_counter % PID_LOOPS_RATIO) == 0) xTaskNotifyGive(task_handle_read_and_process_data_from_mag);
+#endif
+        //if ((large_counter % 200) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", pitch, roll, yaw);
         
         //ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
         //printf ("%ld\n", IMU_interrupt_status); 
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
         //printf("%d\n", data_to_send_to_rc.power_voltage_value);
-        //xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
-#ifdef USING_MAG_DATA
-        xTaskNotifyGive(task_handle_read_and_process_data_from_mag);
-#endif
+//        xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+
         //printf("%0.1f, %0.1f, %0.1f\n", gyro_converted_1[1],(-1)*gyro_converted_2[0], (gyro_converted_1[1] - gyro_converted_2[0]) / 2.0 );  
         //ESP_LOGI(TAG_FLY,"%0.1f", rc_fresh_data.received_yaw);
          
@@ -2287,7 +2311,7 @@ if (!(calibration_flag))
           //ESP_LOGI(TAG_FLY,"fil are %0.2f, %0.2f, %0.2f, %0.2f", engine_filtered[0],engine_filtered[1],engine_filtered[2],engine_filtered[3]);
           //ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f, %0.2f", ((((gyro_converted_1[2] * (-1.0)) - gyro_converted_2[2]) / 2.0) * (180.0 / (float)PI)), rc_fresh_data.received_yaw, error_yaw_rate, pid_yaw_rate);
           //ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", rc_fresh_data.received_pitch, rc_fresh_data.received_roll, rc_fresh_data.received_yaw);
-          //ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", pitch, roll, yaw);
+          
 /*        
           blink = ~blink;
           if (blink == 0) {
@@ -2303,7 +2327,7 @@ if (!(calibration_flag))
         //uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
           //ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
         //printf("%0.1f\n", rc_pitch_filtered);
-        }
+       
 
 
 
@@ -2335,7 +2359,7 @@ if (!(calibration_flag))
  
 #ifdef USING_LIDAR_UART        
         if (xQueueReceive(lidar_to_main_queue, &lidar_fresh_data, 0)) {
-          //ESP_LOGD(TAG_FLY,"height is %d, strength is %d", lidar_fresh_data.height, lidar_fresh_data.strength);
+          ESP_LOGD(TAG_FLY,"height is %d, strength is %d", lidar_fresh_data.height, lidar_fresh_data.strength);
           if (lidar_fresh_data.height < 900) current_altitude = lidar_fresh_data.height * cos(pitch * 0.017453292) * cos(roll * 0.017453292);// PI/180
           //printf ("raw %d, real %02f\n", lidar_fresh_data.height,current_altitude); 
           if (((current_altitude - current_altitude_old) < 5) && ((current_altitude - current_altitude_old) > -5)) current_altitude = current_altitude_old;
@@ -2431,7 +2455,7 @@ static void init(void * pvParameters)
 
   esp_log_level_set(TAG_INIT,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FLY,ESP_LOG_INFO);  //WARN ERROR
-  esp_log_level_set(TAG_GPS,ESP_LOG_WARN);  //WARN ERROR
+  esp_log_level_set(TAG_GPS,ESP_LOG_ERROR);  //WARN ERROR
   esp_log_level_set(TAG_NVS,ESP_LOG_INFO);   //WARN ERROR
   esp_log_level_set(TAG_RC,ESP_LOG_INFO);    //WARN ERROR
   esp_log_level_set(TAG_PMW,ESP_LOG_WARN);   //WARN ERROR
@@ -2441,7 +2465,7 @@ static void init(void * pvParameters)
   esp_log_level_set(TAG_MCP23017,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_LIDAR,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
-  esp_log_level_set(TAG_IST8310,ESP_LOG_WARN);  //WARN ERROR
+  esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
 
   printf("\n");
   ESP_LOGI(TAG_INIT,"System starts\n");  
@@ -2494,7 +2518,7 @@ static void init(void * pvParameters)
 
   if (!(MCP23017_get_inputs_state() & 0b00000100))  //DI2 - calibrating ESC
     { 
-      ESP_LOGI(TAG_INIT,"Calibrating ESCs.....");
+      ESP_LOGW(TAG_INIT,"Calibrating ESCs.....");
       //vTaskDelay(2000/portTICK_PERIOD_MS);
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY*2));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
@@ -2637,7 +2661,10 @@ static void init(void * pvParameters)
     error_code = 4;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  } 
+  }
+
+  ESP_LOGI(TAG_INIT,"Reading cross-axis calibration data from IST8310.....");
+  IST8310_read_cross_axis_data(); 
 
 #endif
 
@@ -2845,11 +2872,11 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"creating and starting test timer.....");
   Create_and_start_test_timer();
   ESP_LOGI(TAG_INIT,"test timer created and started\n");
-*/ 
+ 
   ESP_LOGI(TAG_INIT,"configuring ADC.....");
   configure_ADC();
   ESP_LOGI(TAG_INIT,"ADC is configured");
-
+*/
 //********************************************************************************************************************************************************* */
 
   
