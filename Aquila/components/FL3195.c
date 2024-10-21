@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include <rom/ets_sys.h>
 
+
 extern char *TAG_FL3195;
 extern i2c_master_dev_handle_t FL3195_dev_handle;
 extern i2c_master_bus_handle_t i2c_external_bus_handle;
@@ -56,15 +57,15 @@ esp_err_t FL3195_configuration()
       return err;
 }
 
-void FL3195_set_pattern(uint8_t pulse_duration, uint8_t color_red,uint8_t color_green,uint8_t color_blue)
+void FL3195_set_pattern(uint8_t pulse_length, uint8_t color_red,uint8_t color_green,uint8_t color_blue) //pulse_length 1 - fast, 5 - slow
 {
  //P1 time and cycle
-  uint8_t pulse_parameter_1 = (pulse_duration & 0x0F) | 0x10;      //T3 fall time
-  uint8_t pulse_parameter_2 = (pulse_duration & 0x0F);            //T3 fall time
+  uint8_t pulse_parameter_1 = (pulse_length & 0x0F) | 0x10;      //T3 fall time
+  uint8_t pulse_parameter_2 = (pulse_length & 0x0F);            //T3 fall time
 
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x19,0x10);                 //T1 (rise) & TS (start)
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x1A,pulse_parameter_1);    //T3 (fall) & T2 (hold)  
-  i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x1B,pulse_parameter_2);               //T4 (pause) & TP (off) 
+  i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x1B,pulse_parameter_2);    //T4 (pause) & TP (off) 
 
   //out1 color
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x10,color_red);    //RED чем больше тем ярче 
@@ -73,5 +74,6 @@ void FL3195_set_pattern(uint8_t pulse_duration, uint8_t color_red,uint8_t color_
 
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x50,0xC5);    //upload data  
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x51,0xC5);
+
 }
 

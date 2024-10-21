@@ -70,7 +70,8 @@ extern i2c_master_bus_handle_t i2c_external_bus_handle;
 extern i2c_master_dev_handle_t IST8310_dev_handle;
 
 //semaphores
-SemaphoreHandle_t semaphore_to_read_mag;
+SemaphoreHandle_t semaphore_for_i2c_external;
+StaticSemaphore_t semaphore_for_i2c_external_buffer;
 
 //timer handles
 gptimer_handle_t GP_timer;
@@ -141,7 +142,6 @@ TaskHandle_t task_handle_performace_measurement;
 TaskHandle_t task_handle_read_and_process_data_from_INA219;
 TaskHandle_t task_handle_read_and_process_data_from_mag;
 
-
 static void IRAM_ATTR gpio_interrupt_handler(void *args)
 {
   uint32_t gpio_intr_status_1 = 0;
@@ -162,7 +162,16 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   gpio_intr_status_2 = READ_PERI_REG(GPIO_STATUS1_REG);     // Чтение регистров статуса прерывания для GPIO32-39
   SET_PERI_REG_MASK(GPIO_STATUS1_W1TC_REG , gpio_intr_status_2);      // Очистка регистров прерывания для GPIO32-39 (очистка флагов, запись 1 очищает флаг)
   
-  //gpio_intr_status = gpio_intr_status_1 | gpio_intr_status_2;  
+  //gpio_intr_status = gpio_intr_status_1 | gpio_intr_status_2;
+
+  if (gpio_intr_status_1 & (1ULL << A2))   //fail safe switch, emergency stop
+  {
+    ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN ,0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN ,0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN ,0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
+  }  
   
   if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //IMU_1 routine 
   {
@@ -178,23 +187,13 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
     gptimer_get_raw_count (IMU_2_suspension_timer,&IMU_2_timer_value); 
     gptimer_set_raw_count(IMU_2_suspension_timer, 0);
-  }
-
-  if (gpio_intr_status_1 & (1ULL << A2))   //fail safe switch
-  {
-    ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
-    gpio_set_level(LED_GREEN,0);
-    gpio_set_level(LED_BLUE,0);
-   
   } 
 
   if (imu_1_interrupt_flag && (IMU_1_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000) && (IMU_2_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000)) //all is ok
   {
-    //gpio_set_level(LED_GREEN,0);
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
     xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 14, eSetValueWithOverwrite, NULL,  &xHigherPriorityTaskWoken);
-    //gpio_set_level(LED_GREEN,1);
   }
 
  else if (IMU_2_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //2nd failed
@@ -215,19 +214,14 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
 }
 
 static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    //motor control emergency disable
-{
-   
-   ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
-
-
-  //WRITE_PERI_REG((DR_REG_LEDC_BASE + 0x00),0);                    эти регистры переписываются на update_duty
-
-  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x00),4);  //LEDC_CH0_CONF0_REG
-  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x14),4);  //LEDC_CH1_CONF0_REG
-  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x28),4);  //LEDC_CH2_CONF0_REG
-  //REG_CLR_BIT((DR_REG_LEDC_BASE + 0x3C),4);  //LEDC_CH3_CONF0_REG
+{ 
+  ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN ,0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN ,0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN ,0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
 }
-
+/*
 static void IRAM_ATTR IMU_1_suspension_timer_interrupt_handler(void *args)
 {
   uint8_t flag = 1;
@@ -243,10 +237,11 @@ static void IRAM_ATTR IMU_2_suspension_timer_interrupt_handler(void *args)
   //gpio_set_level(LED_GREEN, 0); 
   //xQueueSendFromISR(IMU_monitoring_timer_to_main_queue, &flag, NULL);
 }
-
+*/
 //main pins configuration
 static void configure_IOs()
 {
+
   gpio_reset_pin(LED_RED);
   gpio_set_direction(LED_RED, GPIO_MODE_OUTPUT);
   gpio_set_level(LED_RED, 1);
@@ -373,7 +368,7 @@ static void remote_control_uart_config(void)
     ESP_ERROR_CHECK(uart_param_config(REMOTE_CONTROL_UART, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(REMOTE_CONTROL_UART, RC_UART_TX_PIN, RC_UART_RX_PIN, RC_UART_RTS_PIN, RC_UART_CTS_PIN));
 
-    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(REMOTE_CONTROL_UART, 0xFF, 1, 10, 0, 0));                 //creating pattern detection
+    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(REMOTE_CONTROL_UART, 0xFF, 1, 5, 0, 0));                 //creating pattern detection
     ESP_ERROR_CHECK(uart_pattern_queue_reset(REMOTE_CONTROL_UART, RC_UART_PATTERN_DETECTION_QUEUE_SIZE));          //allocating queue  
     uart_flush(REMOTE_CONTROL_UART);                                                                           //resetting incoming buffer  
 }
@@ -506,7 +501,7 @@ static void Create_and_start_IMU_1_suspension_Timer()                    //timer
       .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
   };
   ESP_ERROR_CHECK(gptimer_new_timer(&IMU_1_timer_config, &IMU_1_suspension_timer));
-
+/*
   gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
       .alarm_count = IMU_SUSPENSION_TIMER_DELAY_MS * 1000,   //in ms
       .reload_count = 0,
@@ -517,7 +512,7 @@ static void Create_and_start_IMU_1_suspension_Timer()                    //timer
       .on_alarm = IMU_1_suspension_timer_interrupt_handler, // register user callback
   };
   //ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_1_suspension_timer, &IMU_1_suspension_timer_interrupt, NULL));
-
+*/
   ESP_ERROR_CHECK(gptimer_enable(IMU_1_suspension_timer));
   ESP_ERROR_CHECK(gptimer_start(IMU_1_suspension_timer));
 }
@@ -530,7 +525,7 @@ static void Create_and_start_IMU_2_suspension_Timer()                    //timer
       .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
   };
   ESP_ERROR_CHECK(gptimer_new_timer(&IMU_2_timer_config, &IMU_2_suspension_timer));
-
+/*
   gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
       .alarm_count = IMU_SUSPENSION_TIMER_DELAY_MS * 1000,   //in ms
       .reload_count = 0,
@@ -541,7 +536,7 @@ static void Create_and_start_IMU_2_suspension_Timer()                    //timer
       .on_alarm = IMU_2_suspension_timer_interrupt_handler, // register user callback
   };
   //ESP_ERROR_CHECK(gptimer_register_event_callbacks(IMU_2_suspension_timer, &IMU_2_suspension_timer_interrupt, NULL));
-
+*/
   ESP_ERROR_CHECK(gptimer_enable(IMU_2_suspension_timer));
   ESP_ERROR_CHECK(gptimer_start(IMU_2_suspension_timer));
 }
@@ -694,7 +689,7 @@ void NVS_writing_calibration_values(int16_t accel_1_offset[], int16_t gyro_1_off
   }
 }
 
-/*******************************TASKS*************************************/
+/***********************************************************************TASKS**************************************************************************/
 //displaying error codes at LED
 static void error_code_LED_blinking(void * pvParameters)
 {
@@ -702,7 +697,6 @@ static void error_code_LED_blinking(void * pvParameters)
   uint8_t *error_code = pvParameters;
   while(1) 
   {
-    
     gpio_set_level(LED_RED, 1);
     gpio_set_level(LED_BLUE, 1);
     gpio_set_level(LED_GREEN, 1);
@@ -720,7 +714,7 @@ static void error_code_LED_blinking(void * pvParameters)
   }
 }
 
-static void read_and_process_data_from_mag(void * pvParameters)
+static void rread_and_process_data_from_mag(void * pvParameters)
 {
   uint8_t i = 0;
   float cross_axis[3][3] = {{0.9800471,  -0.0310357,   -0.0148492},    //calculated manually based on received once frmo new chip values
@@ -729,10 +723,12 @@ static void read_and_process_data_from_mag(void * pvParameters)
   uint8_t mag_raw_values[6] = {0,0,0,0,0,0}; 
   int16_t magn_data[3]= {0,0,0};
   float magn_data_axis_corrected[3]= {0,0,0};
-  float A_inv[3][3] = {{1.037165, 0.014685,    0.008656},    //calibration values with Magneto 1.2
-                       {0.014685,  1.050965,   0.005259},
-                       {0.008656,  0.005259,   1.134274}};
-  float hard_bias[3] = {-51.629844, 14.082741, -103.028427};   //calibration values with Magneto 1.2
+  float hard_bias[3] = {-51.782394, 18.121590, -66.742550};   //calibration values with Magneto 1.2
+  
+  float A_inv[3][3] = {{1.019563,   0.014807,   -0.010553},    //calibration values with Magneto 1.2
+                       {0.014807,   1.037489,   0.006424},
+                       {-0.010553,  0.006424,   1.111749}};
+  
   float magn_wo_hb[3] = {0,0,0};
   float magn_data_calibrated[3] = {0,0,0};
 
@@ -742,9 +738,14 @@ static void read_and_process_data_from_mag(void * pvParameters)
     
     if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0)
     {
+      
+      xSemaphoreTake (semaphore_for_i2c_external,portMAX_DELAY);
       IST8310_request_data();
-      vTaskDelay(10/portTICK_PERIOD_MS);
+      xSemaphoreGive(semaphore_for_i2c_external);
+      vTaskDelay(5/portTICK_PERIOD_MS);   //delay of 5ms as per datasheet min sampling is 200Hz 5ms
+      xSemaphoreTake (semaphore_for_i2c_external,portMAX_DELAY);
       IST8310_read_data(mag_raw_values);
+      xSemaphoreGive(semaphore_for_i2c_external);
   
       magn_data[0] = mag_raw_values[1] << 8 | mag_raw_values[0]; //X
       magn_data[1] = mag_raw_values[3] << 8 | mag_raw_values[2]; //Y
@@ -754,7 +755,7 @@ static void read_and_process_data_from_mag(void * pvParameters)
       magn_data_axis_corrected[0] = cross_axis[0][0]*magn_data[0] + cross_axis[0][1]*magn_data[1] + cross_axis[0][2]*magn_data[2];
       magn_data_axis_corrected[1] = cross_axis[1][0]*magn_data[0] + cross_axis[1][1]*magn_data[1] + cross_axis[1][2]*magn_data[2];
       magn_data_axis_corrected[2] = cross_axis[2][0]*magn_data[0] + cross_axis[2][1]*magn_data[1] + cross_axis[2][2]*magn_data[2];
-    //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_axis_corrected[0], magn_data_axis_corrected[1], magn_data_axis_corrected[2]);
+    //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_axis_corrected[0], magn_data_axis_corrected[1], magn_data_axis_corrected[2]); // for compass calibration
 
 
       for (i=0;i<3;i++) magn_wo_hb[i] = (float)magn_data_axis_corrected[i] - hard_bias[i];
@@ -774,10 +775,12 @@ static void read_and_process_data_from_mag(void * pvParameters)
       //uart_write_bytes(REMOTE_CONTROL_UART, magn_data, NUMBER_OF_BYTES_TO_SEND_TO_RC);
       //length = sprintf(M,"%i,%i,%i\n",magn_data[0],magn_data[1],magn_data[2]);
       //uart_write_bytes(LIDAR_UART, M, length);
-                   
+                 
       xQueueSend(magnetometer_queue, magn_data_calibrated, NULL);
+       
     }
   }
+  
 }
 
 //GPS UART processing
@@ -800,7 +803,7 @@ static void read_and_process_data_from_gps(void * pvParameters)
   bool gps_ok = 0;
 
   struct data_from_gps_to_main_struct gps_data;
-  uint8_t gps_status_old = 0;
+  uint8_t gps_status_old = 5;
 
   ESP_LOGI(TAG_GPS,"Configuring GPS UART.....");
   gps_uart_config();
@@ -880,8 +883,23 @@ static void read_and_process_data_from_gps(void * pvParameters)
                   
                   if (gps_data.status != gps_status_old )
                   {
-                    if (gps_data.status) FL3195_set_pattern(4, 0,255,0);
-                    else FL3195_set_pattern(4, 255,0,0);
+                    if (gps_data.status) 
+                      {
+                        if (xSemaphoreTake(semaphore_for_i2c_external, ( TickType_t ) 10) == pdTRUE)
+                        {
+                          FL3195_set_pattern(3, 0,255,0);
+                          xSemaphoreGive(semaphore_for_i2c_external);
+                        }
+                      }
+                    
+                    else 
+                    {
+                      if (xSemaphoreTake(semaphore_for_i2c_external, ( TickType_t ) 10) == pdTRUE)
+                        {
+                          FL3195_set_pattern(3, 255,0,0);
+                          xSemaphoreGive(semaphore_for_i2c_external);
+                        }
+                    }
                   }
                   gps_status_old = gps_data.status;
                   
@@ -933,9 +951,8 @@ static void read_and_process_data_from_RC(void * pvParameters)
   uint8_t remote_packets_counter = 0;
   uart_event_t remote_control_uart_event;
   uint8_t incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2];
-  uint16_t received_throttle;
+  uint16_t received_throttle = 0;
   uint16_t received_pitch = 2000;                       //neutral position
-                   //temporary variable to determine fixed angle of pitch when input signal is out of neutral range
   uint16_t received_roll = 2000;
   uint16_t received_yaw = 2000;
   short trim_roll = -1;
@@ -967,39 +984,48 @@ static void read_and_process_data_from_RC(void * pvParameters)
       {
         case UART_PATTERN_DET:
           pos = uart_pattern_pop_pos(REMOTE_CONTROL_UART);
+          //printf("P: %d\n",pos);
           //ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
-          if (pos > 30)
+          if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-1))
           {
+            //int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);
+            //for (uint8_t j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
+            //printf("\n");
             uart_flush_input(REMOTE_CONTROL_UART); 
             xQueueReset(remote_control_queue_for_events);
-            ESP_LOGW(TAG_RC, "more than 30, %d", pos);
+            ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);
+            
           }
           else 
           {
             int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);
             ESP_LOGD(TAG_RC, "Received in total %d bytes", read_len);
             //for (j=0;j<15;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
+/*            
             j = 0;
             while ((incoming_message_buffer_remote[0] != RC_MESSAGE_HEADER) && (j < read_len+1)) 
             {
               for (i=0; i<read_len; i++) incoming_message_buffer_remote[i] = incoming_message_buffer_remote[i+1];
               j++;
             }
+*/
             //for (j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
-            if (incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-2)) 
+            //printf("\n");
+            if ((incoming_message_buffer_remote[0] == RC_MESSAGE_HEADER) 
+            && (incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-2)))
             {
-              
               ESP_LOGD(TAG_RC, "CRC passed");
               uart_flush(REMOTE_CONTROL_UART);
               if (LED_status) {gpio_set_level(LED_GREEN, 0); LED_status=0;}
               else {gpio_set_level(LED_GREEN, 1);LED_status=1;}
+              
               received_throttle = (incoming_message_buffer_remote[1] << 8) | incoming_message_buffer_remote[2];
               received_roll = ((incoming_message_buffer_remote[3] << 8) | incoming_message_buffer_remote[4]);               
               received_pitch = ((incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6]);                
               received_yaw = ((incoming_message_buffer_remote[7] << 8) | incoming_message_buffer_remote[8]);
               remote_control_data.mode = ~incoming_message_buffer_remote[10];
 
-              remote_control_data.received_throttle = 7836.0f + 48.97f * sqrt((double)received_throttle); //7836.0f + 81.86248443f * sqrt((double)received_throttle);
+              remote_control_data.received_throttle = 7836.0f + 48.98f * sqrt((double)received_throttle); //7836.0f + 81.86248443f * sqrt((double)received_throttle);
 
               if ((received_pitch > 360)&&( received_pitch < 1800)) remote_control_data.received_pitch = 0.02083333f*(float)received_pitch - 37.5f;
                 else if ((received_pitch > 2245) && (received_pitch < 3741)) remote_control_data.received_pitch  = 0.02005348*(float)received_pitch - 45.020053f;
@@ -1038,7 +1064,7 @@ static void read_and_process_data_from_RC(void * pvParameters)
               else trim_roll = incoming_message_buffer_remote[9] & 0b00001111;
 
               if (incoming_message_buffer_remote[9] & 0b10000000) {                            //if pitch negative values
-                trim_pitch = (((~((incoming_message_buffer_remote[9] >> 4) & 0b00001111)) & 0b00001111)  + 1) * -1;}
+              trim_pitch = (((~((incoming_message_buffer_remote[9] >> 4) & 0b00001111)) & 0b00001111)  + 1) * -1;}
               else trim_pitch = (incoming_message_buffer_remote[9] >> 4) & 0b00001111; 
             
               if ((remote_control_data.received_throttle < 8400) && (remote_control_data.mode & 0x0001)) remote_control_data.engines_start_flag = 1;
@@ -1053,7 +1079,8 @@ static void read_and_process_data_from_RC(void * pvParameters)
               xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
               }
                 
-              xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);           
+              xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);
+              for (i=0;i<NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2;i++) incoming_message_buffer_remote[i] = 0;           
               
               mode_old = remote_control_data.mode;
 
@@ -1066,7 +1093,8 @@ static void read_and_process_data_from_RC(void * pvParameters)
             }
             else 
             { 
-              ESP_LOGW(TAG_RC, "CRC failed");       
+              ESP_LOGW(TAG_RC, "CRC failed");
+              //for (j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);       
               uart_flush(REMOTE_CONTROL_UART);
               xQueueReset(remote_control_queue_for_events);
             }
@@ -1176,7 +1204,7 @@ static void read_and_process_data_from_lidar(void * pvParameters)
   if(xQueueReceive(lidar_queue_for_events, (void * )&lidar_uart_event, (TickType_t)portMAX_DELAY))
   {
     switch (lidar_uart_event.type) {
-            case UART_PATTERN_DET:
+        case UART_PATTERN_DET:
                 pos = uart_pattern_pop_pos(LIDAR_UART);
                 ESP_LOGD(TAG_LIDAR, "[UART PATTERN DETECTED] pos: %d", pos);
                     int read_len = uart_read_bytes(LIDAR_UART, incoming_message_buffer_lidar, pos+9, portMAX_DELAY);
@@ -1199,11 +1227,11 @@ static void read_and_process_data_from_lidar(void * pvParameters)
                 xQueueReset(lidar_queue_for_events);
                 sum = 0;
                 break;
-            case UART_FIFO_OVF:
-          ESP_LOGW(TAG_LIDAR, "hw fifo overflow");
-          uart_flush_input(LIDAR_UART);
-          xQueueReset(lidar_queue_for_events);
-          break;
+        case UART_FIFO_OVF:
+              ESP_LOGW(TAG_LIDAR, "hw fifo overflow");
+              uart_flush_input(LIDAR_UART);
+              xQueueReset(lidar_queue_for_events);
+              break;
 
         case UART_BUFFER_FULL:
           ESP_LOGW(TAG_LIDAR, "ring buffer full");
@@ -1211,9 +1239,9 @@ static void read_and_process_data_from_lidar(void * pvParameters)
           xQueueReset(lidar_queue_for_events);
           break;
 
-        case UART_DATA: break;
+      case UART_DATA: break;
        
-        case UART_BREAK:
+      case UART_BREAK:
           ESP_LOGW(TAG_LIDAR, "uart rx break");
           break;
         
@@ -1344,7 +1372,7 @@ static void blinking_flight_lights(void * pvParameters)
         gpio_set_level(RED_FLIGHT_LIGHTS, 1);
         vTaskDelay(50/portTICK_PERIOD_MS);
         gpio_set_level(RED_FLIGHT_LIGHTS, 0);
-        vTaskDelay(1500/portTICK_PERIOD_MS);
+        vTaskDelay(750/portTICK_PERIOD_MS);
       } 
     }
 }
@@ -1404,10 +1432,10 @@ static void read_and_process_data_from_INA219(void * pvParameters)
 
 static void main_flying_cycle(void * pvParameters)
 {
-  extern volatile float q0;// = 34.56; //0x420A3D71
-  extern volatile float q1;// = 0.56; //0x3F0F5C29
-  extern volatile float q2;// = 0.996; //0x3F7EF9DB
-  extern volatile float q3;// = -0.001; //0xBA83126F
+  extern volatile float q0;
+  extern volatile float q1;
+  extern volatile float q2;
+  extern volatile float q3;
   
   uint8_t sensor_data_1[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
   uint8_t sensor_data_2[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
@@ -1461,6 +1489,11 @@ static void main_flying_cycle(void * pvParameters)
 
   float accel_converted_accumulated_2[3] = {0.0,0.0,0.0};
   float gyro_converted_accumulated_2[3] = {0.0,0.0,0.0};
+#ifdef USING_HOLYBRO_M9N  
+  const uint8_t madgwick_cycles = 1;
+#else 
+  const uint8_t  madgwick_cycles = 5;
+#endif
 
   static float pitch = 0; 
   static float roll = 0; 
@@ -1508,9 +1541,9 @@ static void main_flying_cycle(void * pvParameters)
   float Kd_yaw_angle = 10;
   float Ki_yaw_angle = 0.001;
   float integral_yaw_error_angle = 0;
-  float Kp_yaw_rate = 100;//24;
+  float Kp_yaw_rate = 100;
   float Ki_yaw_rate = 0.01;
-  float Kd_yaw_rate = 0;//30;
+  float Kd_yaw_rate = 0;
   float error_yaw_rate = 0;
   float error_yaw_angle = 0;
   float error_yaw_angle_old = 0;
@@ -1521,17 +1554,14 @@ static void main_flying_cycle(void * pvParameters)
   float diff_yaw_error = 0.0;
 
 
-  float engine[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY}; //00001ABE 0x00001E83 0x0000000C 0x000025D4
+  float engine[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY}; 
   float engine_filtered[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY};
   float engine_filter_pool [LENGTH_OF_ESC_FILTER][6] = {0};                                   //data pool for ESC input filter
   float accum_float;
 
   uint8_t command_for_MCP23017;
   uint16_t command_for_PCA9685;
-  uint8_t blink = 0;
-  uint8_t blink_gps = 0;
-  uint8_t blink_mag = 0;
-  uint8_t blink_rc = 0;
+  
   UBaseType_t uxHighWaterMark;
 
   struct data_from_rc_to_main_struct rc_fresh_data;
@@ -1596,20 +1626,15 @@ static void main_flying_cycle(void * pvParameters)
     a31 =   2.0f * (q0 * q1 + q2 * q3);
     a32 =   2.0f * (q1 * q3 - q0 * q2);
     a33 =   q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
-    pitch = - asin(a32);
-    roll  = atan2(a31, a33);
-    yaw   = atan2(a12, a22);
-
-    pitch *= -57.29577951;    //pitch *= (180.0 / (float)PI) * -1.0;
-    roll  *= 57.29577951;             //roll  *= 180.0 / (float)PI;
-    roll = roll + 180.0;
+    
+    pitch = asin(a32) * 57.29577951;
+    
+    roll  = atan2(a31, a33) * 57.29577951;
+    roll += 180.0;
     if (roll > 90) roll -= 360.0;
-    yaw   *= 57.29577951;             //yaw   *= 180.0 / (float)PI;
-    //yaw   -= 9.4; // Declination at Moscow Russia 29.01.2019               9.4 for Smolensk
-    //yaw   +=180.0;    //making [0..360] from [-180..180]
-    //if (yaw < 0) yaw   += 360.0;     
-
-
+    
+    yaw   = atan2(a12, a22) * 57.29577951;
+    yaw   -= 9.4; // compensation of declination if using magnetometer, if not using doesnot matter
 
   }
 
@@ -1630,14 +1655,17 @@ static void main_flying_cycle(void * pvParameters)
     gyro_pitch_old = gyro_pitch;
 
     error_pitch_rate = pid_pitch_angle - gyro_pitch;
-    //error_pitch_rate = rc_fresh_data.received_pitch - gyro_pitch;
+    //error_pitch_rate = rc_fresh_data.received_pitch - gyro_pitch;         //for inner loop setup
     integral_pitch_error_rate = integral_pitch_error_rate + Ki_pitch_rate * error_pitch_rate;
     if (integral_pitch_error_rate > 1000.0) {integral_pitch_error_rate = 1000.0; }
-    if (integral_pitch_error_rate < -1000.0) {integral_pitch_error_rate = -1000.0; }
+    if (integral_pitch_error_rate < -1000.0) {integral_pitch_error_rate = -1000.0;}
+    if (rc_fresh_data.received_throttle < 9000) integral_pitch_error_rate = 0;              //to avoid accumulation on the ground
     diff_pitch_error_rate = Kd_pitch_rate * (error_pitch_rate - error_pitch_rate_old); 
     pid_pitch_rate = Kp_pitch_rate * error_pitch_rate + integral_pitch_error_rate + diff_pitch_error_rate;
+
     if (pid_pitch_rate > 3000.0) {pid_pitch_rate = 3000.0; }
     if (pid_pitch_rate < -3000.0) {pid_pitch_rate = -3000.0;}
+    
     error_pitch_rate_old = error_pitch_rate;
 
 //outer (angle) roll cycle
@@ -1654,10 +1682,11 @@ static void main_flying_cycle(void * pvParameters)
     gyro_roll = 0.1 * (((gyro_converted_1[1] - gyro_converted_2[0]) / 2.0 ) * (180.0 / (float)PI)) + 0.9 * gyro_roll_old;
     gyro_roll_old = gyro_roll;
     error_roll_rate = pid_roll_angle - gyro_roll;
-    //error_roll_rate = rc_fresh_data.received_roll - gyro_roll;
+    //error_roll_rate = rc_fresh_data.received_roll - gyro_roll;//for inner loop setup
     integral_roll_error_rate = integral_roll_error_rate + Ki_roll_rate * error_roll_rate;
     if (integral_roll_error_rate > 1000.0) integral_roll_error_rate = 1000.0; 
     if (integral_roll_error_rate < -1000.0) integral_roll_error_rate = -1000.0;
+    if (rc_fresh_data.received_throttle < 9000) integral_roll_error_rate = 0;              //to avoid accumulation on the ground
     diff_roll_error_rate = Kd_roll_rate * (error_roll_rate - error_roll_rate_old); 
     pid_roll_rate = Kp_roll_rate * error_roll_rate + integral_roll_error_rate + diff_roll_error_rate;
     if (pid_roll_rate > 3000.0) pid_roll_rate = 3000.0;
@@ -1681,19 +1710,20 @@ static void main_flying_cycle(void * pvParameters)
     if (pid_yaw_angle < -1000.0) pid_yaw_angle = -1000.0;
     error_yaw_angle_old = error_yaw_angle;
    
-//inner yaw cycle (rate only)  
+//inner yaw cycle
     error_yaw_rate = pid_yaw_angle - ((((gyro_converted_1[2] * (-1.0)) - gyro_converted_2[2]) / 2.0) * (180.0 / (float)PI));
-    //error_yaw_rate = rc_fresh_data.received_yaw - ((((gyro_converted_1[2] * (-1.0)) - gyro_converted_2[2]) / 2.0) * (180.0 / (float)PI));
+    //error_yaw_rate = rc_fresh_data.received_yaw - ((((gyro_converted_1[2] * (-1.0)) - gyro_converted_2[2]) / 2.0) * (180.0 / (float)PI)); //for inner loop setup
     integral_yaw_error_rate = integral_yaw_error_rate + Ki_yaw_rate * error_yaw_rate;
     if (integral_yaw_error_rate > 1000.0) integral_yaw_error_rate = 1000.0; 
     if (integral_yaw_error_rate < -1000.0) integral_yaw_error_rate = -1000.0;
+    if (rc_fresh_data.received_throttle < 9000) integral_yaw_error_rate = 0;              //to avoid accumulation on the ground
     diff_yaw_error = Kd_yaw_rate * (error_yaw_rate - error_yaw_rate_old); 
     pid_yaw_rate = Kp_yaw_rate * error_yaw_rate + integral_yaw_error_rate + diff_yaw_error;
     if (pid_yaw_rate > 3000.0) pid_yaw_rate = 3000.0;
     if (pid_yaw_rate < -3000.0) pid_yaw_rate = -3000.0;
     error_yaw_rate_old = error_yaw_rate;
 
-    engine[0] = rc_fresh_data.received_throttle + pid_pitch_rate + pid_roll_rate - pid_yaw_rate;
+    engine[0] = rc_fresh_data.received_throttle + pid_pitch_rate + pid_roll_rate- pid_yaw_rate;
     engine[1] = rc_fresh_data.received_throttle + pid_pitch_rate - pid_roll_rate + pid_yaw_rate;
     engine[2] = rc_fresh_data.received_throttle - pid_pitch_rate - pid_roll_rate - pid_yaw_rate;
     engine[3] = rc_fresh_data.received_throttle - pid_pitch_rate + pid_roll_rate + pid_yaw_rate;
@@ -1749,7 +1779,7 @@ static void main_flying_cycle(void * pvParameters)
     ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
   }
 
-  void prepare_logs(void) {
+void prepare_logs(void) {
     p_to_uint8 = &timestamp;
     logs_buffer[0] = *p_to_uint8;
     logs_buffer[1] = *(p_to_uint8+1);
@@ -2237,9 +2267,6 @@ if (!(calibration_flag))
 
           accel_converted_2[i] = ((float)accel_raw_2[i] - (float)accel_2_offset[i]) / 8192.0;         // in G    8192
           gyro_converted_2[i]  = (((float)gyro_raw_2[i] - (float)gyro_2_offset[i]) / 131.0) * ((float)PI / 180.0);   //in rads
-#ifdef USING_MAG_DATA
-          magnet_converted[i] = ((float)magnet_raw[i] - magnet_hard_bias[i]) * magnet_coeff[i];
-#endif
           
           accel_converted_accumulated_1[i] += accel_converted_1[i];
           gyro_converted_accumulated_1[i] += gyro_converted_1[i];
@@ -2249,12 +2276,15 @@ if (!(calibration_flag))
         
         }
 //********************************************************************************************************************************************************        
-      if ((large_counter % PID_LOOPS_RATIO) == 0) { 
-        for (i=0;i<MADGWICK_ITERATIONS;i++) {
+      if ((large_counter % PID_LOOPS_RATIO) == 0) {
+
+        for (i=0;i<madgwick_cycles;i++) {
           ESP_ERROR_CHECK(gptimer_get_raw_count(GP_timer, &timer_value));
           ESP_ERROR_CHECK(gptimer_set_raw_count(GP_timer, 0));
 
-#ifdef USING_MAG_DATA
+#ifdef USING_HOLYBRO_M9N
+        
+        xQueueReceive(magnetometer_queue, mag_fresh_data, 0);    //get fresh portion og magnetometer data
 
         MadgwickAHRSupdate((gyro_converted_accumulated_1[1] - gyro_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO), 
                               (gyro_converted_accumulated_1[0] + gyro_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO), 
@@ -2266,6 +2296,8 @@ if (!(calibration_flag))
                               mag_fresh_data[0],            
                               mag_fresh_data[2],   
                               timer_value);
+        xTaskNotifyGive(task_handle_read_and_process_data_from_mag);    //start collecting mag data again
+        
 #else
           MadgwickAHRSupdateIMU((gyro_converted_accumulated_1[1] - gyro_converted_accumulated_2[0]) / (2.0 * PID_LOOPS_RATIO) , 
                                 (gyro_converted_accumulated_1[0] + gyro_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO) ,
@@ -2293,10 +2325,9 @@ if (!(calibration_flag))
 //***********************************************************************************************************************************************************        
         large_counter++;
 
-#ifdef USING_MAG_DATA
-        if ((large_counter % PID_LOOPS_RATIO) == 0) xTaskNotifyGive(task_handle_read_and_process_data_from_mag);
-#endif
-        //if ((large_counter % 200) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", pitch, roll, yaw);
+        //if ((large_counter % 500) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", pitch, roll, yaw);
+        if ((large_counter % 1000) == 0) xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+        //if ((large_counter % 100) == 0) printf("%0.2f, %0.2f, %0.2f\n", pitch, roll, yaw);
         
         //ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
         //printf ("%ld\n", IMU_interrupt_status); 
@@ -2325,31 +2356,26 @@ if (!(calibration_flag))
           xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
 */         
         //uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-          //ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
+        //ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
         //printf("%0.1f\n", rc_pitch_filtered);
        
-
-
-
         if (xQueueReceive(remote_control_to_main_queue, &rc_fresh_data, 0)) 
         {
-          remote_control_lost_comm_counter = 0;
-          
+          remote_control_lost_comm_counter = 0; 
           xTaskNotify(task_handle_blinking_flight_lights,1,eSetValueWithOverwrite);
-          //ESP_LOGW(TAG_FLY,"RC comm restored"); 
         }
         else remote_control_lost_comm_counter++;
 
         if (remote_control_lost_comm_counter > RC_NO_COMM_DELAY_MAIN_CYCLES)  
         {
-            if (rc_fresh_data.engines_start_flag) {
-              remote_control_lost_comm_counter = RC_NO_COMM_DELAY_MAIN_CYCLES;
-              rc_fresh_data.received_throttle = RC_NO_COMM_THROTTLE_HOVER_VALUE;
-              rc_fresh_data.received_pitch = 0;
-              rc_fresh_data.received_roll = 0;
-              rc_fresh_data.received_yaw = 0;
-              }
-            xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
+          if (rc_fresh_data.engines_start_flag) {
+            remote_control_lost_comm_counter = RC_NO_COMM_DELAY_MAIN_CYCLES;
+            rc_fresh_data.received_throttle = RC_NO_COMM_THROTTLE_HOVER_VALUE;
+            rc_fresh_data.received_pitch = 0;
+            rc_fresh_data.received_roll = 0;
+            rc_fresh_data.received_yaw = 0;
+          }
+          xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
         }
 
         if (xQueueReceive(gps_to_main_queue, &gps_fresh_data, 0)) 
@@ -2370,12 +2396,6 @@ if (!(calibration_flag))
 if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0)) {
         //ESP_LOGE(TAG_FLY, "V: %0.4fV, I: %0.4fA, P: %0.4fW, A: %0.8f",INA219_fresh_data[0], INA219_fresh_data[1], INA219_fresh_data[2], INA219_fresh_data[3]);
       };
-
-#ifdef USING_MAG_DATA
-if (xQueueReceive(magnetometer_queue, mag_fresh_data, 0)) {
-        //ESP_LOGW(TAG_FLY,"Mag values are %d, %d, %d",(int16_t)mag_fresh_data[0],(int16_t)mag_fresh_data[1],(int16_t)mag_fresh_data[2]);
-      };
-#endif
     
         if (rc_fresh_data.engines_start_flag)
         {
@@ -2439,9 +2459,9 @@ if (xQueueReceive(magnetometer_queue, mag_fresh_data, 0)) {
 #endif
         //cycle_end_time = get_time();
         //if ((cycle_end_time - cycle_start_time) > 800) ESP_LOGW(TAG_FLY,"%lld", (cycle_end_time - cycle_start_time));
-      gpio_set_level(LED_RED, 1);
+        gpio_set_level(LED_RED, 1);
 
-      IMU_interrupt_status = 0;
+        IMU_interrupt_status = 0;
         
         ESP_ERROR_CHECK(gptimer_set_raw_count(general_suspension_timer, 0));    //resetting general_suspension timer at this point
       }
@@ -2466,11 +2486,11 @@ static void init(void * pvParameters)
   esp_log_level_set(TAG_LIDAR,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
+  esp_log_level_set(TAG_FL3195,ESP_LOG_WARN); 
 
   printf("\n");
   ESP_LOGI(TAG_INIT,"System starts\n");  
 
-  //NVS_read_write_test();
   ESP_LOGI(TAG_INIT,"Configuring input-output pins.....");
   configure_IOs();
   ESP_LOGI(TAG_INIT,"IO pins configured\n");
@@ -2624,7 +2644,7 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-#ifdef USING_MAG_DATA
+#ifdef USING_HOLYBRO_M9N
   ESP_LOGI(TAG_INIT,"Checking communicaion with FL3195.....");
   if (FL3195_communication_check() != ESP_OK) {
     error_code = 10;
@@ -2639,7 +2659,7 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-  FL3195_set_pattern(3, 255,0,0);
+  //FL3195_set_pattern(3, 255,0,0);
 
   ESP_LOGI(TAG_INIT,"Checking communicaion with IST8310.....");
   if (IST8310_communication_check() != ESP_OK) {
@@ -2770,7 +2790,7 @@ static void init(void * pvParameters)
   }
     else ESP_LOGI(TAG_INIT,"Queue for PCA9685 created\n");
 
-#ifdef USING_MAG_DATA
+#ifdef USING_HOLYBRO_M9N
   
   ESP_LOGI(TAG_INIT,"Creating queue to transfer data from magnetometer to main.....");
   magnetometer_queue = xQueueCreate(9, 3 * sizeof(float));       //9 values 6 bytes each (3 x 2)
@@ -2781,18 +2801,21 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
     else ESP_LOGI(TAG_INIT,"queue to transfer data from magnetometer to main created\n");
-  
-  ESP_LOGI(TAG_INIT,"Creating semaphore to start mag data reading.....");
-  semaphore_to_read_mag = xSemaphoreCreateBinary();
-  if (semaphore_to_read_mag == NULL) {
-    ESP_LOGE(TAG_INIT,"Semaphore_to_read_mag could not be created\n");
+  #endif
+
+  ESP_LOGI(TAG_INIT,"Creating semaphore to control access to i2c external bus.....");
+  semaphore_for_i2c_external = xSemaphoreCreateBinaryStatic(&semaphore_for_i2c_external_buffer);
+  if (semaphore_for_i2c_external == NULL) {
+    ESP_LOGE(TAG_INIT,"semaphore_for_i2c_external could not be created\n");
     error_code = 1;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-  else ESP_LOGI(TAG_INIT,"Semaphore to read mag data created\n");
+  else ESP_LOGI(TAG_INIT,"semaphore_for_i2c_external created\n");
 
-#endif 
+  xSemaphoreGive(semaphore_for_i2c_external);   //The semaphore is created in the 'empty' state, meaning the semaphore must first be given
+
+
 
   ESP_LOGI(TAG_INIT,"Creating queue to send data from remote control to main task");
   remote_control_to_main_queue = xQueueCreate(10, sizeof(struct data_from_rc_to_main_struct));
@@ -2903,16 +2926,15 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-  #ifdef USING_GPS                
+  #ifdef USING_HOLYBRO_M9N                
         ESP_LOGI(TAG_INIT,"Creating read_and_process_data_from_GPS task.....");
         if (xTaskCreateStaticPinnedToCore(read_and_process_data_from_gps, "read_and_process_data_from_gps", READ_AND_PROCESS_DATA_FROM_GPS_STACK_SIZE, NULL, 3, read_and_process_data_from_gps_stack, &read_and_process_data_from_gps_TCB_buffer, 0) != NULL)
           ESP_LOGI(TAG_INIT,"read_and_process_data_from_GPS task is created at core 0");
-#endif        
+
         vTaskDelay(50/portTICK_PERIOD_MS);
 
-#ifdef USING_MAG_DATA               
         ESP_LOGI(TAG_INIT,"Creating read_and_process_data_from_magnetometer task.....");
-        task_handle_read_and_process_data_from_mag = xTaskCreateStaticPinnedToCore(read_and_process_data_from_mag, "read_and_process_data_from_mag", READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE, NULL, 3, read_and_process_data_from_mag_stack, &read_and_process_data_from_mag_TCB_buffer, 0);
+        task_handle_read_and_process_data_from_mag = xTaskCreateStaticPinnedToCore(rread_and_process_data_from_mag, "rread_and_process_data_from_mag", READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE, NULL, 6, read_and_process_data_from_mag_stack, &read_and_process_data_from_mag_TCB_buffer, 0);
         if (task_handle_read_and_process_data_from_mag != NULL)
           ESP_LOGI(TAG_INIT,"read_and_process_data_from_mag task is created at core 0");
 #endif        
@@ -2955,8 +2977,8 @@ static void init(void * pvParameters)
         task_handle_blinking_flight_lights = xTaskCreateStaticPinnedToCore(blinking_flight_lights,"blinking_flight_lights",BLINKING_FLIGHT_LIGHTS_STACK_SIZE,NULL,0,blinking_flight_lights_stack, &blinking_flight_lights_TCB_buffer,0);
         if ( task_handle_blinking_flight_lights != NULL)
           ESP_LOGI(TAG_INIT,"blinking flight lights task created");
-        
-        //vTaskSuspend(task_handle_blinking_flight_lights); 
+
+         //vTaskSuspend(task_handle_blinking_flight_lights); 
         //ESP_LOGI(TAG_INIT,"blinking flight lights task is suspended until establishing communication with RC");      
 
         gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);

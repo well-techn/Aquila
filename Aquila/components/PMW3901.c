@@ -31,7 +31,7 @@ void PMW3901_write_address(uint8_t address, uint8_t value)
 {
   gpio_set_level(GPIO_CS_PMW3901,0);
   ets_delay_us(1);
-  SPI_write_byte (PMW3901, 0, NULL, 8, address | 0x80, 0, value);
+  SPI_write_byte (PMW3901, 0, 0, 8, address | 0x80, 0, value);
   ets_delay_us(1);
   gpio_set_level(GPIO_CS_PMW3901, 1);
   ets_delay_us(50);

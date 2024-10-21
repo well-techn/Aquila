@@ -61,12 +61,7 @@ if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"MCP23017 is configured\n");
 
     return err;
 }    
-/*
-uint8_t MCP23017_read_register(uint8_t reg_to_read_from)
-{
-    return i2c_read_byte_from_address(I2C_INT_PORT, MCP23017_ADDR, reg_to_read_from);
-}
-*/
+
 esp_err_t MCP23017_set_output(uint8_t * previous_output_state, uint8_t out_pin)
 {
     esp_err_t ret;

@@ -2,8 +2,7 @@
 #define VE_ALLDEFS_H
 
 //#define USING_W25N 
-#define USING_GPS 
-#define USING_MAG_DATA
+//#define USING_HOLYBRO_M9N
 #define USING_LIDAR_UART
 //#define USING_PERFORMANCE_MESUREMENT
 
@@ -29,7 +28,6 @@
 #define I2C_PCA9685_FREQ_HZ               (400000)
 #define I2C_MCP23017_FREQ_HZ              (400000)
 #define I2C_INA219_FREQ_HZ                (400000)
-#define I2C_FL3195_FREQ_HZ                (400000)
 #define I2C_INT_MASTER_TX_BUF_DISABLE     (0)                           
 #define I2C_INT_MASTER_RX_BUF_DISABLE     (0)                                           
 #define ACK_CHECK_EN                      (0x01)                       
@@ -40,12 +38,13 @@
 
 //defining external i2c pins and parameters
 
-  #define I2C_EXT_SDA                       (33) 
-  #define I2C_EXT_SCL                       (47)
-  #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)     
-  #define I2C_IST8310_FREQ_HZ               (400000)                      
-  #define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)                                               
-  #define I2C_EXT_PORT                      (1)
+#define I2C_EXT_SDA                       (33) 
+#define I2C_EXT_SCL                       (47)
+#define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)     
+#define I2C_IST8310_FREQ_HZ               (400000)
+#define I2C_FL3195_FREQ_HZ                (400000)                      
+#define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)                                               
+#define I2C_EXT_PORT                      (1)
 
 //defining remote control UART pins and parameters
 #define REMOTE_CONTROL_UART                           (2)
@@ -147,11 +146,6 @@ struct data_from_gps_to_main_struct {                             //structure to
 //defining madgwick and general math parameters
 #define SMPL                                    (0)                //IMU sample rate = 1000Hz/ 1+SMPL
 #define PI                                      (3.1415926536)
-#ifdef USING_MAG_DATA                                      
-  #define MADGWICK_ITERATIONS                   (1)
-#else
-  #define MADGWICK_ITERATIONS                   (4)//5
-#endif  
 #define MADGWICK_BETA                           (0.2) //0.999
 
 //defining logging to external flash memory parameters
@@ -188,6 +182,7 @@ struct data_from_gps_to_main_struct {                             //structure to
 #define read_and_process_data_from_lidar_STACK_SIZE   (4096)
 #define READ_AND_PROCESS_DATA_FROM_INA219_STACK_SIZE  (4096) 
 #define READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE     (4096)
+#define RGB_LED_CONTROL_STACK_SIZE                    (2048)
 
 
 
