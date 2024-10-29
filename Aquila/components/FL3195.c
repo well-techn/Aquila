@@ -15,8 +15,8 @@ esp_err_t FL3195_communication_check()
   esp_err_t err = ESP_FAIL;
 
   err = i2c_master_probe(i2c_external_bus_handle, FL3195_ADDR, -1);
-  if (err == ESP_OK)  ESP_LOGI(TAG_FL3195,"FL3195 is online");
-  else ESP_LOGE(TAG_FL3195,"FL3195 is offline\n");
+  if (err == ESP_OK)  ESP_LOGI(TAG_FL3195,"Связь с FL3195 установлена");
+  else ESP_LOGE(TAG_FL3195,"Связь с FL3195 не установлена\n");
 
   return err;
 }
@@ -42,18 +42,18 @@ esp_err_t FL3195_configuration()
       ets_delay_us(500);
     }
 
-    for (i=1; i<9; i++) //checking against predefined configuration  //except reset
+    for (i=1; i<9; i++) //checking against predefined configuration except reset
     {
       received_value = i2c_read_byte_from_address_NEW(FL3195_dev_handle, FL3195_configuration_data[i][0]);
       if (received_value != FL3195_configuration_data[i][1]) 
       {
         err = ESP_FAIL;
-        ESP_LOGE(TAG_FL3195,"FL3195 configuration failed at register %02x, returned value is %02x",FL3195_configuration_data[i][0], received_value);
+        ESP_LOGE(TAG_FL3195,"Ошибка конфигурирования FL3195 в регистре %02x, считано значение %02x",FL3195_configuration_data[i][0], received_value);
       }
     }
 
-      if (err == ESP_OK) ESP_LOGI(TAG_FL3195,"FL3195 is configured\n");
-      else  ESP_LOGE(TAG_FL3195,"FL3195 configuration failed\n");
+      if (err == ESP_OK) ESP_LOGI(TAG_FL3195,"FL3195 настроен\n");
+      else  ESP_LOGE(TAG_FL3195,"Ошибка настройки FL3195\n");
       return err;
 }
 
@@ -74,6 +74,5 @@ void FL3195_set_pattern(uint8_t pulse_length, uint8_t color_red,uint8_t color_gr
 
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x50,0xC5);    //upload data  
   i2c_write_byte_to_address_NEW(FL3195_dev_handle,0x51,0xC5);
-
 }
 

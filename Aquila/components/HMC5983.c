@@ -15,10 +15,10 @@ esp_err_t HMC5983L_SPI_communication_check()
       if (SPI_read_byte(HMC5983, 0, 0, 8, HMC5983_ID_A | SPI_READ_FLAG, 0) == 0b01001000)
       {
             err = ESP_OK;
-            ESP_LOGI(TAG_HMC5983, "HMC5985 is online");
+            ESP_LOGI(TAG_HMC5983, "Связь с HMC5985 установлена");
       }
       else
-            ESP_LOGE(TAG_HMC5983, "HMC5985 is offline\n");
+            ESP_LOGE(TAG_HMC5983, "Связь с HMC5985 не установлена\n");
       return err;
 }
 
@@ -42,14 +42,14 @@ esp_err_t HMC5983L_SPI_init()
             if (reg_value != HMC5983_configuration_data[i][1])
             {
                   err = ESP_FAIL;
-                  ESP_LOGE(TAG_HMC5983, "HMC5983 configuration failed at register %x, returned value is %d", HMC5983_configuration_data[i][0], reg_value);
+                  ESP_LOGE(TAG_HMC5983, "Ошибка конфигурирования HMC5983 в регистре %x, считано значение %d", HMC5983_configuration_data[i][0], reg_value);
             }
       }
 
       if (err == ESP_OK)
-            ESP_LOGI(TAG_HMC5983, "HMC5983 is configured\n");
+            ESP_LOGI(TAG_HMC5983, "HMC5983 настроен\n");
       else
-            ESP_LOGE(TAG_HMC5983, "HMC5983 configuration failed\n");
+            ESP_LOGE(TAG_HMC5983, "Ошибка настройки HMC5983\n");
 
       return err;
 }
@@ -114,10 +114,10 @@ esp_err_t HMC5983L_SPI_selftest()
       if (test_result != 0)
       {
             err = ESP_OK;
-            ESP_LOGI(TAG_HMC5983, "HMC5983 self-test passed");
+            ESP_LOGI(TAG_HMC5983, "Самодиагностика HMC5983 успешно пройдена");
       }
       else
-            ESP_LOGE(TAG_HMC5983, "HMC5983 self-test failed");
+            ESP_LOGE(TAG_HMC5983, "Самодиагностика HMC5983 не пройдена");
 
       return err;
 }

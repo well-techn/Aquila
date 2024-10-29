@@ -15,10 +15,10 @@ esp_err_t MPU6000_communication_check(spi_device_handle_t MPU_handle) {
 
     if ((SPI_read_byte (MPU_handle, 0, 0, 8, MPU6000_WHO_AM_I | MPU6000_READ_FLAG, 0)) == 0x68) 
     {
-        ESP_LOGI(TAG_MPU6000,"MPU6000 is online");
+        ESP_LOGI(TAG_MPU6000,"Связь с MPU6000 установлена");
         err = ESP_OK;
     }
-    else ESP_LOGE(TAG_MPU6000,"MPU6000 is offline\n");
+    else ESP_LOGE(TAG_MPU6000,"Связь с MPU6000 не установлена\n");
     
     return err;
 }     
@@ -53,8 +53,8 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
     factory_trim_values_gyro[1] = buf[1] & 0b00011111; //assembling GY trim value
     factory_trim_values_gyro[2] = buf[2] & 0b00011111; //assembling GZ trim value
 
-    ESP_LOGI(TAG_MPU6000,"Accel factory trim values are %d, %d, %d",factory_trim_values_accel[0],factory_trim_values_accel[1],factory_trim_values_accel[2]);
-    ESP_LOGI(TAG_MPU6000,"Gyro factory trim values are %d, %d, %d",factory_trim_values_gyro[0],factory_trim_values_gyro[1],factory_trim_values_gyro[2]);
+    ESP_LOGI(TAG_MPU6000,"Factory trim values для акселерометра %d, %d, %d",factory_trim_values_accel[0],factory_trim_values_accel[1],factory_trim_values_accel[2]);
+    ESP_LOGI(TAG_MPU6000,"Factory trim values для гироскопа %d, %d, %d",factory_trim_values_gyro[0],factory_trim_values_gyro[1],factory_trim_values_gyro[2]);
     
     for (i=0;i<3;i++) {
         if (factory_trim_values_accel[i] == 0) factory_trim_calculated_values_accel[i] = 0;
@@ -66,8 +66,8 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
 
     factory_trim_calculated_values_gyro[1] *= -1.0;     //as Y should be -25, not 25 as above  
     
-    ESP_LOGI(TAG_MPU6000,"Calculated accel factory trim values are %0.2f, %0.2f, %0.2f",factory_trim_calculated_values_accel[0],factory_trim_calculated_values_accel[1],factory_trim_calculated_values_accel[2]);
-    ESP_LOGI(TAG_MPU6000,"Calculated gyro factory trim values are %0.2f, %0.2f, %0.2f",factory_trim_calculated_values_gyro[0],factory_trim_calculated_values_gyro[1],factory_trim_calculated_values_gyro[2]);
+    ESP_LOGI(TAG_MPU6000,"Вычисленные значения для акселерометра %0.2f, %0.2f, %0.2f",factory_trim_calculated_values_accel[0],factory_trim_calculated_values_accel[1],factory_trim_calculated_values_accel[2]);
+    ESP_LOGI(TAG_MPU6000,"Вычисленные значения для гироскопа %0.2f, %0.2f, %0.2f",factory_trim_calculated_values_gyro[0],factory_trim_calculated_values_gyro[1],factory_trim_calculated_values_gyro[2]);
     
     //settings up minimum registers to read data (accel +-8G, gyro +-250dps)
     SPI_write_byte (MPU_handle, 0, 0, 8, MPU6000_PWR_MGMT_1, 0, 0x80);
@@ -90,8 +90,8 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
     gyro_raw[1] = (sensor_data[10] << 8) | sensor_data[11];          //Y
     gyro_raw[2] = (sensor_data[12] << 8) | sensor_data[13];          //Z  
 
-    ESP_LOGI(TAG_MPU6000,"Accel values w/o test are %d, %d, %d",accel_raw[0],accel_raw[1],accel_raw[2]);
-    ESP_LOGI(TAG_MPU6000,"Gyro values w/o test are %d, %d, %d",gyro_raw[0],gyro_raw[1],gyro_raw[2]);
+    ESP_LOGI(TAG_MPU6000,"Данные с акселерометра вне режима самодиагностики %d, %d, %d",accel_raw[0],accel_raw[1],accel_raw[2]);
+    ESP_LOGI(TAG_MPU6000,"Данные с гироскопа вне режима самодиагностики %d, %d, %d",gyro_raw[0],gyro_raw[1],gyro_raw[2]);
 
     //enabling test bits
     SPI_write_byte (MPU_handle, 0, 0, 8, MPU6000_GYRO_CONFIG, 0, 0b11100000);     //+-250dps
@@ -107,8 +107,8 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
     gyro_raw_test[1] = (sensor_data[10] << 8) | sensor_data[11];          //Y
     gyro_raw_test[2] = (sensor_data[12] << 8) | sensor_data[13];          //Z  
 
-    ESP_LOGI(TAG_MPU6000,"Accel values with test are %d, %d, %d",accel_raw_test[0],accel_raw_test[1],accel_raw_test[2]);
-    ESP_LOGI(TAG_MPU6000,"Gyro values with test are %d, %d, %d",gyro_raw_test[0],gyro_raw_test[1],gyro_raw_test[2]);
+    ESP_LOGI(TAG_MPU6000,"Данные с акселерометра в режиме самодиагностики %d, %d, %d",accel_raw_test[0],accel_raw_test[1],accel_raw_test[2]);
+    ESP_LOGI(TAG_MPU6000,"Данные с гироскопа в режиме самодиагностики %d, %d, %d",gyro_raw_test[0],gyro_raw_test[1],gyro_raw_test[2]);
 
     //calculating difference
     for (i=0;i<3;i++) {
@@ -119,12 +119,12 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
         final_value_gyro[i] =   (str_gyro[i] - factory_trim_calculated_values_gyro[i]) / factory_trim_calculated_values_gyro[i]; 
 
         if (fabs(final_value_accel[i]) > 0.14)
-            {ESP_LOGE(TAG_MPU6000,"Self test accel[%d] failed, calculated value is %0.2f but should be within [-0.14...0.14] range",i,final_value_accel[i]); err = ESP_FAIL;}
-            else ESP_LOGI(TAG_MPU6000,"Self test accel[%d] is ok, calculated value is %0.2f",i,final_value_accel[i]); 
+            {ESP_LOGE(TAG_MPU6000,"Самодиагностика акселерометра IMU[%d] не пройдена, вычисленное значение %0.2f за пределами диапазона [-0.14...0.14] range",i,final_value_accel[i]); err = ESP_FAIL;}
+            else ESP_LOGI(TAG_MPU6000,"Самодиагностика акселерометра IMU[%d] успешно пройдена, вычисленное значение %0.2f",i,final_value_accel[i]); 
 
         if ((final_value_gyro[i] > 0.14) || (final_value_gyro[i] < -0.14))
-            {ESP_LOGE(TAG_MPU6000,"Self test gyro[%d] failed, calculated value is %0.2f but should be within [-0.14...0.14] range",i,final_value_gyro[i]); err = ESP_FAIL;}
-            else ESP_LOGI(TAG_MPU6000,"Self test gyro[%d] is ok, calculated value is %0.2f",i,final_value_gyro[i]);   
+            {ESP_LOGE(TAG_MPU6000,"Самодиагностика гироскопа IMU[%d] не пройдена, вычисленное значение %0.2f за пределами диапазона [-0.14...0.14]",i,final_value_gyro[i]); err = ESP_FAIL;}
+            else ESP_LOGI(TAG_MPU6000,"Самодиагностика гироскопа IMU[%d] успешно пройдена, вычисленное значение %0.2f",i,final_value_gyro[i]);   
     }
 
     return err;
@@ -154,12 +154,12 @@ esp_err_t MPU6000_init(spi_device_handle_t MPU_handle) {
         reg_value = SPI_read_byte(MPU_handle, 0, 0, 8, MPU6000_configuration_data[i][0] | MPU6000_READ_FLAG, 0);
         if ( reg_value != MPU6000_configuration_data[i][1]) {
             err = ESP_FAIL;
-            ESP_LOGE(TAG_MPU6000,"MPU6000 configuration failed at register %x, returned value is %d",MPU6000_configuration_data[i][0], reg_value);
+            ESP_LOGE(TAG_MPU6000,"Ошибка конфигурирования MPU6000 в регистре %x, считано значение %d",MPU6000_configuration_data[i][0], reg_value);
         }
     }
 
-    if (err == ESP_OK) ESP_LOGI(TAG_MPU6000,"MPU6000 is configured\n");
-    else  ESP_LOGE(TAG_MPU6000,"MPU6000 configuration failed\n");
+    if (err == ESP_OK) ESP_LOGI(TAG_MPU6000,"MPU6000 настроен\n");
+    else  ESP_LOGE(TAG_MPU6000,"Ошибка настройки MPU6000\n");
 
     return err;
 }

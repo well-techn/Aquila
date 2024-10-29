@@ -18,6 +18,7 @@ extern char *TAG_W25N;
 void W25N_reset(void) {
   SPI_write_byte(W25N01, 0, NULL, 0, NULL, 0, W25N_RESET);
   vTaskDelay(1/portTICK_PERIOD_MS);
+  ESP_LOGI(TAG_W25N,"W25N сброшена");
 }
 
 esp_err_t W25N_read_JEDEC_ID(void) {
@@ -29,9 +30,9 @@ esp_err_t W25N_read_JEDEC_ID(void) {
   if ((buf[0] == WINBOND_MAN_ID) && (buf[1] == W25N01GV_DEV_ID_HI) && (buf[2] == W25N01GV_DEV_ID_LO)) 
   {
     err = ESP_OK;
-    ESP_LOGI(TAG_W25N,"JEDEC is OK");
+    ESP_LOGI(TAG_W25N,"Проверка JEDEC пройдена");
   } 
-  else ESP_LOGE(TAG_W25N,"JEDEC test failed, returned values are %02x, %02x, %02x\n",buf[0],buf[1],buf[2]);
+  else ESP_LOGE(TAG_W25N,"Проверка JEDEC не пройдена, считаны значения %02x, %02x, %02x\n",buf[0],buf[1],buf[2]);
   
   return err;
 }
@@ -54,12 +55,11 @@ uint8_t W25N_read_STATUS_register(void) {
 
   SPI_read_bytes (W25N01, 8, W25N_READ_STATUS_REG, 8, W25N_STAT_REG_SR3, 0, &buff, 1);
   return (buff);
-
 }
 
 void W25N_write_status_register(uint8_t status_register_address, uint8_t reg_value) {
 
-SPI_write_byte(W25N01, 8, W25N_WRITE_STATUS_REG, 8, status_register_address, 0, reg_value);
+  SPI_write_byte(W25N01, 8, W25N_WRITE_STATUS_REG, 8, status_register_address, 0, reg_value);
 }
 
 void W25N_write_enable(void) {
@@ -236,7 +236,7 @@ void W25N_read_and_print_all(void)
     }
   page_address++;
   }
-  ESP_LOGI(TAG_W25N,"Flash memory reading sucesfully completed, please remove the jumper and restart the system");
+  ESP_LOGI(TAG_W25N,"Считывание логов из внешней flash-памяти завершено, снимите джампер и перезапустите систему");
 }
 
 esp_err_t winbond_read_write_test(void)

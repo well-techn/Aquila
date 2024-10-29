@@ -14,8 +14,8 @@ esp_err_t INA219_communication_check()
   esp_err_t err = ESP_FAIL;
 
   err = i2c_master_probe(i2c_internal_bus_handle, INA219_ADDR, -1);
-  if (err == ESP_OK)  ESP_LOGI(TAG_INA219,"INA219 is online");
-  else ESP_LOGE(TAG_INA219,"INA219 is offline\n");
+  if (err == ESP_OK)  ESP_LOGI(TAG_INA219,"Связь с INA219 установлена");
+  else ESP_LOGE(TAG_INA219,"Связь с INA219 не установлена\n");
 
   return err;
 }
@@ -44,12 +44,12 @@ esp_err_t INA219_configuration()
       if ((i2c_read_2_bytes_from_address_NEW(INA219_dev_handle, INA219_configuration_data[i][0])) != ((INA219_configuration_data[i][1] << 8) + INA219_configuration_data[i][2])) 
       {  
         err = ESP_FAIL;
-        ESP_LOGE(TAG_INA219,"INA219 configuration failed at register %x",INA219_configuration_data[i][0]);
+        ESP_LOGE(TAG_INA219,"Ошибка конфигурирования INA219 в регистре %x",INA219_configuration_data[i][0]);
       }
     }
   
-  if (err == ESP_OK) ESP_LOGI(TAG_INA219,"INA219 is configured\n");
-    else  ESP_LOGE(TAG_INA219,"INA219 configuration failed\n");
+  if (err == ESP_OK) ESP_LOGI(TAG_INA219,"INA219 настроен\n");
+    else  ESP_LOGE(TAG_INA219,"Ошибка настройки INA219\n");
 
   return err;
 }

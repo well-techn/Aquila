@@ -1,3 +1,117 @@
+typedef struct
+{
+	float * pointer;
+	float state[1];
+	float output;
+} filter1Type;
+
+
+
+void filter1_reset( filter1Type * pThis )
+{
+    memset( &pThis->state, 0, sizeof( pThis->state ) );   // Reset state to 0
+    pThis->pointer = pThis->state;                        // History buffer points to start of state buffer
+    pThis->output = 0;                                    // Reset output
+}
+
+
+filter1Type *filter1_create( void )
+{
+    filter1Type *result = (filter1Type *)malloc( sizeof( filter1Type ) ); // Allocate memory for the object
+    filter1_reset( result );                                               // Initialize it
+    return result;                                                        // Return the result
+}
+
+int filter1_filterBlock( filter1Type * pThis, float * pInput, float * pOutput, unsigned int count )
+{
+    float accumulator;
+    int originalCount = count;
+    while( count-- )
+    {
+        accumulator = *pInput;        // The input sample
+        accumulator -= *(pThis->pointer);        // The oldest sample (multiplied by alpha if applicable)
+
+        *(pOutput++) = accumulator * 0.5;   // Output the result
+
+         *(pThis->pointer++) = *(pInput++);                            // Store the new sample in the circular history buffer
+         if( pThis->pointer >= pThis->state + filter1_length )          // Handle wrap-around
+             pThis->pointer -= filter1_length;
+    }
+     return originalCount;
+}
+
+static void NVS_read_write_test(void * pvParameters)
+{
+  // Initialize NVS ESP_LOGI(TAG_INIT,
+  esp_err_t err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+      // NVS partition was truncated and needs to be erased
+      // Retry nvs_flash_init
+      ESP_ERROR_CHECK(nvs_flash_erase());
+      err = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK( err );
+
+  // Open
+
+  ESP_LOGI(TAG_NVS,"Открываем EEPROM... ");
+  nvs_handle_t my_handle;
+  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+  if (err != ESP_OK) {
+      ESP_LOGE(TAG_NVS,"Error (%s) opening NVS handle!\n", esp_err_to_name(err));
+  } else {
+        ESP_LOGI(TAG_NVS,"EEPROM открыт");
+
+  // Write
+        ESP_LOGI(TAG_NVS,"Generating random number ... ");
+        uint32_t random_number = esp_random(); 
+        ESP_LOGI(TAG_NVS,"%lu",random_number);
+        err = nvs_set_u32(my_handle, "random_number", random_number);
+        //ESP_LOGI(TAG_NVS,(err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+        // Commit written value.
+        // After setting any values, nvs_commit() must be called to ensure changes are written
+        // to flash storage. Implementations may write to storage at other times,
+        // but this is not guaranteed.
+        ESP_LOGI(TAG_NVS,"Committing updates in NVS ... ");
+        err = nvs_commit(my_handle);
+        //ESP_LOGI(TAG_NVS,(err != ESP_OK) ? "Failed!\n" : "Done\n");
+
+        // Read
+        ESP_LOGI(TAG_NVS,"Reading number from NVS ... ");
+       
+        err = nvs_get_u32(my_handle, "random_number", &random_number); //3841694106
+        switch (err) {
+            case ESP_OK:
+                ESP_LOGI(TAG_NVS,"Done\n");
+                ESP_LOGI(TAG_NVS,"Random_number = %lu", random_number);
+                break;
+            case ESP_ERR_NVS_NOT_FOUND:
+                ESP_LOGW(TAG_NVS,"The value is not initialized yet!\n");
+                break;
+            default :
+                ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
+        }
+
+        nvs_close(my_handle);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 zzz
 

@@ -2,7 +2,7 @@
 #define VE_ALLDEFS_H
 
 //#define USING_W25N 
-//#define USING_HOLYBRO_M9N
+#define USING_HOLYBRO_M9N
 #define USING_LIDAR_UART
 //#define USING_PERFORMANCE_MESUREMENT
 
@@ -111,10 +111,11 @@ struct data_from_gps_to_main_struct {                             //structure to
       uint16_t height;
       uint16_t strength;
     };
+#define LIDAR_RATE_HZ                               (50)
 #endif
 
 //defining onboard PWM pins and parameters
-#define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT) // Set duty resolution to 14 bits
+#define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT) // duty resolution to 14 bits
 #define ENGINE_PWM_MIN_DUTY                     (6553) // Set duty to 1ms: ((2 ^ 14) - 1) * 400 (Hz) = 6553,2
 #define ENGINE_PWM_FREQUENCY                    (400) // Frequency in Hertz. 
 #define ENGINE_PWM_TIMER                        (LEDC_TIMER_0)

@@ -18,8 +18,8 @@ esp_err_t MCP23017_communication_check() {
 
     err = i2c_master_probe(i2c_internal_bus_handle, MCP23017_ADDR, -1);
 
-    if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"MCP23017 is online\n");
-    else  ESP_LOGE(TAG_MCP23017,"MCP23017 is offline\n");
+    if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"Связь с MCP23017 установлена\n");
+    else  ESP_LOGE(TAG_MCP23017,"Связь с MCP23017 не установлена\n");
 
     return err;
 }
@@ -52,12 +52,12 @@ esp_err_t MCP23017_init() {
         if (reg_value != MCP23017_configuration_data[i][1]) 
         {
             err = ESP_FAIL;
-            ESP_LOGE(TAG_MCP23017,"MCP23017 configuration failed at register %02x, returned value is %d",MCP23017_configuration_data[i][0], reg_value);
+            ESP_LOGE(TAG_MCP23017,"Ошибка конфигурирования MCP23017 в регистре %02x, считано значение %d",MCP23017_configuration_data[i][0], reg_value);
         }
 }
 
-if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"MCP23017 is configured\n");
-    else  ESP_LOGE(TAG_MCP23017,"MCP23017 configuration failed\n");
+if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"MCP23017 настроен\n");
+    else  ESP_LOGE(TAG_MCP23017,"Ошибка настройки MCP23017\n");
 
     return err;
 }    

@@ -14,10 +14,10 @@ esp_err_t PCA9685_communication_check()
   esp_err_t err = ESP_FAIL;
 
   if (i2c_read_byte_from_address_NEW(PCA9685_dev_handle, PCA9685_SUBADR1) == 0xE2) {
-    ESP_LOGI(TAG_PCA9685,"PCA9685 is online");
+    ESP_LOGI(TAG_PCA9685,"Связь с PCA9685 установлена");
     err = ESP_OK;
   }
-  else ESP_LOGE(TAG_PCA9685,"PCA9685 is offline\n");
+  else ESP_LOGE(TAG_PCA9685,"Связь с PCA9685 не установлена\n");
 
   return err;
 }
@@ -43,12 +43,12 @@ for (i=1; i<4; i++) //checking against predefined configuration
   if (i2c_read_byte_from_address_NEW(PCA9685_dev_handle, PCA9685_configuration_data[i][0]) != (PCA9685_configuration_data[i][1] & 0b01111111)) //for MODE1
   {
     err = ESP_FAIL;
-    ESP_LOGE(TAG_PCA9685,"PCA9685 configuration failed at register %d",PCA9685_configuration_data[i][0]);
+    ESP_LOGE(TAG_PCA9685,"Ошибка конфигурирования PCA9685 в регистре %d",PCA9685_configuration_data[i][0]);
   }
 }
 
-  if (err == ESP_OK) ESP_LOGI(TAG_PCA9685,"PCA9685 is configured\n");
-  else  ESP_LOGE(TAG_PCA9685,"PCA9685 configuration failed\n");
+  if (err == ESP_OK) ESP_LOGI(TAG_PCA9685,"PCA9685 настроена\n");
+  else  ESP_LOGE(TAG_PCA9685,"Ошибка настройки PCA9685\n");
   return err;
 }
 
