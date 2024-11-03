@@ -1,7 +1,7 @@
 {
     "version":            "1.1",
     "project_name":       "main",
-    "project_version":    "212dd93-dirty",
+    "project_version":    "2b48132-dirty",
     "project_path":       "C:/Users/VVE/YandexDisk/GitRepo/Aquila",
     "idf_path":           "C:/Users/VVE/esp/v5.2/esp-idf",
     "build_dir":          "C:/Users/VVE/YandexDisk/GitRepo/Aquila/build",
@@ -130,7 +130,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/components/libcomponents.a",
-            "sources": [ "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/ve_i2c.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/ve_spi.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/winbondW25N.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/madgwick.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/HMC5983.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/MPU6000.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/PMW3901.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/MCP23017.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/PCA9685.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/INA219.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/IST8310.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/FL3195.c" ],
+            "sources": [ "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_i2c.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_spi.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/winbondW25N.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/madgwick.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/HMC5983.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/MPU6000.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/MCP23017.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/PCA9685.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/INA219.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/IST8310.c", "C:/Users/VVE/YandexDisk/GitRepo/Aquila/components/FL3195.c" ],
             "include_dirs": [ ".", "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/i2c/include/", "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/spi/include/", "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/gpio/include/", "C:/Users/VVE/esp/v5.2/esp-idf/components/driver/uart/include/" ]
         },
         "console": {

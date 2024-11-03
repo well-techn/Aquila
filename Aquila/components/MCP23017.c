@@ -1,8 +1,8 @@
-#include "ve_i2c.h"
+#include "wt_i2c.h"
 #include "MCP23017.h"
 //#include "driver/i2c.h"
 #include "driver/i2c_master.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 #include "esp_log.h"
 #include <rom/ets_sys.h>
 
@@ -43,12 +43,12 @@ esp_err_t MCP23017_init() {
                                                   {MCP23017_INTCONB,  0x00}};           //Pin value is compared against the previous pin value
                                                            
     for (i=0;i<13;i++) {
-        i2c_write_byte_to_address_NEW(MCP23017_dev_handle, MCP23017_configuration_data[i][0], MCP23017_configuration_data[i][1]);
+        i2c_write_byte_to_address(MCP23017_dev_handle, MCP23017_configuration_data[i][0], MCP23017_configuration_data[i][1]);
         ets_delay_us(500);
     }
 
     for (i=0; i<13; i++) {                              //checking against predefined configuration  
-        reg_value = i2c_read_byte_from_address_NEW(MCP23017_dev_handle, MCP23017_configuration_data[i][0]);
+        reg_value = i2c_read_byte_from_address(MCP23017_dev_handle, MCP23017_configuration_data[i][0]);
         if (reg_value != MCP23017_configuration_data[i][1]) 
         {
             err = ESP_FAIL;
@@ -68,9 +68,9 @@ esp_err_t MCP23017_set_output(uint8_t * previous_output_state, uint8_t out_pin)
     uint8_t MCP23017_new_outputs;
     uint8_t MCP23017_previous_outputs;
 
-    MCP23017_previous_outputs = &previous_output_state;
+    MCP23017_previous_outputs = *previous_output_state;
     MCP23017_new_outputs = MCP23017_previous_outputs | (1 << out_pin);
-    ret = i2c_write_byte_to_address_NEW(MCP23017_dev_handle, MCP23017_OLATA, MCP23017_new_outputs);
+    ret = i2c_write_byte_to_address(MCP23017_dev_handle, MCP23017_OLATA, MCP23017_new_outputs);
 
     return ret;
 }
@@ -81,14 +81,14 @@ esp_err_t MCP23017_clear_output(uint8_t * previous_output_state, uint8_t out_pin
     uint8_t MCP23017_new_outputs;
     uint8_t MCP23017_previous_outputs;
 
-    MCP23017_previous_outputs = &previous_output_state; 
+    MCP23017_previous_outputs = *previous_output_state; 
     MCP23017_new_outputs = MCP23017_previous_outputs & (~( 0b00000001 << out_pin));
-    ret = i2c_write_byte_to_address_NEW(MCP23017_dev_handle, MCP23017_OLATA, MCP23017_new_outputs);
+    ret = i2c_write_byte_to_address(MCP23017_dev_handle, MCP23017_OLATA, MCP23017_new_outputs);
 
     return ret;
 }
 
 uint8_t MCP23017_get_inputs_state()
 {
-    return i2c_read_byte_from_address_NEW(MCP23017_dev_handle, MCP23017_INTCAPB);
+    return i2c_read_byte_from_address(MCP23017_dev_handle, MCP23017_INTCAPB);
 } 

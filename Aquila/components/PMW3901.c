@@ -1,9 +1,9 @@
 #include "PMW3901.h"
-#include "ve_spi.h" 
+#include "wt_spi.h" 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_err.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 #include <rom/ets_sys.h>
 #include "driver/gpio.h"
 #include "esp_log.h"

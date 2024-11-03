@@ -6,17 +6,17 @@
 #include "winbondW25N.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "ve_spi.h"
+#include "wt_spi.h"
 #include "esp_log.h"
 #include <rom/ets_sys.h>
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 #include "esp_random.h"
 
 extern spi_device_handle_t W25N01;
 extern char *TAG_W25N;
 
 void W25N_reset(void) {
-  SPI_write_byte(W25N01, 0, NULL, 0, NULL, 0, W25N_RESET);
+  SPI_write_byte(W25N01, 0, 0, 0, 0, 0, W25N_RESET);
   vTaskDelay(1/portTICK_PERIOD_MS);
   ESP_LOGI(TAG_W25N,"W25N сброшена");
 }
@@ -26,7 +26,7 @@ esp_err_t W25N_read_JEDEC_ID(void) {
   esp_err_t err = ESP_FAIL;
   uint8_t buf[3] = "0";
 
-  SPI_read_bytes (W25N01, 8, W25N_READ_JEDEC_ID, 0, NULL, 8, &buf, 3);
+  SPI_read_bytes (W25N01, 8, W25N_READ_JEDEC_ID, 0, 0, 8, &buf, 3);
   if ((buf[0] == WINBOND_MAN_ID) && (buf[1] == W25N01GV_DEV_ID_HI) && (buf[2] == W25N01GV_DEV_ID_LO)) 
   {
     err = ESP_OK;

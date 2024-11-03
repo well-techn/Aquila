@@ -1,9 +1,9 @@
 #include "MPU6000.h"
-#include "ve_spi.h" 
+#include "wt_spi.h" 
 #include "esp_log.h"
 #include <rom/ets_sys.h>
 #include "math.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 
 
 

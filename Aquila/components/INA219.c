@@ -1,7 +1,7 @@
 #include "INA219.h"
-#include "ve_i2c.h"
+#include "wt_i2c.h"
 //#include "driver/i2c.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 #include "esp_log.h"
 #include <rom/ets_sys.h>
 
@@ -35,13 +35,13 @@ esp_err_t INA219_configuration()
   uint8_t INA219_configuration_data[2][3] = {{INA219_CALIBRATION,               0b00010000,              0b00000000},    //MSB goes first, shifted right 1 bit calibration value       
                                              {INA219_CONFIGURATION,  (settings >> 8), settings & 0x00FF }};   //MSB goes first, 16V, PGA/4, 
 
-  for (i=0;i<2;i++) { i2c_write_2_bytes_to_address_NEW(INA219_dev_handle, INA219_configuration_data[i][0], INA219_configuration_data[i][1], INA219_configuration_data[i][2]);  //pointer to 2D massive
+  for (i=0;i<2;i++) { i2c_write_2_bytes_to_address(INA219_dev_handle, INA219_configuration_data[i][0], INA219_configuration_data[i][1], INA219_configuration_data[i][2]);  //pointer to 2D massive
                       ets_delay_us(100);
                     }
   
   for (i=0;i<2;i++) 
     { 
-      if ((i2c_read_2_bytes_from_address_NEW(INA219_dev_handle, INA219_configuration_data[i][0])) != ((INA219_configuration_data[i][1] << 8) + INA219_configuration_data[i][2])) 
+      if ((i2c_read_2_bytes_from_address(INA219_dev_handle, INA219_configuration_data[i][0])) != ((INA219_configuration_data[i][1] << 8) + INA219_configuration_data[i][2])) 
       {  
         err = ESP_FAIL;
         ESP_LOGE(TAG_INA219,"Ошибка конфигурирования INA219 в регистре %x",INA219_configuration_data[i][0]);
@@ -61,7 +61,7 @@ float INA219_read_voltage()
   float voltage;
   uint8_t raw_data[2];
 
-  i2c_read_bytes_from_address_NEW(INA219_dev_handle, INA219_BUS_VOLTAGE, 2, raw_data);
+  i2c_read_bytes_from_address(INA219_dev_handle, INA219_BUS_VOLTAGE, 2, raw_data);
   ADC_value = ((raw_data[0] << 8) + raw_data[1]) >> 3;
   voltage = ADC_value * 0.004;
 
@@ -74,7 +74,7 @@ float INA219_read_shunt_voltage()
   float shunt_voltage;
   uint8_t raw_data[2];
 
-  i2c_read_bytes_from_address_NEW(INA219_dev_handle, INA219_SHUNT_VOLTAGE, 2, raw_data);
+  i2c_read_bytes_from_address(INA219_dev_handle, INA219_SHUNT_VOLTAGE, 2, raw_data);
   ADC_value = ((raw_data[0] << 8) + raw_data[1]);
   shunt_voltage = ADC_value * 0.001000;   
   //printf("%d ", ADC_value);
@@ -87,7 +87,7 @@ float INA219_read_current()
   float current;
   uint8_t raw_data[2];
 
-  i2c_read_bytes_from_address_NEW(INA219_dev_handle, INA219_CURRENT, 2, raw_data);
+  i2c_read_bytes_from_address(INA219_dev_handle, INA219_CURRENT, 2, raw_data);
   ADC_value = (raw_data[0] << 8) + raw_data[1];
   //printf("%d ", ADC_value);
   current = ADC_value * 0.001;//1mA LSB
@@ -101,7 +101,7 @@ float INA219_read_power()
   float power;
   uint8_t raw_data[2];
 
-  i2c_read_bytes_from_address_NEW(INA219_dev_handle, INA219_POWER, 2, raw_data);
+  i2c_read_bytes_from_address(INA219_dev_handle, INA219_POWER, 2, raw_data);
   ADC_value = (raw_data[0] << 8) + raw_data[1];
   power = ADC_value * 0.020; //power LSB
 

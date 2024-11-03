@@ -1,6 +1,6 @@
 #include "HMC5983.h"
-#include "ve_alldef.h"
-#include "ve_spi.h"
+#include "wt_alldef.h"
+#include "wt_spi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
@@ -158,13 +158,13 @@ esp_err_t HMC5883_I2C_configuration()
                                                   {HMC5983_CONF_B, 0b00100000}, // config B register - +-1.3 Gauss
                                                   {HMC5983_MODE,   0b00000000}};   //MSB goes first, 16V, PGA/4, 
 
-  for (i=0;i<2;i++) { i2c_write_2_bytes_to_address_NEW(HMC5883_I2C_dev_handle, HMC5883_I2C_configuration_data[i][0], HMC5883_I2C_configuration_data[i][1], HMC5883_I2C_configuration_data[i][2]);  //pointer to 2D massive
+  for (i=0;i<2;i++) { i2c_write_2_bytes_to_address(HMC5883_I2C_dev_handle, HMC5883_I2C_configuration_data[i][0], HMC5883_I2C_configuration_data[i][1], HMC5883_I2C_configuration_data[i][2]);  //pointer to 2D massive
                       ets_delay_us(100);
                     }
   
   for (i=0;i<2;i++) 
     { 
-      if ((i2c_read_2_bytes_from_address_NEW(HMC5883_I2C_dev_handle, HMC5883_I2C_configuration_data[i][0])) != ((HMC5883_I2C_configuration_data[i][1] << 8) + HMC5883_I2C_configuration_data[i][2])) 
+      if ((i2c_read_2_bytes_from_address(HMC5883_I2C_dev_handle, HMC5883_I2C_configuration_data[i][0])) != ((HMC5883_I2C_configuration_data[i][1] << 8) + HMC5883_I2C_configuration_data[i][2])) 
       {  
         err = ESP_FAIL;
         ESP_LOGE(TAG_HMC5883_I2C,"HMC5883_I2C configuration failed at register %x",HMC5883_I2C_configuration_data[i][0]);
@@ -179,7 +179,7 @@ esp_err_t HMC5883_I2C_configuration()
 
 esp_err_t IST8310_read_data(uint8_t *buffer)
 {
-  return i2c_read_bytes_from_address_NEW(HMC5883_I2C_dev_handle, HMC5983_OUT_X_MSB, 6, buffer);
+  return i2c_read_bytes_from_address(HMC5883_I2C_dev_handle, HMC5983_OUT_X_MSB, 6, buffer);
 }
 */
 

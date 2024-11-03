@@ -24,11 +24,11 @@
 #include "soc/gpio_reg.h"
 
 //proprietary libraries
-#include "ve_alldef.h"
-#include "ve_i2c.h"
+#include "wt_alldef.h"
+#include "wt_i2c.h"
 #include "PCA9685.h"
 #include "MCP23017.h"
-#include "ve_spi.h"
+#include "wt_spi.h"
 #include "winbondW25N.h"
 #include "madgwick.h"
 #include "PMW3901.h"
@@ -40,7 +40,7 @@
 
 /********************************************************************     СЕКЦИЯ 1     ***********************************************************************************************/
 /**************************************************************************************************************************************************************************************/
-//ESP32 logging labels
+//таги для логирования
 const char *TAG_INIT = "INIT";
 const char *TAG_FLY = "FLY";
 const char *TAG_GPS = "GPS";
@@ -57,56 +57,54 @@ const char *TAG_IST8310 = "IST8310";
 const char *TAG_FL3195 = "RGB_LED";
 
 
-//spi devices handles
+//spi handles
 extern spi_device_handle_t W25N01;
 extern spi_device_handle_t MPU6000_1;
 extern spi_device_handle_t MPU6000_2;
+
+//i2c handles
 extern i2c_master_bus_handle_t i2c_internal_bus_handle;
 extern i2c_master_bus_handle_t i2c_external_bus_handle;
-
-//i2c devices handles
 extern i2c_master_dev_handle_t IST8310_dev_handle;
 
-//semaphores
-SemaphoreHandle_t semaphore_for_i2c_external;
-StaticSemaphore_t semaphore_for_i2c_external_buffer;
+//семафоры
+static SemaphoreHandle_t semaphore_for_i2c_external;
+static StaticSemaphore_t semaphore_for_i2c_external_buffer;
 
-SemaphoreHandle_t semaphore_for_i2c_internal;
-StaticSemaphore_t semaphore_for_i2c_internal_buffer;
+static SemaphoreHandle_t semaphore_for_i2c_internal;
+static StaticSemaphore_t semaphore_for_i2c_internal_buffer;
 
-//timer handles
-gptimer_handle_t GP_timer;
-gptimer_handle_t RC_timer;
-gptimer_handle_t general_suspension_timer;
-gptimer_handle_t IMU_1_suspension_timer;
-gptimer_handle_t IMU_2_suspension_timer;
-
+//timers handles
+static gptimer_handle_t GP_timer;
+static gptimer_handle_t general_suspension_timer;
+static gptimer_handle_t IMU_1_suspension_timer;
+static gptimer_handle_t IMU_2_suspension_timer;
 
 //queues handles
-static QueueHandle_t gps_queue_for_events; //queue to handle gps uart events (pattern detection)
-static QueueHandle_t gps_to_main_queue; //queue to transfer gps information from gps processing task to main flying task
-static QueueHandle_t remote_control_queue_for_events; //queue to handle RC uart events (pattern detection)
-static QueueHandle_t remote_control_to_main_queue; //queue to transfer remote control data to main flying task
-static QueueHandle_t lidar_queue_for_events; //queue to handle lidar uart events (pattern detection)
-static QueueHandle_t MCP23017_queue; //queue to handle any deals with MCP23017
-static QueueHandle_t PCA9685_queue; //queue to handle any deals with PCA9685
-static QueueHandle_t magnetometer_queue; //queue to transfer data from mag read task to main flying task
-static QueueHandle_t main_to_rc_queue; //queue to transfer data from main to rc_send task 
-static QueueHandle_t W25N01_queue;  //queue to transfer data from main to logging task
-static QueueHandle_t lidar_to_main_queue; //queue to transfer data from lidar to main
-static QueueHandle_t INA219_to_main_queue; //queue to transfer data from INA219 to main
-static QueueHandle_t any_to_blinking_queue; //queue to transfer data from any task to blinking
-static QueueHandle_t IMU_monitoring_timer_to_main_queue; //queue which is used to transfer data about any of 2 IMUs suspension (no interrupt signal at a time)
+static QueueHandle_t gps_queue_for_events = NULL; //очередь для передачи событий от UART с подключенным GPS (pattern detection) в задачу обработки данных GPS
+static QueueHandle_t gps_to_main_queue = NULL; //очередь для передачи обработанных GPS данных в main_flying_cycle
+static QueueHandle_t remote_control_queue_for_events = NULL; //очередь для передачи событий от UART пульта управления (pattern detection) в задачу обработки данных пульта
+static QueueHandle_t remote_control_to_main_queue = NULL; //очередь для передачи обработанных данных от пульта в main_flying_cycle
+static QueueHandle_t lidar_queue_for_events = NULL; //очередь для передачи событий от UART с подключенным лидаром (pattern detection) в задачу обработки данных от лидара
+static QueueHandle_t lidar_to_main_queue = NULL; //очередь для передачи обработанных данных от лидара в main_flying_cycle
+static QueueHandle_t MCP23017_queue = NULL; //очередь принимающая команды на считывания состояния или управления MCP23017
+static QueueHandle_t PCA9685_queue = NULL; //очередь принимающая команды управления PCA9685
+static QueueHandle_t magnetometer_queue = NULL; //очередь для передачи обработанных данных из задачи обработки данных магнетометра в main_flying_cycle
+static QueueHandle_t main_to_rc_queue = NULL; //очередь для передачи данных из main_flying_cycle в задачу отправки телеметрии на пульт
+static QueueHandle_t W25N01_queue = NULL;  //очередь для передачи данных из main_flying_cycle в задачу записи логов во внешнюю флэш-память
 
-//static tasks parameters 
+static QueueHandle_t INA219_to_main_queue = NULL; //очередь для передачи данных из задачи обработки данных от INA219 в main_flying_cycle
+
+
+//параметры выделения памяти для статического размещения задач
 StaticTask_t MCP23017_monitoring_and_control_TCB_buffer;
 StackType_t MCP23017_monitoring_and_control_stack[MCP23017_MONITORING_AND_CONTROL_STACK_SIZE];
 
 StaticTask_t PCA9685_control_TCB_buffer;
 StackType_t PCA9685_control_stack[PCA9685_CONTROL_STACK_SIZE];
 
-StaticTask_t read_and_process_data_from_mag_TCB_buffer;
-StackType_t read_and_process_data_from_mag_stack[READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE];
+StaticTask_t mag_read_and_process_data_TCB_buffer;
+StackType_t mag_read_and_process_data_stack[MAG_READ_AND_PROCESS_DATA_STACK_SIZE];
 
 StaticTask_t main_flying_cycle_TCB_buffer;
 StackType_t main_flying_cycle_stack[MAIN_FLYING_CYCLE_STACK_SIZE];
@@ -114,12 +112,11 @@ StackType_t main_flying_cycle_stack[MAIN_FLYING_CYCLE_STACK_SIZE];
 StaticTask_t monitoring_pins_interrupt_queue_TCB_buffer;
 StackType_t monitoring_pins_interrupt_queue_stack[MONITORING_PINS_INTERRUPT_QUEUE_STACK_SIZE];
 
-StackType_t read_and_process_data_from_gps_stack[READ_AND_PROCESS_DATA_FROM_GPS_STACK_SIZE];
-StaticTask_t read_and_process_data_from_gps_TCB_buffer;
+StackType_t gps_read_and_process_data_stack[GPS_READ_AND_PROCESS_DATA_STACK_SIZE];
+StaticTask_t gps_read_and_process_data_TCB_buffer;
 
-
-StaticTask_t read_and_process_data_from_RC_TCB_buffer;
-StackType_t read_and_process_data_from_RC_stack[READ_AND_PROCESS_DATA_FROM_RC_STACK_SIZE];
+StaticTask_t RC_read_and_process_data_TCB_buffer;
+StackType_t RC_read_and_process_data_stack[RC_READ_AND_PROCESS_DATA_STACK_SIZE];
 
 StaticTask_t send_data_to_RC_TCB_buffer;
 StackType_t send_data_to_RC_stack[SEND_DATA_TO_RC_STACK_SIZE];
@@ -127,25 +124,34 @@ StackType_t send_data_to_RC_stack[SEND_DATA_TO_RC_STACK_SIZE];
 StaticTask_t blinking_flight_lights_TCB_buffer;
 StackType_t blinking_flight_lights_stack[BLINKING_FLIGHT_LIGHTS_STACK_SIZE];
 
-StaticTask_t read_and_process_data_from_lidar_TCB_buffer;
-StackType_t read_and_process_data_from_lidar_stack[read_and_process_data_from_lidar_STACK_SIZE];
+StaticTask_t lidar_read_and_process_data_TCB_buffer;
+StackType_t lidar_read_and_process_data_stack[LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE];
 
-StaticTask_t read_and_process_data_from_INA219_TCB_buffer;
-StackType_t read_and_process_data_from_INA219_stack[READ_AND_PROCESS_DATA_FROM_INA219_STACK_SIZE];
+StaticTask_t INA219_read_and_process_data_TCB_buffer;
+StackType_t INA219_read_and_process_data_stack[INA219_READ_AND_PROCESS_DATA_STACK_SIZE];
 
-TaskHandle_t task_handle_blinking_flight_lights;
-TaskHandle_t task_handle_main_flying_cycle;
-TaskHandle_t task_handle_send_data_to_RC;
-TaskHandle_t task_handle_init;
-TaskHandle_t task_handle_performace_measurement;
-TaskHandle_t task_handle_read_and_process_data_from_INA219;
-TaskHandle_t task_handle_read_and_process_data_from_mag;
-TaskHandle_t task_handle_PCA9685_control;
-TaskHandle_t task_handle_MCP23017_monitoring_and_control;
+StaticTask_t writing_logs_to_flash_TCB_buffer;
+StackType_t writing_logs_to_flash_stack[WRITING_LOGS_TO_FLASH_STACK_SIZE];
+
+//tasks handlers
+static TaskHandle_t task_handle_blinking_flight_lights;
+static TaskHandle_t task_handle_main_flying_cycle;
+static TaskHandle_t task_handle_send_data_to_RC;
+static TaskHandle_t task_handle_init;
+static TaskHandle_t task_handle_performace_measurement;
+static TaskHandle_t task_handle_INA219_read_and_process_data;
+static TaskHandle_t task_handle_mag_read_and_process_data;
+static TaskHandle_t task_handle_PCA9685_control;
+static TaskHandle_t task_handle_MCP23017_monitoring_and_control;
+static TaskHandle_t task_handle_writing_logs_to_flash;
+
+
+
 
 /********************************************************************     СЕКЦИЯ 2     ***********************************************************************************************/
-/********************************************************************   ОБЩИЕ ФУНКЦИИ  ***********************************************************************************************/
+/********************************************************************    ПРЕРЫВАНИЯ    ***********************************************************************************************/
 
+//прерывания от GPIO - IMU, аварийная остановка
 static void IRAM_ATTR gpio_interrupt_handler(void *args)
 {
   uint32_t gpio_intr_status_1 = 0;
@@ -158,7 +164,6 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   uint64_t IMU_2_timer_value = 0;
 
   BaseType_t xHigherPriorityTaskWoken;
-
   xHigherPriorityTaskWoken = pdFALSE;
 
   gpio_intr_status_1 = READ_PERI_REG(GPIO_STATUS_REG);     // Чтение регистров статуса прерывания для GPIO0-31
@@ -168,7 +173,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   
   //gpio_intr_status = gpio_intr_status_1 | gpio_intr_status_2;
 
-  if (gpio_intr_status_1 & (1ULL << A2))   //fail safe switch, emergency stop
+  if (gpio_intr_status_1 & (1ULL << A2))   //сигнал от кнопки аварийной остановки на Holybro M9N, выключаем двигатели
   {
     ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
     gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN ,0);
@@ -177,7 +182,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
   }  
   
-  if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //IMU_1 routine 
+  if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //сигнал от IMU1
   {
     imu_1_interrupt_flag = 1; 
     gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
@@ -185,7 +190,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gptimer_get_raw_count (IMU_2_suspension_timer,&IMU_2_timer_value);
   } 
   
-  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN))   //IMU_2 routine  
+  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN))   //сигнал от IMU1 
   {
     imu_2_interrupt_flag = 1;
     gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
@@ -193,31 +198,33 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gptimer_set_raw_count(IMU_2_suspension_timer, 0);
   } 
 
-  if (imu_1_interrupt_flag && (IMU_1_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000) && (IMU_2_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000)) //all is ok
+  if (imu_1_interrupt_flag && (IMU_1_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000) && (IMU_2_timer_value < IMU_SUSPENSION_TIMER_DELAY_MS * 1000)) //все в порядке, оба сигнала от IMU пришли вовремя 
   {
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
-    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 14, eSetValueWithOverwrite, NULL,  &xHigherPriorityTaskWoken);
+    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 14, eSetValueWithOverwrite, NULL,  &xHigherPriorityTaskWoken);    //14 - код что все ок
   }
 
- else if (IMU_2_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //2nd failed
+ else if (IMU_2_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //IMU2 не выдал сигнал
   {
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
-    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 15, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);
+    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 15, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);     //15 - код что 2ой завис
   }
 
-  else if ( IMU_1_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //1st failed
+  else if ( IMU_1_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //IMU1 не выдал сигнал
   {
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
-    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 16, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);
+    xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 16, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);     //16 - код что 1ый завис
   }
 
   portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
 }
 
-static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    //motor control emergency disable
+//прерывание от таймера зависания основного полетного цикла
+//этот таймер сбрасывается в основном цикле полета. Если он переполнился - значит основной цикл завис, аварийно останавливаем двигетели
+static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    
 { 
   ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
   gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN ,0);
@@ -226,7 +233,11 @@ static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    
   gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
 }
 
-//main pins configuration
+
+/********************************************************************     СЕКЦИЯ 3     ***********************************************************************************************/
+/********************************************************************   ОБЩИЕ ФУНКЦИИ  ***********************************************************************************************/
+
+//настройка входов-выходов общего назначения
 static void configure_IOs()
 {
   gpio_reset_pin(LED_RED);
@@ -270,7 +281,7 @@ static void configure_IOs()
   gpio_set_pull_mode(GP_SPI_MOSI, GPIO_PULLUP_ENABLE);
     
 }
-//IO interrupts configuration
+//настройка пинов, которые используются для прерываний
 static void configure_pins_for_interrupt()
 {
   ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_1_INTERRUPT_PIN));
@@ -300,23 +311,16 @@ static void configure_pins_for_interrupt()
     .intr_type = GPIO_INTR_POSEDGE
   };
 
-  ESP_ERROR_CHECK(gpio_reset_pin(A2));
-  gpio_config_t INT_4 = {
-    .pin_bit_mask = 1ULL << A2,
-    .mode = GPIO_MODE_INPUT,
-    .pull_up_en = GPIO_PULLUP_DISABLE,
-    .pull_down_en = GPIO_PULLDOWN_ENABLE,
-    .intr_type = GPIO_INTR_POSEDGE
-  };  
-
   ESP_ERROR_CHECK(gpio_config(&INT_1));
   ESP_ERROR_CHECK(gpio_config(&INT_2));
   ESP_ERROR_CHECK(gpio_config(&INT_3));
-  ESP_ERROR_CHECK(gpio_config(&INT_4));
 
   ESP_ERROR_CHECK(gpio_isr_register(gpio_interrupt_handler, 0, 0, NULL)); 
 }
-//UARTs configuration
+
+
+#ifdef USING_HOLYBRO_M9N
+//настройка UART для GPS
 static void gps_uart_config()
 {
     int intr_alloc_flags = 0;
@@ -337,7 +341,7 @@ static void gps_uart_config()
     ESP_ERROR_CHECK(uart_pattern_queue_reset(GPS_UART, GPS_UART_PATTERN_DETECTION_QUEUE_SIZE));          //allocating queue  
     uart_flush(GPS_UART);                                                                           //resetting incoming buffer
 }
-
+#endif
 static void remote_control_uart_config(void)
 {
     int intr_alloc_flags = 0;
@@ -350,7 +354,7 @@ static void remote_control_uart_config(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(REMOTE_CONTROL_UART, RC_UART_BUFF_SIZE, 0, RC_UART_PATTERN_DETECTION_QUEUE_SIZE, &remote_control_queue_for_events, intr_alloc_flags)); 
+    ESP_ERROR_CHECK(uart_driver_install(REMOTE_CONTROL_UART, RC_RX_UART_BUFF_SIZE, RC_TX_UART_BUFF_SIZE, RC_UART_PATTERN_DETECTION_QUEUE_SIZE, &remote_control_queue_for_events, intr_alloc_flags)); 
     ESP_ERROR_CHECK(uart_param_config(REMOTE_CONTROL_UART, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(REMOTE_CONTROL_UART, RC_UART_TX_PIN, RC_UART_RX_PIN, RC_UART_RTS_PIN, RC_UART_CTS_PIN));
 
@@ -359,7 +363,9 @@ static void remote_control_uart_config(void)
     uart_flush(REMOTE_CONTROL_UART);                                                                           //resetting incoming buffer  
 }
 
+
 #ifdef USING_LIDAR_UART
+//настройка UART для Benewake TFmini-S
 static void lidar_uart_config()
 {
     int intr_alloc_flags = 0;
@@ -382,14 +388,14 @@ static void lidar_uart_config()
 }
 #endif
 
-//CRC
+//алгоритм вычисления контрольной суммы по типу Maxim (Dallas)
 static uint8_t dallas_crc8(uint8_t *input_data, unsigned int size)
 {
   uint8_t crc = 0;
-  unsigned int i;
-  unsigned char inbyte;
-  unsigned char j;
-  unsigned char mix1;
+  uint8_t i = 0;
+  uint8_t inbyte = 0;
+  uint8_t j = 0;
+  uint8_t mix1 = 0;
   for (  i = 0; i < size; i++ ) {
         inbyte = input_data[i];
       for (  j = 0; j < 8; j++ ) {
@@ -401,7 +407,7 @@ static uint8_t dallas_crc8(uint8_t *input_data, unsigned int size)
   return crc;
 }
 
-//timers
+//функция, возвращающая время в микросенундах со старта приложения
 static int64_t get_time(void)
 {
   struct timeval tv_now;
@@ -409,7 +415,8 @@ static int64_t get_time(void)
   return (int64_t)((int64_t)tv_now.tv_sec * 1000000L + (int64_t)tv_now.tv_usec);
 }
 
-static void Create_and_start_GP_Timer()                    //timer for Madgwick
+//создание таймера, отсчитывающего временые промежутки для фильтра Маджвика
+static void Create_and_start_GP_Timer()                    
 {
   gptimer_config_t timer_config = {
       .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -421,7 +428,8 @@ static void Create_and_start_GP_Timer()                    //timer for Madgwick
   ESP_ERROR_CHECK(gptimer_start(GP_timer));
 }
 
-static void create_and_start_general_suspension_timer()                    //timer to control suspension of main cycle
+//создание таймера, контролирующего зависание главного цикла. Сбрасывается из этого главного цикла. Если переполняется - по прерыванию аварийно отключаем моторы. 
+static void create_and_start_general_suspension_timer()                    
 {
   gptimer_config_t timer_config = {
       .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -431,13 +439,13 @@ static void create_and_start_general_suspension_timer()                    //tim
   ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &general_suspension_timer));
 
   gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
-      .alarm_count = SUSPENSION_TIMER_DELAY_SEC * 1000 * 1000,   //10 seconds
+      .alarm_count = SUSPENSION_TIMER_DELAY_SEC * 1000 * 1000,   //1 second
       //.reload_count = NULL,
   };
   ESP_ERROR_CHECK(gptimer_set_alarm_action(general_suspension_timer, &alarm_config));
 
   gptimer_event_callbacks_t  Suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
-      .on_alarm = general_suspension_timer_interrupt_handler, // register user callback
+      .on_alarm = general_suspension_timer_interrupt_handler,     // register user callback
   };
   ESP_ERROR_CHECK(gptimer_register_event_callbacks(general_suspension_timer, &Suspension_timer_interrupt, NULL));
 
@@ -445,7 +453,8 @@ static void create_and_start_general_suspension_timer()                    //tim
   ESP_ERROR_CHECK(gptimer_start(general_suspension_timer));
 }
 
-static void Create_and_start_IMU_1_suspension_Timer()                    //timer to control absense of control signal from RC
+//создание таймера, контролирующего зависание IMU1
+static void Create_and_start_IMU_1_suspension_Timer()           
 {
   gptimer_config_t IMU_1_timer_config = {
       .clk_src = GPTIMER_CLK_SRC_DEFAULT,
@@ -457,6 +466,7 @@ static void Create_and_start_IMU_1_suspension_Timer()                    //timer
   ESP_ERROR_CHECK(gptimer_start(IMU_1_suspension_timer));
 }
 
+//создание таймера, контролирующего зависание IMU2
 static void Create_and_start_IMU_2_suspension_Timer()                    //timer to control absense of control signal from RC
 {
   gptimer_config_t IMU_2_timer_config = {
@@ -469,6 +479,7 @@ static void Create_and_start_IMU_2_suspension_Timer()                    //timer
   ESP_ERROR_CHECK(gptimer_start(IMU_2_suspension_timer));
 }
 
+//создание таймера для управления двигателями через LEDC
 static void configuring_timer_for_PWM()
 {
     ledc_timer_config_t engine_pwm_timer = {
@@ -481,6 +492,7 @@ static void configuring_timer_for_PWM()
   ESP_ERROR_CHECK(ledc_timer_config(&engine_pwm_timer));
 }
 
+//настройка каналов модуля LEDC
 static void configuring_channel_for_PWM(uint8_t channel, uint8_t pin)   // Prepare and then apply the LEDC PWM channel configuration
 {
   ledc_channel_config_t engine_pwm_channel = {
@@ -495,6 +507,7 @@ static void configuring_channel_for_PWM(uint8_t channel, uint8_t pin)   // Prepa
   ESP_ERROR_CHECK(ledc_channel_config(&engine_pwm_channel));
 }
 
+//запись во flash (NVS) калибровочных коэффициентов акселерометров и гироскопов
 void NVS_writing_calibration_values(int16_t accel_1_offset[], int16_t gyro_1_offset[], int16_t accel_2_offset[], int16_t gyro_2_offset[])
 {
   ESP_ERROR_CHECK(nvs_flash_erase());
@@ -507,10 +520,10 @@ void NVS_writing_calibration_values(int16_t accel_1_offset[], int16_t gyro_1_off
   }
   ESP_ERROR_CHECK( err );
 
-  ESP_LOGI(TAG_NVS,"Открываем EEPROM... ");
+  ESP_LOGI(TAG_NVS,"Открываем NVS... ");
   nvs_handle_t NVS_handle;
   err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
-  if (err != ESP_OK) ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия EEPROM (NVS)!\n", esp_err_to_name(err));
+  if (err != ESP_OK) ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
   else 
   {
     ESP_LOGI(TAG_NVS,"Записываем accel_1_X offset %d...", accel_1_offset[0]);
@@ -556,8 +569,8 @@ void NVS_writing_calibration_values(int16_t accel_1_offset[], int16_t gyro_1_off
   }
 }
 
-/********************************************************************     СЕКЦИЯ 3     ***********************************************************************************************/
-/********************************************************************     ЗАДАЧИ       ***********************************************************************************************/
+/********************************************************************     СЕКЦИЯ 4     ***********************************************************************************************/
+/********************************************************************      ЗАДАЧИ      ***********************************************************************************************/
 
 
 //задача моргания светодиодами на плате для отображения кода ошибки. Она создается при возниконовении какой-либо ошибки при прохождении первичной инициализации железа.
@@ -585,9 +598,10 @@ static void error_code_LED_blinking(void * pvParameters)
   }
 }
 
+#ifdef USING_HOLYBRO_M9N
 //задача периодического считывания данных с магнетометра IST8310. После создения находится с заблокированном состоянии. Разблокируется из main_flying_cycle.
 //Активирует режим однократного измерения, считываем результат после задержки и выдает результат в очередь в сторону main_flying_cycle
-static void rread_and_process_data_from_mag(void * pvParameters)
+static void mag_read_and_process_data (void * pvParameters)
 {
   uint8_t i = 0;
   float cross_axis[3][3] = {{0.9800471,  -0.0310357,   -0.0148492},    //calculated manually based on data read from the chip
@@ -650,11 +664,13 @@ static void rread_and_process_data_from_mag(void * pvParameters)
     }
   }  
 }
+#endif
 
+#ifdef USING_HOLYBRO_M9N
 //Задача получения и обработки данных от GPS. Подразумеваем что получаем только RMC сообщения.
 //Ждет прерывания по обнаружению символа конца строки, при обнаружении разбираем полученную строку, вычленяем координаты и выдаем в очередь в сторону main_flying_cycle.
 //Управляем трехцветным светодиодом FL3195 на модуле Holybro M9N для отображения сиатуса GPS. 
-static void read_and_process_data_from_gps(void * pvParameters)
+static void gps_read_and_process_data(void * pvParameters)
 {
   uint8_t incoming_message_buffer_gps[NUMBER_OF_BYTES_TO_RECEIVE_FROM_GPS];
   uint16_t i = 0;
@@ -665,13 +681,9 @@ static void read_and_process_data_from_gps(void * pvParameters)
   uint8_t asteriks_place = 0;
   unsigned char coma_places[13] = {0};
   UBaseType_t uxHighWaterMark;
-  uart_event_t gps_uart_event;
-  uint8_t toggle = 0;
-  
+  uart_event_t gps_uart_event;  
   char latitude = 0;
   char longtitude = 0;
-  bool gps_ok = 0;
-
   struct data_from_gps_to_main_struct gps_data;
   uint8_t gps_status_old = 5;
 
@@ -813,14 +825,14 @@ static void read_and_process_data_from_gps(void * pvParameters)
   }
 }
 }
-
+#endif
 
 //Задача получения и обработки данных от пульта управления. 
 //Ждет прерывания по обнаружению символа конца строки, при обнаружении разбираем полученные данные, проводим их обработку и выдаем в очередь в сторону main_flying_cycle.
 //Если есть команда на управление сервоприводами выдает команду на PCA9685. По завершении раз через 3 активируем задачу передачи телеметрии обратно на пульт
-static void read_and_process_data_from_RC(void * pvParameters) 
+static void RC_read_and_process_data(void * pvParameters) 
 {
-  uint16_t i,j;
+  uint16_t i = 0;
   int16_t pos = 0;
   uint8_t remote_packets_counter = 0;
   uart_event_t remote_control_uart_event;
@@ -862,9 +874,10 @@ static void read_and_process_data_from_RC(void * pvParameters)
           //ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
           if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-1))
           {
-            //int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);
-            //for (uint8_t j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
-            //printf("\n");
+            printf("P: %d\n",pos);
+            int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 0);
+            for (uint8_t j=0;j<read_len;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
+            printf("\n");
             uart_flush_input(REMOTE_CONTROL_UART); 
             xQueueReset(remote_control_queue_for_events);
             ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);  
@@ -873,17 +886,7 @@ static void read_and_process_data_from_RC(void * pvParameters)
           {
             int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);
             ESP_LOGD(TAG_RC, "Received in total %d bytes", read_len);
-            //for (j=0;j<15;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
-/*            
-            j = 0;
-            while ((incoming_message_buffer_remote[0] != RC_MESSAGE_HEADER) && (j < read_len+1)) 
-            {
-              for (i=0; i<read_len; i++) incoming_message_buffer_remote[i] = incoming_message_buffer_remote[i+1];
-              j++;
-            }
-*/
-            //for (j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
-            //printf("\n");
+
             if ((incoming_message_buffer_remote[0] == RC_MESSAGE_HEADER) 
             && (incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-2)))
             {
@@ -1057,11 +1060,10 @@ static void send_data_to_RC(void * pvParameters)
 //ждет прерывания от обнаружения символа начала строки, считывает данные, обрабатывает и отправляем в main_flying_cycle 
 //опционально можем настраивать частоту выдачи данных с TFSmini 
 #ifdef USING_LIDAR_UART
-static void read_and_process_data_from_lidar(void * pvParameters)
+static void lidar_read_and_process_data(void * pvParameters)
 {
   uint8_t incoming_message_buffer_lidar[NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR];
   uint16_t i = 0;
-  uint16_t j = 0;
   uint16_t pos = 0;
   uint8_t sum = 0;
   struct data_from_lidar_to_main_struct lidar_data;
@@ -1092,7 +1094,6 @@ static void read_and_process_data_from_lidar(void * pvParameters)
                     uart_flush_input(LIDAR_UART); 
                     //for (i=0; i<read_len; i++) printf ("%02x", incoming_message_buffer_lidar[i]);
                     //printf("\n");
-                    j = 0;
                     for (i=0;i<8;i++) sum+= incoming_message_buffer_lidar[i];
                     //printf("%02x\n",sum);
                     if ((incoming_message_buffer_lidar[0] == 0x59) && (incoming_message_buffer_lidar[1] == 0x59) && (incoming_message_buffer_lidar[8] == sum))
@@ -1210,11 +1211,12 @@ static void PCA9685_control(void * pvParameters)
         xSemaphoreGive (semaphore_for_i2c_internal);
         ESP_LOGI(TAG_PCA9685,"Output #%d set to %d%%",output_number, pwm_value);
       }  
-    
     }
   }
 }
 
+
+#ifdef USING_W25N
 //Задача записи логов во внешнюю flash-память
 //Принимает на вход данные на запись из main_flyibg_cycle и записывает их в Winbond 
 static void writing_logs_to_flash(void * pvParameters)
@@ -1234,10 +1236,31 @@ static void writing_logs_to_flash(void * pvParameters)
         W25N_program_execute(page_address);       //65536 pages, total 26 minutes
         page_address++;
       }
+    if (page_address == 65535)
+    {
+      ESP_LOGE(TAG_W25N,"Внешняя flash-память для логов переполнена, запись останавливается\n");
+      vTaskDelete(NULL);
+    } 
     }
   }
 }
 
+//Задача считывания данных из внешней flash. Активируется только если обнаруживается установленная перемычка "считать логи."
+//Получает данные с памяти и выдает их в UART
+static void reading_logs_from_external_flash(void * pvParameters)
+{
+  while(1) {
+    W25N_read_and_print_all();
+    while (1) 
+    {
+      gpio_set_level(LED_RED, 1);
+      vTaskDelay(500/portTICK_PERIOD_MS); 
+      gpio_set_level(LED_RED, 0);
+      vTaskDelay(500/portTICK_PERIOD_MS); 
+    }; 
+  }
+}
+#endif
 
 //Задача управления полетными огнями
 //В зависимости от состояния мограет полетными огнями с разной задержкой
@@ -1249,7 +1272,7 @@ static void blinking_flight_lights(void * pvParameters)
   {
     xTaskNotifyWait(0,0,&blinking_mode,NULL);
   
-    if (blinking_mode == 0)
+    if (blinking_mode == 0)                 //аварийный режим (1 зеленый 1 красный)
     {
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
       gpio_set_level(RED_FLIGHT_LIGHTS, 1);
@@ -1260,7 +1283,7 @@ static void blinking_flight_lights(void * pvParameters)
       vTaskDelay(250/portTICK_PERIOD_MS);
     }
 
-    if (blinking_mode == 1)
+    if (blinking_mode == 1)               //штатный режим (2 зеленых 1 красный)
     {
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
       vTaskDelay(50/portTICK_PERIOD_MS);
@@ -1280,28 +1303,14 @@ static void blinking_flight_lights(void * pvParameters)
 }
 
 
-//Задача считывания данных из внешней flash. Активируется только если обнаруживается установленная перемычка "считать логи."
-//Получает данные с памяти и выдает их в UART
-static void reading_logs_from_external_flash(void * pvParameters)
-{
-  while(1) {
-    W25N_read_and_print_all();
-    while (1) 
-    {
-      gpio_set_level(LED_RED, 1);
-      vTaskDelay(500/portTICK_PERIOD_MS); 
-      gpio_set_level(LED_RED, 0);
-      vTaskDelay(500/portTICK_PERIOD_MS); 
-    }; 
-  }
-}
+
 
 //Задача печати статистики загруженности системы.
 //Получает данные vTaskGetRunTimeStats и петатает их раз в 5 секунд. Только для режима диагностики.
 #ifdef USING_PERFORMANCE_MESUREMENT
 static void performace_monitor(void * pvParameters)
 {
-  char statbuf[512];
+   char statbuf[800];
   
   while(1)
   {
@@ -1315,7 +1324,7 @@ static void performace_monitor(void * pvParameters)
 
 //Задача считывания данных с INA219 (мониторинг тока и напряжений)
 //Активируется из main_flying_cycle, возвращает через очередь данные о напряжении АКБ, токе, мощности и затраченной энергии
-static void read_and_process_data_from_INA219(void * pvParameters)
+static void INA219_read_and_process_data(void * pvParameters)
 {
   float INA219_data[4] = {0.0, 0.0, 0.0, 0.0};
   int64_t prev_time = 0;
@@ -1342,14 +1351,13 @@ static void read_and_process_data_from_INA219(void * pvParameters)
 /*Задача основного полетного цикла. Единственная задача на ядре 1. 
   - Активируется по прерыванию о готовности данных от IMU.
   - при необходимости калибрует и записывает в NVS калибровочные коэффициенты 
-  - Считывает данные от IMU, обрабатывает, вычисляет Маджвиком (с учетом магнетометра или без углы наклона
+  - Считывает данные от IMU, обрабатывает, вычисляет Маджвиком (с учетом магнетометра или без) углы наклона
   - получает из очереди команды от пульта
-  - на основе данных по текущим углам и команд от пульта вычисляет необходимые воздействия 
+  - на основе данных по текущим углам и команд от пульта вычисляет необходимые воздействия на двигатели посредством двухконтурного PID
   - выдает эти воздействия на моторы
   - подготавливает данные для записи логов и выдает их в соответствующую очередь 
 
 Сначала идут переменные, потом вспомогательные функции, потом само тело задачи.
-
 */
 static void main_flying_cycle(void * pvParameters)
 {
@@ -1358,16 +1366,20 @@ static void main_flying_cycle(void * pvParameters)
   extern volatile float q2;
   extern volatile float q3;
   
+  uint32_t IMU_interrupt_status = 0;
+  uint8_t test_for_all_0 = 0;
+  uint8_t test_for_all_1 = 0xFF;
+  
   uint8_t sensor_data_1[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
   uint8_t sensor_data_2[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
 
-  uint8_t sensor_data_1_old[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
-  uint8_t sensor_data_2_old[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
-  
-  int16_t accel_raw_1[3] = {31562,13,7613};  //0x7B4A 0x000D 0x1DBD
-  int16_t gyro_raw_1[3] = {9568,28999,-31444}; //0x2560 0x7147 0x852C
-  int16_t accel_raw_2[3] = {31562,13,7613};  //0x7B4A 0x000D 0x1DBD
-  int16_t gyro_raw_2[3] = {9568,28999,-31444}; //0x2560 0x7147 0x852C
+  int16_t accel_raw_1[3] = {0,0,0}; 
+  int16_t gyro_raw_1[3] = {0,0,0}; 
+  int16_t accel_raw_2[3] = {0,0,0}; 
+  int16_t gyro_raw_2[3] = {0,0,0};
+
+  uint8_t calibration_flag = 0;
+  float number_of_IMU_calibration_counts = NUMBER_OF_IMU_CALIBRATION_COUNTS; 
           
   float Gyro_X_cal_1 = 0.0;
   float Gyro_Y_cal_1 = 0.0;
@@ -1383,23 +1395,15 @@ static void main_flying_cycle(void * pvParameters)
   float Accel_Y_cal_2 = 0.0;
   float Accel_Z_cal_2 = 0.0;
 
-  uint16_t counter = 0;
+  uint64_t large_counter = 0;
+  uint64_t timer_value = 0;
   uint16_t i = 0;
-
+ 
   int16_t accel_1_offset[3] = {0,0,0};
   int16_t accel_2_offset[3] = {0,0,0};
   int16_t gyro_1_offset[3] = {0,0,0};
   int16_t gyro_2_offset[3] = {0,0,0};
-
-  int16_t magnet_raw[3] = {0,0,0};
-  int16_t magnet_max[3] = {0,0,0};
-  int16_t magnet_min[3] = {0,0,0};
-  float magnet_hard_bias[3] = {0.0,0.0,0.0};
-  float magnet_radius[3] = {0.0,0.0,0.0};
-  float magnet_avg_radius = 0.0;
-  float magnet_coeff[3] = {0.0,0.0,0.0};
-  float magnet_converted[3] = {0.0,0.0,0.0};
-     
+   
   float gyro_converted_1[3] = {0.0,0.0,0.0};
   float accel_converted_1[3] = {0.0,0.0,0.0};
   float gyro_converted_2[3] = {0.0,0.0,0.0};
@@ -1410,6 +1414,7 @@ static void main_flying_cycle(void * pvParameters)
 
   float accel_converted_accumulated_2[3] = {0.0,0.0,0.0};
   float gyro_converted_accumulated_2[3] = {0.0,0.0,0.0};
+
 #ifdef USING_HOLYBRO_M9N  
   const uint8_t madgwick_cycles = 1;
 #else 
@@ -1474,38 +1479,25 @@ static void main_flying_cycle(void * pvParameters)
   float pid_yaw_rate = 0;
   float diff_yaw_error = 0.0;
 
-
   float engine[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY}; 
   float engine_filtered[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY};
   float engine_filter_pool [LENGTH_OF_ESC_FILTER][6] = {0};                                   //data pool for ESC input filter
-  float accum_float;
+  float accum_float = 0;;
 
-  uint8_t command_for_MCP23017;
-  uint16_t command_for_PCA9685;
-  
   UBaseType_t uxHighWaterMark;
 
   struct data_from_rc_to_main_struct rc_fresh_data;
     rc_fresh_data.mode = 0;
     rc_fresh_data.engines_start_flag = 0;
     rc_fresh_data.altitude_hold_flag = 0;
-  struct data_from_gps_to_main_struct gps_fresh_data;
   struct data_from_main_to_rc_struct data_to_send_to_rc;
-  float rc_throttle_filtered = 0;
-
   uint32_t remote_control_lost_comm_counter = 0;
 
-  float number_of_IMU_calibration_counts = NUMBER_OF_IMU_CALIBRATION_COUNTS;
-  float number_of_magnetometer_calibration_counts = NUMBER_OF_MAGNETOMETER_CALIBRATION_COUNTS; 
+#ifdef USING_HOLYBRO_M9N
+  struct data_from_gps_to_main_struct gps_fresh_data;
+  float mag_fresh_data[3];
+#endif
 
-//logging related variables
-  uint8_t logs_buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
-  uint64_t start_time = 0;
-  uint32_t timestamp = 0;
-  uint64_t timer_value = 0;
-  uint64_t large_counter = 0;
-  uint8_t *p_to_uint8;
-  uint8_t flags_byte = 0;
 //altitude hold related variables
   bool altitude_hold_mode_enabled = 0;
   float altitude_setpoint = 0;
@@ -1519,6 +1511,7 @@ static void main_flying_cycle(void * pvParameters)
   float integral_alt_error = 0;
   float alt_hold_initial_throttle = 0;
   float current_altitude_old = 0;
+  float error_vertical_velocity = 0;
 
 #ifdef USING_LIDAR_UART
     struct data_from_lidar_to_main_struct lidar_fresh_data;
@@ -1529,12 +1522,15 @@ static void main_flying_cycle(void * pvParameters)
 #endif
 
   float INA219_fresh_data[4];
-  uint8_t calibration_flag = 0;
-  float mag_fresh_data[3];
-
-  uint32_t IMU_interrupt_status = 0;
-  uint8_t test_for_all_0 = 0;
-  uint8_t test_for_all_1 = 0xFF;
+  
+#ifdef USING_W25N 
+  //logging related variables
+  uint8_t logs_buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
+  uint64_t start_time = 0;
+  uint32_t timestamp = 0;
+  uint8_t *p_to_uint8 = NULL;
+  uint8_t flags_byte = 0;
+#endif
 
 
   void Convert_Q_to_degrees(void) {
@@ -1694,126 +1690,127 @@ static void main_flying_cycle(void * pvParameters)
     ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
   }
 
+#ifdef USING_W25N 
 void prepare_logs(void) {
-    p_to_uint8 = &timestamp;
+    p_to_uint8 = (uint8_t*)&timestamp; 
     logs_buffer[0] = *p_to_uint8;
     logs_buffer[1] = *(p_to_uint8+1);
     logs_buffer[2] = *(p_to_uint8+2);
     logs_buffer[3] = *(p_to_uint8+3);
 
-    p_to_uint8 = &accel_raw_1[0];       //raw accel_1 X
+    p_to_uint8 = (uint8_t*)&accel_raw_1[0];     //raw accel_1 X
     logs_buffer[4] = *p_to_uint8;
     logs_buffer[5] = *(p_to_uint8+1);
 
-    p_to_uint8 = &accel_raw_1[1];       //raw accel_1 Y
+    p_to_uint8 = (uint8_t*)&accel_raw_1[1];       //raw accel_1 Y
     logs_buffer[6] = *p_to_uint8;
     logs_buffer[7] = *(p_to_uint8+1);
 
-    p_to_uint8 = &accel_raw_1[2];       //raw accel_1 Z
+    p_to_uint8 = (uint8_t*)&accel_raw_1[2];       //raw accel_1 Z
     logs_buffer[8] = *p_to_uint8;
     logs_buffer[9] = *(p_to_uint8+1);
 
-    p_to_uint8 = &gyro_raw_1[0];        //raw gyro_1 X
+    p_to_uint8 = (uint8_t*)&gyro_raw_1[0];        //raw gyro_1 X
     logs_buffer[10] = *p_to_uint8;
     logs_buffer[11] = *(p_to_uint8+1);
 
-    p_to_uint8 = &gyro_raw_1[1];        //raw gyro_1 Y
+    p_to_uint8 = (uint8_t*)&gyro_raw_1[1];        //raw gyro_1 Y
     logs_buffer[12] = *p_to_uint8;
     logs_buffer[13] = *(p_to_uint8+1);
 
-    p_to_uint8 = &gyro_raw_1[2];        //raw gyro_1 Z
+    p_to_uint8 = (uint8_t*)&gyro_raw_1[2];        //raw gyro_1 Z
     logs_buffer[14] = *p_to_uint8;
     logs_buffer[15] = *(p_to_uint8+1);
 
-    p_to_uint8 = &q0;                    //q0
+    p_to_uint8 = (uint8_t*)&q0;                    //q0
     logs_buffer[16] = *p_to_uint8;
     logs_buffer[17] = *(p_to_uint8+1);
     logs_buffer[18] = *(p_to_uint8+2);
     logs_buffer[19] = *(p_to_uint8+3);
 
-    p_to_uint8 = &q1;                     //q1
+    p_to_uint8 = (uint8_t*)&q1;                     //q1
     logs_buffer[20] = *p_to_uint8;
     logs_buffer[21] = *(p_to_uint8+1);
     logs_buffer[22] = *(p_to_uint8+2);
     logs_buffer[23] = *(p_to_uint8+3);
 
-    p_to_uint8 = &q2;                     //q2
+    p_to_uint8 = (uint8_t*)&q2;                     //q2
     logs_buffer[24] = *p_to_uint8;
     logs_buffer[25] = *(p_to_uint8+1);
     logs_buffer[26] = *(p_to_uint8+2);
     logs_buffer[27] = *(p_to_uint8+3);
 
-    p_to_uint8 = &q3;                      //q3
+    p_to_uint8 = (uint8_t*)&q3;                      //q3
     logs_buffer[28] = *p_to_uint8;
     logs_buffer[29] = *(p_to_uint8+1);
     logs_buffer[30] = *(p_to_uint8+2);
     logs_buffer[31] = *(p_to_uint8+3);
 
-    p_to_uint8 = &pitch;
+    p_to_uint8 = (uint8_t*)&pitch;
     logs_buffer[32] = *p_to_uint8;
     logs_buffer[33] = *(p_to_uint8+1);
     logs_buffer[34] = *(p_to_uint8+2);
     logs_buffer[35] = *(p_to_uint8+3);
 
-    p_to_uint8 = &roll;
+    p_to_uint8 = (uint8_t*)&roll;
     logs_buffer[36] = *p_to_uint8;
     logs_buffer[37] = *(p_to_uint8+1);
     logs_buffer[38] = *(p_to_uint8+2);
     logs_buffer[39] = *(p_to_uint8+3);
 
-    p_to_uint8 = &yaw;
+    p_to_uint8 = (uint8_t*)&yaw;
     logs_buffer[40] = *p_to_uint8;
     logs_buffer[41] = *(p_to_uint8+1);
     logs_buffer[42] = *(p_to_uint8+2);
     logs_buffer[43] = *(p_to_uint8+3);
 
-    p_to_uint8 = &rc_fresh_data.received_throttle;
+    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_throttle;
     logs_buffer[44] = *p_to_uint8;
     logs_buffer[45] = *(p_to_uint8+1);
     logs_buffer[46] = *(p_to_uint8+2);
     logs_buffer[47] = *(p_to_uint8+3);
 
-    p_to_uint8 = &rc_fresh_data.received_pitch;
+    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_pitch;
     logs_buffer[48] = *p_to_uint8;
     logs_buffer[49] = *(p_to_uint8+1);
     logs_buffer[50] = *(p_to_uint8+2);
     logs_buffer[51] = *(p_to_uint8+3);
 
-    p_to_uint8 = &rc_fresh_data.received_roll;
+    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_roll;
     logs_buffer[52] = *p_to_uint8;
     logs_buffer[53] = *(p_to_uint8+1);
     logs_buffer[54] = *(p_to_uint8+2);
     logs_buffer[55] = *(p_to_uint8+3);
 
-    p_to_uint8 = &rc_fresh_data.received_yaw;
+    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_yaw;
     logs_buffer[56] = *p_to_uint8;
     logs_buffer[57] = *(p_to_uint8+1);
     logs_buffer[58] = *(p_to_uint8+2);
     logs_buffer[59] = *(p_to_uint8+3);
 
-    p_to_uint8 = &rc_fresh_data.mode;        
+    p_to_uint8 = (uint8_t*)&rc_fresh_data.mode;        
     logs_buffer[60] = *p_to_uint8;
     logs_buffer[61] = *(p_to_uint8+1);
     
-    p_to_uint8 = &engine_filtered[0];
+    p_to_uint8 = (uint8_t*)&engine_filtered[0];
     logs_buffer[62] = *p_to_uint8;
     logs_buffer[63] = *(p_to_uint8+1);
     logs_buffer[64] = *(p_to_uint8+2);
     logs_buffer[65] = *(p_to_uint8+3);
 
-    p_to_uint8 = &engine_filtered[1];
+    p_to_uint8 = (uint8_t*)&engine_filtered[1];
     logs_buffer[66] = *p_to_uint8;
     logs_buffer[67] = *(p_to_uint8+1);
     logs_buffer[68] = *(p_to_uint8+2);
     logs_buffer[69] = *(p_to_uint8+3);
 
-    p_to_uint8 = &engine_filtered[2];
+    p_to_uint8 = (uint8_t*)&engine_filtered[2];
     logs_buffer[70] = *p_to_uint8;
     logs_buffer[71] = *(p_to_uint8+1);
     logs_buffer[72] = *(p_to_uint8+2);
     logs_buffer[73] = *(p_to_uint8+3);
 
-    p_to_uint8 = &engine_filtered[3];
+    p_to_uint8 = (uint8_t*)&engine_filtered[3];
     logs_buffer[74] = *p_to_uint8;
     logs_buffer[75] = *(p_to_uint8+1);
     logs_buffer[76] = *(p_to_uint8+2);
@@ -1827,6 +1824,7 @@ void prepare_logs(void) {
 
     logs_buffer[78] = flags_byte;
 }
+#endif
 
 void NVS_reading_calibration_values(void)
 {
@@ -1839,11 +1837,11 @@ void NVS_reading_calibration_values(void)
   }
   ESP_ERROR_CHECK( err );
 
-  ESP_LOGI(TAG_NVS,"Открываем EEPROM (NVS)... ");
+  ESP_LOGI(TAG_NVS,"Открываем NVS... ");
   nvs_handle_t NVS_handle;
   err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
   if (err != ESP_OK) {
-      ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия EEPROM (NVS)!\n", esp_err_to_name(err));
+      ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
   } else {
         ESP_LOGI(TAG_NVS,"NVS открыт");
 
@@ -2032,6 +2030,9 @@ ESP_LOGI(TAG_FLY,"Таймер контроля зависания IMU#2 зап�
 ESP_LOGI(TAG_FLY,"Активируем прерывания на входах от IMU и MCP23017.....");
 configure_pins_for_interrupt();
 ESP_LOGI(TAG_FLY,"Прерывания от IMU и MCP23017 активированы\n");
+#ifdef USING_W25N
+start_time = get_time();
+#endif
 
 if (calibration_flag) ESP_LOGI(TAG_INIT,"Установлена перемычка DI4, начинаем калибровку IMU....");
 else ESP_LOGI(TAG_FLY,"К ПОЛЕТУ ГОТОВ!\n");
@@ -2210,7 +2211,7 @@ if (!(calibration_flag))
                               mag_fresh_data[2],   
                               timer_value);
 //запрашиваем очередную порцию данных от магнетометра
-        xTaskNotifyGive(task_handle_read_and_process_data_from_mag);    
+        xTaskNotifyGive(task_handle_mag_read_and_process_data);    
 
 //если не используем модуль с компасом и GPS - запускаем маджвика без учета данных от магнетометра используя в качестве входных параметров усредненные накопленные за предыдущие циклы 
 //показания гироскопов и акселерометров      
@@ -2242,7 +2243,7 @@ if (!(calibration_flag))
 //увеличиваем глобальный счетчик циклов        
         large_counter++;
 //производим запрос данных от INA219 (раз в 1000 циклов, то есть раз в секунду) 
-        if ((large_counter % 1000) == 0) xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+        if ((large_counter % 1000) == 0) xTaskNotifyGive(task_handle_INA219_read_and_process_data);
         
 //далее место где удобно что-то выводить, печатать 
 
@@ -2254,7 +2255,7 @@ if (!(calibration_flag))
         //printf ("%ld\n", IMU_interrupt_status); 
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
         //printf("%d\n", data_to_send_to_rc.power_voltage_value);
-//        xTaskNotifyGive(task_handle_read_and_process_data_from_INA219);
+//        xTaskNotifyGive(task_handle_INA219_read_and_process_data);
 
         //printf("%0.1f, %0.1f, %0.1f\n", gyro_converted_1[1],(-1)*gyro_converted_2[0], (gyro_converted_1[1] - gyro_converted_2[0]) / 2.0 );  
         //ESP_LOGI(TAG_FLY,"%0.1f", rc_fresh_data.received_yaw);
@@ -2268,15 +2269,16 @@ if (!(calibration_flag))
         //ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
         //printf("%0.1f\n", rc_pitch_filtered);
 
-//получаем свежие данные из очереди от пульта управления. Если данные успешно получены - информируем задачу моргания полетными огнями что моргаем в штатном режиме в штатном режиме
-//в противном случае если были уже в полете - фиксируем уровень газа на некоем уровне и ставим в нули управление по углам.       
+//получаем свежие данные из очереди от пульта управления. Если данные успешно получены - информируем задачу моргания полетными огнями что моргаем в штатном режиме (режим "1")
+    
         if (xQueueReceive(remote_control_to_main_queue, &rc_fresh_data, 0)) 
         {
           remote_control_lost_comm_counter = 0; 
           xTaskNotify(task_handle_blinking_flight_lights,1,eSetValueWithOverwrite);
         }
+//в противном случае инкрементируем счетчик, определяющий допустимое время без связи с пультом если были уже в полете - фиксируем уровень газа на некоем уровне и ставим в нули управление по углам.     
         else remote_control_lost_comm_counter++;
-
+//если счетчик превысил порог - фиксируем уровень газа на некоем предустановленном значении и все управляющие сигналы в ноль (то есть в идеале висение на месте) 
         if (remote_control_lost_comm_counter > RC_NO_COMM_DELAY_MAIN_CYCLES)  
         {
           if (rc_fresh_data.engines_start_flag) {
@@ -2286,14 +2288,16 @@ if (!(calibration_flag))
             rc_fresh_data.received_roll = 0;
             rc_fresh_data.received_yaw = 0;
           }
+//и оповещаем задачу моргания полетными огнями моргать в аварийном режиме (режим "0")
           xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
         }
-
+#ifdef USING_GPS
 //получаем свежие данные из очереди от GPS
         if (xQueueReceive(gps_to_main_queue, &gps_fresh_data, 0)) 
         {
           //ESP_LOGI(TAG_FLY,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_fresh_data.latitude_d, gps_fresh_data.longtitude_d);
         }; 
+#endif
 
 //получаем свежие данные из очереди от лидара
 #ifdef USING_LIDAR_UART        
@@ -2321,7 +2325,7 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
       };
 
 //далее разбираемся с полетным режимом
-// если двигатели запущены - понимаем стоит ли режим удержания высоты. Если да - замещаем полученное от пульта значение газа вычисленным автоматически  
+// если двигатели запущены - понимаем стоит ли режим удержания высоты. Если да - замещаем полученное от пульта значение газа вычисленным автоматически на основание данных от лидара 
         if (rc_fresh_data.engines_start_flag)
         {
 #ifdef USING_LIDAR_UART
@@ -2333,8 +2337,8 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
               altitude_hold_mode_enabled = 1;
               alt_hold_initial_throttle = rc_fresh_data.received_throttle;
             }
-            error_altitude = altitude_setpoint - current_altitude;
-            integral_alt_error = Ki_alt * error_altitude;
+         error_altitude = altitude_setpoint - current_altitude;
+            integral_alt_error = Ki_alt * error_altitude;                           //+=
             if (integral_alt_error > 500) integral_alt_error = 500;
             if (integral_alt_error < -500) integral_alt_error = -500;
 
@@ -2345,6 +2349,16 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
             if (pid_altitude < -3000) pid_altitude = -3000;
             rc_fresh_data.received_throttle = alt_hold_initial_throttle + pid_altitude;
             previous_error_altitude = error_altitude;
+/*          error_vertical_velocity = 0.0 - vertical_velocity;
+            integral_error_vertical_velocity += Ki_vert_vel * error_vertical_velocity;
+            if (integral_error_vertical_velocity > 500) integral_error_vertical_velocity = 500;
+            if (integral_error_vertical_velocity < -500) integral_error_vertical_velocity = -500;
+            pid_vertical_velocity = Kp_vert_vel * error_vertical_velocity + Kd_vert_vel * (error_vertical_velocity - error_vertical_velocity_old) + integral_error_vertical_velocity;
+            if (pid_vertical_velocity > 3000) pid_vertical_velocity = 3000;
+            if (pid_vertical_velocity < -3000) pid_vertical_velocitye = -3000;
+            rc_fresh_data.received_throttle = alt_hold_initial_throttle + pid_vertical_velocity;
+            error_vertical_velocity_old = error_vertical_velocity; 
+*/
           }
         else 
           {
@@ -2373,7 +2387,7 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
         update_engines();
 //на этом цикл от считывания данных от IMU до выдачи сигналов на двигатели фактически закончен
 
-//собираем данные телеметрии и отправляем их в очередь на отправку
+//собираем данные телеметрии и отправляем их в очередь на запись во внешнюю флэш-память
         data_to_send_to_rc.pitch = pitch;
         data_to_send_to_rc.roll = roll;
         data_to_send_to_rc.yaw = yaw;
@@ -2463,13 +2477,13 @@ static void init(void * pvParameters)
   else ESP_LOGI(TAG_INIT,"Очередь для MCP23017 создана\n");
 
 //place it here to avoid engines beeping
-  ESP_LOGI(TAG_INIT,"Настройка модуля ШИМ для управления двигателями.....");
+  ESP_LOGI(TAG_INIT,"Настройка ШИМ-модуля (LEDC) для управления двигателями.....");
   configuring_timer_for_PWM();
   configuring_channel_for_PWM(0,ENGINE_PWM_OUTPUT_0_PIN);
   configuring_channel_for_PWM(1,ENGINE_PWM_OUTPUT_1_PIN);
   configuring_channel_for_PWM(2,ENGINE_PWM_OUTPUT_2_PIN);
   configuring_channel_for_PWM(3,ENGINE_PWM_OUTPUT_3_PIN);
-  ESP_LOGI(TAG_INIT,"ШИМ модуль для двигателей настроен\n");
+  ESP_LOGI(TAG_INIT,"ШИМ-модуль для управления двигателями настроен\n");
 
   if (!(MCP23017_get_inputs_state() & 0b00000100))  //DI2 - calibrating ESC
     { 
@@ -2759,7 +2773,7 @@ static void init(void * pvParameters)
 
   xSemaphoreGive(semaphore_for_i2c_internal);   //The semaphore is created in the 'empty' state, meaning the semaphore must first be given
 
-  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от пульта управления в main_flying_cycle");
+  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от пульта управления в main_flying_cycle.....");
   remote_control_to_main_queue = xQueueCreate(10, sizeof(struct data_from_rc_to_main_struct));
   if (remote_control_to_main_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи данных от пульта управления в main_flying_cycle не создана\n");
@@ -2777,7 +2791,7 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от GPS в main_flying_cycle успешно создана\n");
+    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от GPS в main_flying_cycle успешно создана.....\n");
      
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи телеметрии из main_flying_cycle на пульт управления");
   main_to_rc_queue = xQueueCreate(1, sizeof(struct data_from_main_to_rc_struct));     //size 1 because use xQueueOverwrite
@@ -2790,7 +2804,7 @@ static void init(void * pvParameters)
     else ESP_LOGI(TAG_INIT,"Очередь для передачи телеметрии из main_flying_cycle на пульт управления успешно создана\n"); 
 
 #ifdef USING_LIDAR_UART
-  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от лидара в main_flying_cycle");
+  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от лидара в main_flying_cycle.....");
   lidar_to_main_queue = xQueueCreate(10, sizeof(struct data_from_lidar_to_main_struct));
   if ( lidar_to_main_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи данных от лидара в main_flying_cycle не создана\n");
@@ -2811,29 +2825,9 @@ static void init(void * pvParameters)
   }
     else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от INA219 в main_flying_cycle успешно создана\n");
 
-  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных в задачу аварийного моргания светодиодами.....");
-  any_to_blinking_queue = xQueueCreate(2, sizeof(uint8_t));
-  if (any_to_blinking_queue == NULL) {
-    ESP_LOGE(TAG_INIT,"Очередь для передачи данных в задачу аварийного моргания светодиодами не создана\n");
-    error_code = 1;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных в задачу аварийного моргания светодиодами успешно создана\n"); 
-
   ESP_LOGI(TAG_INIT,"Создаем и запускаем GP timer.....");
   Create_and_start_GP_Timer ();
   ESP_LOGI(TAG_INIT,"GP timer создан и запущен\n");
-
-  ESP_LOGI(TAG_INIT,"Создаем очередь для контроля зависания IMU.....");
-  IMU_monitoring_timer_to_main_queue = xQueueCreate(2, sizeof(uint8_t));
-  if (IMU_monitoring_timer_to_main_queue == NULL) {
-    ESP_LOGE(TAG_INIT,"Очередь для контроля зависания IMU не создана\n");
-    error_code = 1;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-    else ESP_LOGI(TAG_INIT,"Очередь для контроля зависания IMU успешно создана\n"); 
 
 //*************************************************** НАЧИНАЕМ СОЗДАВАТЬ ЗАДАЧИ ****************************************************************************************************** */
 
@@ -2863,8 +2857,8 @@ static void init(void * pvParameters)
   }
 
 #ifdef USING_HOLYBRO_M9N                
-  ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных GPS (read_and_process_data_from_GPS).....");
-  if (xTaskCreateStaticPinnedToCore(read_and_process_data_from_gps, "read_and_process_data_from_gps", READ_AND_PROCESS_DATA_FROM_GPS_STACK_SIZE, NULL, 3, read_and_process_data_from_gps_stack, &read_and_process_data_from_gps_TCB_buffer, 0) != NULL)
+  ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных GPS (gps_read_and_process_data).....");
+  if (xTaskCreateStaticPinnedToCore(gps_read_and_process_data, "gps_read_and_process_data", GPS_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, 3, gps_read_and_process_data_stack, &gps_read_and_process_data_TCB_buffer, 0) != NULL)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных GPS успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для считывания данных GPS не создана\n");
@@ -2875,9 +2869,9 @@ static void init(void * pvParameters)
 
   vTaskDelay(50/portTICK_PERIOD_MS);
 
-  ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных с магнетометра (read_and_process_data_from_magnetometer).....");
-  task_handle_read_and_process_data_from_mag = xTaskCreateStaticPinnedToCore(rread_and_process_data_from_mag, "rread_and_process_data_from_mag", READ_AND_PROCESS_DATA_FROM_MAG_STACK_SIZE, NULL, 6, read_and_process_data_from_mag_stack, &read_and_process_data_from_mag_TCB_buffer, 0);
-  if (task_handle_read_and_process_data_from_mag != NULL)
+  ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных с магнетометра (mag_read_and_process_data).....");
+  task_handle_mag_read_and_process_data = xTaskCreateStaticPinnedToCore(mag_read_and_process_data, "mag_read_and_process_data", MAG_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, 6, mag_read_and_process_data_stack, &mag_read_and_process_data_TCB_buffer, 0);
+  if (task_handle_mag_read_and_process_data != NULL)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных с магнетометра успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для считывания данных с магнетометра не создана\n");
@@ -2889,8 +2883,8 @@ static void init(void * pvParameters)
         
   vTaskDelay(50/portTICK_PERIOD_MS);
     
-  ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных с пульта управления (read_and_process_data_from_RC).....");
-  if (xTaskCreateStaticPinnedToCore(read_and_process_data_from_RC,"read_and_process_data_from_RC",READ_AND_PROCESS_DATA_FROM_RC_STACK_SIZE,NULL,5,read_and_process_data_from_RC_stack,&read_and_process_data_from_RC_TCB_buffer,0) != NULL)
+  ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных с пульта управления (RC_read_and_process_data).....");
+  if (xTaskCreateStaticPinnedToCore(RC_read_and_process_data,"RC_read_and_process_data",RC_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,5,RC_read_and_process_data_stack,&RC_read_and_process_data_TCB_buffer,0) != NULL)
     ESP_LOGI(TAG_INIT,"Задача для получения данных с пульта управления успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для получения данных с пульта управления не создана\n");
@@ -2928,8 +2922,8 @@ static void init(void * pvParameters)
   vTaskDelay(50/portTICK_PERIOD_MS);
 
 #ifdef USING_LIDAR_UART
-  ESP_LOGI(TAG_INIT,"Создавем задачу для получения данных от лидара (read_and_process_data_from_lidar).....");
-  if (xTaskCreateStaticPinnedToCore(read_and_process_data_from_lidar,"read_and_process_data_from_lidar",read_and_process_data_from_lidar_STACK_SIZE ,NULL,3,read_and_process_data_from_lidar_stack,&read_and_process_data_from_lidar_TCB_buffer,0) != NULL)
+  ESP_LOGI(TAG_INIT,"Создавем задачу для получения данных от лидара (lidar_read_and_process_data).....");
+  if (xTaskCreateStaticPinnedToCore(lidar_read_and_process_data,"lidar_read_and_process_data",LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,3,lidar_read_and_process_data_stack,&lidar_read_and_process_data_TCB_buffer,0) != NULL)
     ESP_LOGI(TAG_INIT,"Задача для получения данных от лидара успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для получения данных от лидара не создана\n");
@@ -2941,9 +2935,9 @@ static void init(void * pvParameters)
   vTaskDelay(50/portTICK_PERIOD_MS);
 #endif
         
-  ESP_LOGI(TAG_INIT,"Создаем задачу считывания данных с INA219 (read_and_process_data_from_INA219).....");
-  task_handle_read_and_process_data_from_INA219 = xTaskCreateStaticPinnedToCore(read_and_process_data_from_INA219,"read_and_process_data_from_INA219",READ_AND_PROCESS_DATA_FROM_INA219_STACK_SIZE,NULL,2,read_and_process_data_from_INA219_stack, &read_and_process_data_from_INA219_TCB_buffer,0);
-  if ( task_handle_read_and_process_data_from_INA219 != NULL)
+  ESP_LOGI(TAG_INIT,"Создаем задачу считывания данных с INA219 (INA219_read_and_process_data).....");
+  task_handle_INA219_read_and_process_data = xTaskCreateStaticPinnedToCore(INA219_read_and_process_data,"INA219_read_and_process_data",INA219_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,2,INA219_read_and_process_data_stack, &INA219_read_and_process_data_TCB_buffer,0);
+  if ( task_handle_INA219_read_and_process_data != NULL)
     ESP_LOGI(TAG_INIT,"Задача считывания данных с INA219 успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача считывания данных с INA219 не создана\n");
@@ -2970,10 +2964,10 @@ static void init(void * pvParameters)
 
 #ifdef USING_W25N
   ESP_LOGI(TAG_INIT,"Создаем задачу записи логов во внешнюю flash-память (writing_logs_to_flash).....");
-  if (xTaskCreateStaticPinnedToCore(writing_logs_to_flash,"writing_logs_to_flash",4096,NULL,3,NULL,0) !=NULL) 
+  task_handle_writing_logs_to_flash = xTaskCreateStaticPinnedToCore(writing_logs_to_flash,"writing_logs_to_flash",WRITING_LOGS_TO_FLASH_STACK_SIZE,NULL,0,writing_logs_to_flash_stack, &writing_logs_to_flash_TCB_buffer,0);
+  if (task_handle_writing_logs_to_flash !=NULL) 
     {
       ESP_LOGI(TAG_INIT,"Задача записи логов во внешнюю flash-память успешно создана на ядре 0\n");
-      start_time = get_time();
     }
   else {
     ESP_LOGE(TAG_INIT,"Задача записи логов во внешнюю flash-память не создана\n");
@@ -3006,7 +3000,8 @@ static void init(void * pvParameters)
 
 
 
-
+/********************************************************************     СЕКЦИЯ 5     ***********************************************************************************************/
+/********************************************************************  СОБСТВЕННО MAIN ***********************************************************************************************/
 void app_main(void) {
 
   xTaskCreatePinnedToCore(init, "init", 8912, NULL, 5, &task_handle_init, 1);

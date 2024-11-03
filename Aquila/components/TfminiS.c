@@ -1,7 +1,7 @@
 
-#include "ve_i2c.h"
+#include "wt_i2c.h"
 #include "TfminiS.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 #include "driver/uart.h"
 
 void tfs_i2c_write(uint8_t i2c_port, uint8_t *data_to_write)

@@ -1,8 +1,8 @@
-#include "ve_i2c.h"
+#include "wt_i2c.h"
 #include "PCA9685.h"
 #include "esp_log.h"
 #include <rom/ets_sys.h>
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 
 
 extern char *TAG_PCA9685;
@@ -13,7 +13,7 @@ esp_err_t PCA9685_communication_check()
 {
   esp_err_t err = ESP_FAIL;
 
-  if (i2c_read_byte_from_address_NEW(PCA9685_dev_handle, PCA9685_SUBADR1) == 0xE2) {
+  if (i2c_read_byte_from_address(PCA9685_dev_handle, PCA9685_SUBADR1) == 0xE2) {
     ESP_LOGI(TAG_PCA9685,"Связь с PCA9685 установлена");
     err = ESP_OK;
   }
@@ -34,13 +34,13 @@ esp_err_t PCA9685_init()
 
 for (i=0; i<4; i++)   //writing predefined configuration 
 {
-  i2c_write_byte_to_address_NEW(PCA9685_dev_handle, PCA9685_configuration_data[i][0], PCA9685_configuration_data[i][1]);  
+  i2c_write_byte_to_address(PCA9685_dev_handle, PCA9685_configuration_data[i][0], PCA9685_configuration_data[i][1]);  
   ets_delay_us(500);
 }
 
 for (i=1; i<4; i++) //checking against predefined configuration  
 {
-  if (i2c_read_byte_from_address_NEW(PCA9685_dev_handle, PCA9685_configuration_data[i][0]) != (PCA9685_configuration_data[i][1] & 0b01111111)) //for MODE1
+  if (i2c_read_byte_from_address(PCA9685_dev_handle, PCA9685_configuration_data[i][0]) != (PCA9685_configuration_data[i][1] & 0b01111111)) //for MODE1
   {
     err = ESP_FAIL;
     ESP_LOGE(TAG_PCA9685,"Ошибка конфигурирования PCA9685 в регистре %d",PCA9685_configuration_data[i][0]);
@@ -52,17 +52,17 @@ for (i=1; i<4; i++) //checking against predefined configuration
   return err;
 }
 
-void PCA9685_send(uint8_t value_in_persents, uint8_t output) 
+void PCA9685_send(uint8_t value_in_percents, uint8_t output) 
 {
   uint16_t pulse_length;// temp variable for PWM
   uint8_t data_to_write[4];
 
-  pulse_length = (uint16_t) (value_in_persents * 40.95);
+  pulse_length = (uint16_t) (value_in_percents * 40.95);
   data_to_write[0] = 0;
   data_to_write[1] = 0;
   data_to_write[2] = pulse_length;                  //LSB
   data_to_write[3] = pulse_length >> 8;             //MSB
 
-  i2c_write_bytes_to_address_NEW(PCA9685_dev_handle, PCA9685_LED0_ON_L + 4 * output, 5, &data_to_write);
+  i2c_write_bytes_to_address(PCA9685_dev_handle, PCA9685_LED0_ON_L + 4 * output, 5, data_to_write);
 }
 

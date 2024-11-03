@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <ctype.h>
 #include "math.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 
 volatile float q0 = 0.0; 
 volatile float q1 = 1.0; 

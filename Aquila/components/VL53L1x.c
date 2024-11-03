@@ -6,10 +6,10 @@
 #include <ctype.h>
 #include "VL53L1x.h"
 #include "freertos/FreeRTOS.h"
-#include "ve_i2c.h"
+#include "wt_i2c.h"
 #include "esp_log.h"
 #include "esp_err.h"
-#include "ve_alldef.h"
+#include "wt_alldef.h"
 
 const uint32_t TimingGuard = 4528;
 const uint16_t TargetRate = 0x0A00;
