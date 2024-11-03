@@ -1,4 +1,4 @@
-//system libraries
+//ситемные библиотеки
 
 #include <stdio.h>
 #include <string.h>
