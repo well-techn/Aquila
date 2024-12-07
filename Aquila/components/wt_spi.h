@@ -1,5 +1,5 @@
-#ifndef wt_spi_H
-#define wt_spi_H
+#ifndef WT_SPI_H
+#define WT_SPI_H
 
 #include <stdio.h>
 #include "driver/spi_master.h"

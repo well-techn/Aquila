@@ -16,7 +16,7 @@ i2c_master_dev_handle_t INA219_dev_handle;
 i2c_master_dev_handle_t IST8310_dev_handle;
 i2c_master_dev_handle_t FL3195_dev_handle;
 
-
+//инициализация i2c
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
 {
    i2c_master_bus_config_t i2c_configuration = {
@@ -85,8 +85,7 @@ void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
 }
 
 
-//i2c write operations
-
+//запись в i2c
 esp_err_t i2c_write_byte_to_address(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address, uint8_t data_to_write)
 {
     esp_err_t ret;
@@ -127,7 +126,7 @@ esp_err_t i2c_write_bytes_to_address(i2c_master_dev_handle_t i2c_dev, uint8_t re
     return ret;
 }
 
-
+//чтение i2c
 uint8_t i2c_read_byte_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address)
 {
     uint8_t where_to_read_to;
@@ -140,7 +139,6 @@ uint8_t i2c_read_byte_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t reg_
 
 uint16_t i2c_read_2_bytes_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address)
 {
-    
     uint8_t where_to_read_to[2];
     uint16_t result = 0;
     esp_err_t ret; 
@@ -156,7 +154,6 @@ esp_err_t i2c_read_bytes_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t r
     return i2c_master_transmit_receive(i2c_dev, &read_start_address, 1, where_to_put_to, number_of_bytes_to_read, 0);
 }
 
-
 void checking_address_at_the_bus(i2c_master_bus_handle_t bus_handle, uint8_t device_address)
 {
     esp_err_t ret = ESP_FAIL;
@@ -164,132 +161,4 @@ void checking_address_at_the_bus(i2c_master_bus_handle_t bus_handle, uint8_t dev
     if (ret == ESP_OK) printf ("device with address 0x%02x is discovered\n", device_address);
     else printf ("device with address 0x%02x is not discovered\n", device_address);
 }
-/*
-esp_err_t i2c_write_byte_to_address(uint8_t i2c_port, uint8_t device_address, uint8_t reg_address, uint8_t data_to_write)
-{
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_address, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, data_to_write, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
 
-esp_err_t i2c_write_bytes_to_address(uint8_t i2c_port, uint8_t device_address, uint8_t reg_address, uint8_t *data_to_write)
-{
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_address, ACK_CHECK_EN);
-    i2c_master_write(cmd, data_to_write,sizeof(data_to_write), ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-
-esp_err_t i2c_write_byte_to_address_x16(uint8_t i2c_port, uint8_t device_address, uint16_t reg_address_x16, uint8_t data_to_write)
-{
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)((reg_address_x16 & 0xFF00)>>8), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(reg_address_x16 & 0x00FF), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, data_to_write, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-
-esp_err_t i2c_write_2_bytes_to_address_x16(uint8_t i2c_port, uint8_t device_address, uint16_t reg_address_x16, uint16_t data_to_write)
-{
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)((reg_address_x16 & 0xFF00)>>8), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(reg_address_x16 & 0x00FF), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)((data_to_write & 0xFF00)>>8), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(data_to_write & 0x00FF), ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-
-esp_err_t i2c_write_4_bytes_to_address_x16(uint8_t i2c_port, uint8_t device_address, uint16_t reg_address_x16, uint32_t data_to_write)
-{
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)((reg_address_x16 & 0xFF00)>>8), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(reg_address_x16 & 0x00FF), ACK_CHECK_EN);
-    
-    i2c_master_write_byte(cmd, (uint8_t)(data_to_write >> 24), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(data_to_write >> 16), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(data_to_write >> 8), ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, (uint8_t)(data_to_write), ACK_CHECK_EN);
-    
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    return ret;
-}
-*/
-
-//i2c read operations
-/*
-uint8_t i2c_read_byte_from_address(uint8_t i2c_port, uint8_t device_address, uint8_t reg_address)
-{
-    uint8_t where_to_read_to;
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_address, ACK_CHECK_EN);
-
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &where_to_read_to, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 1 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    return where_to_read_to;
-}
-
-uint8_t i2c_read_byte_from_address_x16(uint8_t i2c_port, uint8_t device_address, uint16_t reg_address_x16)
-{
-    uint8_t where_to_read_to;
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address, ACK_CHECK_EN);
-    //printf("%04x", ((reg_address_x16 & 0xFF00)>>8));
-    i2c_master_write_byte(cmd, (uint8_t)((reg_address_x16 & 0xFF00)>>8), ACK_CHECK_EN);
-    //printf("%04x", (reg_address_x16 & 0x00FF));
-    i2c_master_write_byte(cmd, (uint8_t)(reg_address_x16 & 0x00FF), ACK_CHECK_EN);
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, device_address | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &where_to_read_to, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 100 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd);
-    
-    return where_to_read_to;
-}
-*/

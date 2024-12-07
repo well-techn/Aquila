@@ -1,5 +1,4 @@
 //системные библиотеки
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -23,12 +22,12 @@
 #include <rom/ets_sys.h>
 #include "soc/gpio_reg.h"
 
-//proprietary libraries
+//собственные библиотеки
 #include "wt_alldef.h"
 #include "wt_i2c.h"
+#include "wt_spi.h"
 #include "PCA9685.h"
 #include "MCP23017.h"
-#include "wt_spi.h"
 #include "winbondW25N.h"
 #include "madgwick.h"
 #include "PMW3901.h"
@@ -185,16 +184,16 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //сигнал от IMU1
   {
     imu_1_interrupt_flag = 1; 
-    gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
+    gptimer_get_raw_count(IMU_1_suspension_timer,&IMU_1_timer_value);
     gptimer_set_raw_count(IMU_1_suspension_timer, 0);
-    gptimer_get_raw_count (IMU_2_suspension_timer,&IMU_2_timer_value);
+    gptimer_get_raw_count(IMU_2_suspension_timer,&IMU_2_timer_value);
   } 
   
   if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN))   //сигнал от IMU1 
   {
     imu_2_interrupt_flag = 1;
-    gptimer_get_raw_count (IMU_1_suspension_timer,&IMU_1_timer_value);
-    gptimer_get_raw_count (IMU_2_suspension_timer,&IMU_2_timer_value); 
+    gptimer_get_raw_count(IMU_1_suspension_timer,&IMU_1_timer_value);
+    gptimer_get_raw_count(IMU_2_suspension_timer,&IMU_2_timer_value); 
     gptimer_set_raw_count(IMU_2_suspension_timer, 0);
   } 
 
@@ -1558,9 +1557,9 @@ static void main_flying_cycle(void * pvParameters)
 //outer (angle) pitch cycle
     error_pitch_angle = rc_fresh_data.received_pitch - pitch;    
     integral_pitch_error_angle = integral_pitch_error_angle + Ki_pitch_angle * error_pitch_angle;
-    if (integral_pitch_error_angle > 1000.0) {integral_pitch_error_angle = 1000.0; }
-    if (integral_pitch_error_angle < -1000.0) {integral_pitch_error_angle =-1000.0;}
-
+    if (integral_pitch_error_angle > 1000.0) integral_pitch_error_angle = 1000.0; 
+    if (integral_pitch_error_angle < -1000.0) integral_pitch_error_angle =-1000.0;
+    if (rc_fresh_data.received_throttle < 9000) integral_pitch_error_angle = 0;              //to avoid accumulation on the ground
     pid_pitch_angle = Kp_pitch_angle * error_pitch_angle + integral_pitch_error_angle + Kd_pitch_angle * (error_pitch_angle - error_pitch_angle_old);     
     if (pid_pitch_angle > 2000.0) {pid_pitch_angle = 2000.0; }
     if (pid_pitch_angle < -2000.0) {pid_pitch_angle = -2000.0; }
@@ -1573,8 +1572,8 @@ static void main_flying_cycle(void * pvParameters)
     error_pitch_rate = pid_pitch_angle - gyro_pitch;
     //error_pitch_rate = rc_fresh_data.received_pitch - gyro_pitch;         //for inner loop setup
     integral_pitch_error_rate = integral_pitch_error_rate + Ki_pitch_rate * error_pitch_rate;
-    if (integral_pitch_error_rate > 1000.0) {integral_pitch_error_rate = 1000.0; }
-    if (integral_pitch_error_rate < -1000.0) {integral_pitch_error_rate = -1000.0;}
+    if (integral_pitch_error_rate > 1000.0) integral_pitch_error_rate = 1000.0; 
+    if (integral_pitch_error_rate < -1000.0) integral_pitch_error_rate = -1000.0;
     if (rc_fresh_data.received_throttle < 9000) integral_pitch_error_rate = 0;              //to avoid accumulation on the ground
     diff_pitch_error_rate = Kd_pitch_rate * (error_pitch_rate - error_pitch_rate_old); 
     pid_pitch_rate = Kp_pitch_rate * error_pitch_rate + integral_pitch_error_rate + diff_pitch_error_rate;
@@ -1588,7 +1587,8 @@ static void main_flying_cycle(void * pvParameters)
     error_roll_angle = rc_fresh_data.received_roll - roll; 
     integral_roll_error_angle = integral_roll_error_angle + Ki_roll_angle * error_roll_angle;
     if (integral_roll_error_angle > 1000.0) integral_roll_error_angle = 1000.0;
-    if (integral_roll_error_angle < -1000.0) integral_roll_error_angle =-1000.0;   
+    if (integral_roll_error_angle < -1000.0) integral_roll_error_angle =-1000.0;
+    if (rc_fresh_data.received_throttle < 9000) integral_roll_error_angle = 0;              //to avoid accumulation on the ground  
     pid_roll_angle = Kp_roll_angle * error_roll_angle + integral_roll_error_angle + Kd_roll_angle * (error_roll_angle - error_roll_angle_old);    
     if (pid_roll_angle > 2000.0) pid_roll_angle = 2000.0;
     if (pid_roll_angle < -2000.0) pid_roll_angle = -2000.0;
@@ -1621,6 +1621,7 @@ static void main_flying_cycle(void * pvParameters)
     integral_yaw_error_angle = integral_yaw_error_angle + Ki_yaw_angle * error_yaw_angle;
     if (integral_yaw_error_angle > 500.0) integral_yaw_error_angle = 500.0;
     if (integral_yaw_error_angle < -500.0) integral_yaw_error_angle =-500.0;
+    if (rc_fresh_data.received_throttle < 9000) integral_yaw_error_angle = 0;              //to avoid accumulation on the ground
     pid_yaw_angle = Kp_yaw_angle * error_yaw_angle + integral_yaw_error_angle + Kd_yaw_angle * (error_yaw_angle - error_yaw_angle_old);  ;
     if (pid_yaw_angle > 1000.0)  pid_yaw_angle = 1000.0;
     if (pid_yaw_angle < -1000.0) pid_yaw_angle = -1000.0;
@@ -2249,7 +2250,8 @@ if (!(calibration_flag))
 
         //if ((large_counter % 500) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", pitch, roll, yaw);
 
-        //if ((large_counter % 100) == 0) printf("%0.2f, %0.2f, %0.2f\n", pitch, roll, yaw);
+        //if ((large_counter % 100) == 0) 
+        printf("%0.7f\n", accel_converted_1[0]);
         
         //ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
         //printf ("%ld\n", IMU_interrupt_status); 
@@ -2518,7 +2520,11 @@ static void init(void * pvParameters)
       
       ESP_LOGI(TAG_INIT,"Калибровка ESC завершена, снимите перемычку и перезапустите систему.");
       
-      while (1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
+      while (1) {gpio_set_level(LED_RED, 1);
+                 vTaskDelay(500/portTICK_PERIOD_MS); 
+                 gpio_set_level(LED_RED, 0);
+                 vTaskDelay(500/portTICK_PERIOD_MS);
+                 }
     }
 
   if (!(MCP23017_get_inputs_state() & 0b00001000))  //DI3 - checking engines
@@ -2624,7 +2630,6 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-
   ESP_LOGI(TAG_INIT,"Производим тест IST8310.....");
   if (IST8310_selftest() != ESP_OK) {
     error_code = 4;
@@ -2634,7 +2639,6 @@ static void init(void * pvParameters)
 
   ESP_LOGI(TAG_INIT,"Считываем данные cross-axis calibration из IST8310.....");
   IST8310_read_cross_axis_data(); 
-
 #endif
 
   ESP_LOGI(TAG_INIT,"Настраиваем оба SPI.....");
@@ -2686,7 +2690,7 @@ static void init(void * pvParameters)
   SPI_change_MPUs_speed();
   ESP_LOGI(TAG_INIT,"Оба SPI перенастроены\n");
 
- 
+#ifdef USING_W25N 
   ESP_LOGI(TAG_INIT,"Сбрасываем W25N.....");
   W25N_reset();
   
@@ -2697,7 +2701,6 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-#ifdef USING_W25N
   ESP_LOGI(TAG_INIT,"Записываем status-регистры W25N.....");
   W25N_write_status_register(W25N_PROT_REG_SR1, 0x00);         //disable protection
   W25N_write_status_register(W25N_CONFIG_REG_SR2, 0b00011000); //as default
@@ -2993,7 +2996,6 @@ static void init(void * pvParameters)
   create_and_start_general_suspension_timer();
   ESP_LOGI(TAG_INIT,"Таймер контроля зависания основного полетного цикла запущен\n");
         
-
   vTaskDelete(NULL);
   
 }

@@ -119,7 +119,7 @@
     "requires_hosted.h": "c"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM10",
+  "idf.portWin": "COM19",
   "idf.adapterTargetName": "esp32s3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"

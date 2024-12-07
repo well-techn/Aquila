@@ -131,10 +131,10 @@ void W25N_erase_all(void)
     buf[1] = (uint8_t) page_address;  //LSB
     SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, NULL, 8, buf, 2);
     vTaskDelay(10/portTICK_PERIOD_MS); //tBE = 2..10ms
-    if (W25N_read_STATUS_register() & 0b00000100) ESP_LOGE(TAG_W25N,"Erase all failed at page %d\n",page_address); 
+    if (W25N_read_STATUS_register() & 0b00000100) ESP_LOGE(TAG_W25N,"Ошибка стирания на странице %d\n",page_address); 
     page_address+=64;
   }
-  ESP_LOGI(TAG_W25N,"Full erase successfully completed"); 
+  ESP_LOGI(TAG_W25N,"Полная очистка успешно завершена"); 
 }
 
 void W25N_read_and_print_all(void) 
