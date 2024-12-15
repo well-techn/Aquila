@@ -36,6 +36,7 @@
 #include "INA219.h"
 #include "IST8310.h"
 #include "FL3195.h"
+#include "MS5611.h"
 
 /********************************************************************     СЕКЦИЯ 1     ***********************************************************************************************/
 /**************************************************************************************************************************************************************************************/
@@ -54,6 +55,7 @@ const char *TAG_LIDAR = "TFSmini";
 const char *TAG_INA219 = "INA219";
 const char *TAG_IST8310 = "IST8310";
 const char *TAG_FL3195 = "RGB_LED";
+const char *TAG_MS5611 = "MS5611";
 
 
 //spi handles
@@ -492,7 +494,7 @@ static void configuring_timer_for_PWM()
 }
 
 //настройка каналов модуля LEDC
-static void configuring_channel_for_PWM(uint8_t channel, uint8_t pin)   // Prepare and then apply the LEDC PWM channel configuration
+static void configuring_channel_for_PWM(uint8_t channel, uint8_t pin)   // подготавливаем каналы (GPIO) куда будут выдаваться ШИМ сигналы
 {
   ledc_channel_config_t engine_pwm_channel = {
       .speed_mode     = ENGINE_PWM_MODE,
@@ -500,7 +502,7 @@ static void configuring_channel_for_PWM(uint8_t channel, uint8_t pin)   // Prepa
       .timer_sel      = ENGINE_PWM_TIMER,
       .intr_type      = LEDC_INTR_DISABLE,
       .gpio_num       = pin,
-      .duty           = ENGINE_PWM_MIN_DUTY , // Set duty to 5%
+      .duty           = ENGINE_PWM_MIN_DUTY ,
       .hpoint         = 0
   };
   ESP_ERROR_CHECK(ledc_channel_config(&engine_pwm_channel));
@@ -679,7 +681,6 @@ static void gps_read_and_process_data(void * pvParameters)
   unsigned char XOR_ch = 0;
   uint8_t asteriks_place = 0;
   unsigned char coma_places[13] = {0};
-  UBaseType_t uxHighWaterMark;
   uart_event_t gps_uart_event;  
   char latitude = 0;
   char longtitude = 0;
@@ -755,8 +756,6 @@ static void gps_read_and_process_data(void * pvParameters)
                         xQueueSend(gps_to_main_queue, (void *) &gps_data, NULL);
 
                         for (i=1;i<67;i++) incoming_message_buffer_gps[i] = 0;
-                        //uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-                        //ESP_LOGD(TAG_GPS,"High watermark %d",  uxHighWaterMark);
                         }
                         else {ESP_LOGW(TAG_GPS,"Mode mismatch"); gps_data.status = 0;}
                       } else {ESP_LOGW(TAG_GPS, "CRC mismatch"); gps_data.status = 0;}
@@ -873,13 +872,13 @@ static void RC_read_and_process_data(void * pvParameters)
           //ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
           if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-1))
           {
-            printf("P: %d\n",pos);
-            int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 0);
-            for (uint8_t j=0;j<read_len;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
-            printf("\n");
+            //printf("P: %d\n",pos);
+            //int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 0);
+            //for (uint8_t j=0;j<read_len;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
+            //printf("\n");
             uart_flush_input(REMOTE_CONTROL_UART); 
             xQueueReset(remote_control_queue_for_events);
-            ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);  
+            //ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);  
           }
           else 
           {
@@ -965,7 +964,7 @@ static void RC_read_and_process_data(void * pvParameters)
               if (remote_packets_counter == 3)
               {
                 remote_packets_counter = 0;
-                xTaskNotifyGive(task_handle_send_data_to_RC);
+                xTaskNotifyGive(task_handle_send_data_to_RC);        
               }  
             }
             else 
@@ -1100,7 +1099,7 @@ static void lidar_read_and_process_data(void * pvParameters)
                       lidar_data.height = (incoming_message_buffer_lidar[3] << 8) + incoming_message_buffer_lidar[2];
                       lidar_data.strength = (incoming_message_buffer_lidar[5] << 8) + incoming_message_buffer_lidar[4];
                       ESP_LOGI(TAG_LIDAR, "dist is %d\n",lidar_data.height);
-                      xQueueSend(lidar_to_main_queue, (void *) &lidar_data, NULL); 
+                      xQueueSend(lidar_to_main_queue, (void *) &lidar_data, NULL);
                     }
                 uart_flush(LIDAR_UART);
                 xQueueReset(lidar_queue_for_events);
@@ -1208,7 +1207,7 @@ static void PCA9685_control(void * pvParameters)
         xSemaphoreTake (semaphore_for_i2c_internal,portMAX_DELAY);
         PCA9685_send(pwm_value, output_number);
         xSemaphoreGive (semaphore_for_i2c_internal);
-        ESP_LOGI(TAG_PCA9685,"Output #%d set to %d%%",output_number, pwm_value);
+        ESP_LOGI(TAG_PCA9685,"Output #%d set to %d%%",output_number, pwm_value); 
       }  
     }
   }
@@ -1253,8 +1252,12 @@ static void reading_logs_from_external_flash(void * pvParameters)
     while (1) 
     {
       gpio_set_level(LED_RED, 1);
+      gpio_set_level(LED_GREEN, 1);
+      gpio_set_level(LED_BLUE, 1);
       vTaskDelay(500/portTICK_PERIOD_MS); 
       gpio_set_level(LED_RED, 0);
+      gpio_set_level(LED_GREEN, 0);
+      gpio_set_level(LED_BLUE, 0);
       vTaskDelay(500/portTICK_PERIOD_MS); 
     }; 
   }
@@ -1476,14 +1479,12 @@ static void main_flying_cycle(void * pvParameters)
   float integral_yaw_error_rate = 0;
   float pid_yaw_angle = 0;
   float pid_yaw_rate = 0;
-  float diff_yaw_error = 0.0;
+  float diff_yaw_error_rate = 0.0;
 
   float engine[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY}; 
   float engine_filtered[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY};
   float engine_filter_pool [LENGTH_OF_ESC_FILTER][6] = {0};                                   //data pool for ESC input filter
   float accum_float = 0;;
-
-  UBaseType_t uxHighWaterMark;
 
   struct data_from_rc_to_main_struct rc_fresh_data;
     rc_fresh_data.mode = 0;
@@ -1503,9 +1504,9 @@ static void main_flying_cycle(void * pvParameters)
   float current_altitude = 0;
   float error_altitude = 0;
   float previous_error_altitude = 0;
-  float Kp_alt = 5.0;//10
+  float Kp_alt = 3.5;//10
   float Kd_alt = 100.0;//150
-  float Ki_alt = 0.000;//0
+  float Ki_alt = 0.1;//0
   float pid_altitude = 0;
   float integral_alt_error = 0;
   float alt_hold_initial_throttle = 0;
@@ -1559,7 +1560,7 @@ static void main_flying_cycle(void * pvParameters)
     integral_pitch_error_angle = integral_pitch_error_angle + Ki_pitch_angle * error_pitch_angle;
     if (integral_pitch_error_angle > 1000.0) integral_pitch_error_angle = 1000.0; 
     if (integral_pitch_error_angle < -1000.0) integral_pitch_error_angle =-1000.0;
-    if (rc_fresh_data.received_throttle < 9000) integral_pitch_error_angle = 0;              //to avoid accumulation on the ground
+    if (rc_fresh_data.received_throttle < 9000.0) integral_pitch_error_angle = 0;              //to avoid accumulation on the ground
     pid_pitch_angle = Kp_pitch_angle * error_pitch_angle + integral_pitch_error_angle + Kd_pitch_angle * (error_pitch_angle - error_pitch_angle_old);     
     if (pid_pitch_angle > 2000.0) {pid_pitch_angle = 2000.0; }
     if (pid_pitch_angle < -2000.0) {pid_pitch_angle = -2000.0; }
@@ -1574,8 +1575,8 @@ static void main_flying_cycle(void * pvParameters)
     integral_pitch_error_rate = integral_pitch_error_rate + Ki_pitch_rate * error_pitch_rate;
     if (integral_pitch_error_rate > 1000.0) integral_pitch_error_rate = 1000.0; 
     if (integral_pitch_error_rate < -1000.0) integral_pitch_error_rate = -1000.0;
-    if (rc_fresh_data.received_throttle < 9000) integral_pitch_error_rate = 0;              //to avoid accumulation on the ground
-    diff_pitch_error_rate = Kd_pitch_rate * (error_pitch_rate - error_pitch_rate_old); 
+    diff_pitch_error_rate = Kd_pitch_rate * (error_pitch_rate - error_pitch_rate_old);
+    if (rc_fresh_data.received_throttle < 9000.0) {integral_pitch_error_rate = 0; diff_pitch_error_rate = 0;}             //to avoid accumulation on the ground 
     pid_pitch_rate = Kp_pitch_rate * error_pitch_rate + integral_pitch_error_rate + diff_pitch_error_rate;
 
     if (pid_pitch_rate > 3000.0) {pid_pitch_rate = 3000.0; }
@@ -1588,7 +1589,7 @@ static void main_flying_cycle(void * pvParameters)
     integral_roll_error_angle = integral_roll_error_angle + Ki_roll_angle * error_roll_angle;
     if (integral_roll_error_angle > 1000.0) integral_roll_error_angle = 1000.0;
     if (integral_roll_error_angle < -1000.0) integral_roll_error_angle =-1000.0;
-    if (rc_fresh_data.received_throttle < 9000) integral_roll_error_angle = 0;              //to avoid accumulation on the ground  
+    if (rc_fresh_data.received_throttle < 9000.0) integral_roll_error_angle = 0;              //to avoid accumulation on the ground  
     pid_roll_angle = Kp_roll_angle * error_roll_angle + integral_roll_error_angle + Kd_roll_angle * (error_roll_angle - error_roll_angle_old);    
     if (pid_roll_angle > 2000.0) pid_roll_angle = 2000.0;
     if (pid_roll_angle < -2000.0) pid_roll_angle = -2000.0;
@@ -1602,8 +1603,8 @@ static void main_flying_cycle(void * pvParameters)
     integral_roll_error_rate = integral_roll_error_rate + Ki_roll_rate * error_roll_rate;
     if (integral_roll_error_rate > 1000.0) integral_roll_error_rate = 1000.0; 
     if (integral_roll_error_rate < -1000.0) integral_roll_error_rate = -1000.0;
-    if (rc_fresh_data.received_throttle < 9000) integral_roll_error_rate = 0;              //to avoid accumulation on the ground
-    diff_roll_error_rate = Kd_roll_rate * (error_roll_rate - error_roll_rate_old); 
+    diff_roll_error_rate = Kd_roll_rate * (error_roll_rate - error_roll_rate_old);
+    if (rc_fresh_data.received_throttle < 9000.0) {integral_roll_error_rate = 0; diff_roll_error_rate = 0;}             //to avoid accumulation on the ground 
     pid_roll_rate = Kp_roll_rate * error_roll_rate + integral_roll_error_rate + diff_roll_error_rate;
     if (pid_roll_rate > 3000.0) pid_roll_rate = 3000.0;
     if (pid_roll_rate < -3000.0) pid_roll_rate = -3000.0;
@@ -1614,6 +1615,7 @@ static void main_flying_cycle(void * pvParameters)
     if (yaw_setpoint < 0) yaw_setpoint = yaw_setpoint + 360.0;
 
 //outer (angle) yaw cycle
+    if (rc_fresh_data.received_throttle < 9000.0) yaw_setpoint = yaw;  //to avoid accumulation on the ground
     error_yaw_angle = -yaw_setpoint + yaw;
     if (error_yaw_angle <= -180.0) error_yaw_angle = error_yaw_angle + 360.0; 
     if (error_yaw_angle >= 180.0)  error_yaw_angle = error_yaw_angle - 360.0;
@@ -1633,9 +1635,9 @@ static void main_flying_cycle(void * pvParameters)
     integral_yaw_error_rate = integral_yaw_error_rate + Ki_yaw_rate * error_yaw_rate;
     if (integral_yaw_error_rate > 1000.0) integral_yaw_error_rate = 1000.0; 
     if (integral_yaw_error_rate < -1000.0) integral_yaw_error_rate = -1000.0;
-    if (rc_fresh_data.received_throttle < 9000) integral_yaw_error_rate = 0;              //to avoid accumulation on the ground
-    diff_yaw_error = Kd_yaw_rate * (error_yaw_rate - error_yaw_rate_old); 
-    pid_yaw_rate = Kp_yaw_rate * error_yaw_rate + integral_yaw_error_rate + diff_yaw_error;
+    diff_yaw_error_rate = Kd_yaw_rate * (error_yaw_rate - error_yaw_rate_old); 
+    if (rc_fresh_data.received_throttle < 9000.0) {integral_yaw_error_rate = 0; diff_yaw_error_rate = 0;}            //to avoid accumulation on the ground
+    pid_yaw_rate = Kp_yaw_rate * error_yaw_rate + integral_yaw_error_rate + diff_yaw_error_rate;
     if (pid_yaw_rate > 3000.0) pid_yaw_rate = 3000.0;
     if (pid_yaw_rate < -3000.0) pid_yaw_rate = -3000.0;
     error_yaw_rate_old = error_yaw_rate;
@@ -2248,10 +2250,17 @@ if (!(calibration_flag))
         
 //далее место где удобно что-то выводить, печатать 
 
-        //if ((large_counter % 500) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", pitch, roll, yaw);
+        //if ((large_counter % 500) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f, %0.2f", rc_fresh_data.received_throttle, pid_pitch_rate, pid_roll_rate, pid_yaw_rate);
+/*        if ((large_counter % 5000) == 0) 
+        {
+          UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+          ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
+        }
+*/        
+        
 
         //if ((large_counter % 100) == 0) 
-        printf("%0.7f\n", accel_converted_1[0]);
+        //printf("%0.7f\n", accel_converted_1[0]);
         
         //ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
         //printf ("%ld\n", IMU_interrupt_status); 
@@ -2267,8 +2276,7 @@ if (!(calibration_flag))
           //ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f, %0.2f", ((((gyro_converted_1[2] * (-1.0)) - gyro_converted_2[2]) / 2.0) * (180.0 / (float)PI)), rc_fresh_data.received_yaw, error_yaw_rate, pid_yaw_rate);
           //ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f", rc_fresh_data.received_pitch, rc_fresh_data.received_roll, rc_fresh_data.received_yaw);
         
-        //uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-        //ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
+        
         //printf("%0.1f\n", rc_pitch_filtered);
 
 //получаем свежие данные из очереди от пульта управления. Если данные успешно получены - информируем задачу моргания полетными огнями что моргаем в штатном режиме (режим "1")
@@ -2340,7 +2348,7 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
               alt_hold_initial_throttle = rc_fresh_data.received_throttle;
             }
          error_altitude = altitude_setpoint - current_altitude;
-            integral_alt_error = Ki_alt * error_altitude;                           //+=
+            integral_alt_error += Ki_alt * error_altitude;                           //+=
             if (integral_alt_error > 500) integral_alt_error = 500;
             if (integral_alt_error < -500) integral_alt_error = -500;
 
@@ -2398,10 +2406,13 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
         xQueueOverwrite(main_to_rc_queue, (void *) &data_to_send_to_rc);         
 
 //подготавливаем данные для записи в логи и записываем по flash
-#ifdef USING_W25N       
+#ifdef USING_W25N
+  if ((large_counter % 50) == 0) 
+  {       
         timestamp = get_time() - start_time;
         prepare_logs();
         xQueueSend(W25N01_queue, logs_buffer, NULL);
+  }
 #endif
 
         gpio_set_level(LED_RED, 1);
@@ -2418,7 +2429,7 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
 //Задача первичной инициализации.
 //Проверяет связь со всем компонентами, производит их настройку. При необходимости калибрует ESC, запускает задачу считывания логов. 
 //если все прошло гладко - создает основные рабочие задачи. Если где-то ошибка - запускается задача аварийного моргания светодиодами для визуальной индикации ошибки.
-//по завершении выполнения зачада самоликвидируется, так как она больше не нужна
+//по завершении выполнения задача инициализации самоликвидируется, так как она больше не нужна
 
 static void init(void * pvParameters)
 {
@@ -2440,7 +2451,7 @@ static void init(void * pvParameters)
   esp_log_level_set(TAG_FL3195,ESP_LOG_WARN); 
 
   printf("\n");
-  ESP_LOGI(TAG_INIT,"Старт системы\n");  
+  ESP_LOGI(TAG_INIT,"Старт системы\n");
 
   ESP_LOGI(TAG_INIT,"Конфигурирование пинов входов - выходов.....");
   configure_IOs();
@@ -2456,14 +2467,14 @@ static void init(void * pvParameters)
 
   ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
   if (MCP23017_communication_check() != ESP_OK) {
-    error_code = 10;
+    error_code = 3;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Настройка MCP23017.....");
   if (MCP23017_init() != ESP_OK) {
-    error_code = 8;
+    error_code = 4;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2478,7 +2489,7 @@ static void init(void * pvParameters)
   }
   else ESP_LOGI(TAG_INIT,"Очередь для MCP23017 создана\n");
 
-//place it here to avoid engines beeping
+//настраиваем модуль ШИМ на борту ESP32. Делаем это в начале программы, чтобы сразу выдать на ESC управляющие сигналы и они не пищали  
   ESP_LOGI(TAG_INIT,"Настройка ШИМ-модуля (LEDC) для управления двигателями.....");
   configuring_timer_for_PWM();
   configuring_channel_for_PWM(0,ENGINE_PWM_OUTPUT_0_PIN);
@@ -2487,11 +2498,10 @@ static void init(void * pvParameters)
   configuring_channel_for_PWM(3,ENGINE_PWM_OUTPUT_3_PIN);
   ESP_LOGI(TAG_INIT,"ШИМ-модуль для управления двигателями настроен\n");
 
-  if (!(MCP23017_get_inputs_state() & 0b00000100))  //DI2 - calibrating ESC
+  if (!(MCP23017_get_inputs_state() & 0b00000100))                                      //если стоит перемычка DI2 - запускаем калибровку ESC
     { 
       ESP_LOGW(TAG_INIT,"Установлена перемычка DI2, начинаем калибровку ESCs.....");
-      //vTaskDelay(2000/portTICK_PERIOD_MS);
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY*2));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY*2));        //выдаем на все каналы максимальный уровень сигнала
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_PWM_MIN_DUTY*2));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 1));
@@ -2499,8 +2509,8 @@ static void init(void * pvParameters)
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 2));
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_PWM_MIN_DUTY*2));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
-      vTaskDelay(3000/portTICK_PERIOD_MS);
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY));
+      vTaskDelay(3000/portTICK_PERIOD_MS);                                               //держим его 3 секунды
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY));           //выдаем на все каналы минимальный уровень сигнала
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_PWM_MIN_DUTY));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 1));
@@ -2508,8 +2518,8 @@ static void init(void * pvParameters)
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 2));
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_PWM_MIN_DUTY));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
-      vTaskDelay(3000/portTICK_PERIOD_MS);
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY+1));
+      vTaskDelay(3000/portTICK_PERIOD_MS);                                                //держим его 3 секунды
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY+1));          //выдаем на все каналы минимальный уровень сигнала + 1 (не обязательное действие)
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_PWM_MIN_DUTY+1));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 1));
@@ -2520,19 +2530,20 @@ static void init(void * pvParameters)
       
       ESP_LOGI(TAG_INIT,"Калибровка ESC завершена, снимите перемычку и перезапустите систему.");
       
-      while (1) {gpio_set_level(LED_RED, 1);
-                 vTaskDelay(500/portTICK_PERIOD_MS); 
-                 gpio_set_level(LED_RED, 0);
-                 vTaskDelay(500/portTICK_PERIOD_MS);
-                 }
+      while (1) 
+      { gpio_set_level(LED_RED, 1);
+        vTaskDelay(500/portTICK_PERIOD_MS); 
+        gpio_set_level(LED_RED, 0);
+        vTaskDelay(500/portTICK_PERIOD_MS);
+      }
     }
 
-  if (!(MCP23017_get_inputs_state() & 0b00001000))  //DI3 - checking engines
+  if (!(MCP23017_get_inputs_state() & 0b00001000))  //если стоит перемычка DI3 - запускаем по очереди каждый из двигателей (использовал для балансировки двигателей)
     { 
       ESP_LOGI(TAG_INIT,"Установлена перемычка DI3, начинаем проверку двигателей.....");
       printf ("%d", MCP23017_get_inputs_state() );
       vTaskDelay(2000/portTICK_PERIOD_MS);
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY * 1.5));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_PWM_MIN_DUTY * 1.5));                  //проверяем двигатели на среднем уровне сигнала
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
       vTaskDelay(TIME_TO_KEEP_RUNNING_AT_CHECK_MS/portTICK_PERIOD_MS);
 
@@ -2573,22 +2584,21 @@ static void init(void * pvParameters)
 
     ESP_LOGI(TAG_INIT,"Проверка связи с PCA9685.....");
     if (PCA9685_communication_check() != ESP_OK) {
-      error_code = 10;
+      error_code = 5;
       xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
       while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
     }
 
     ESP_LOGI(TAG_INIT,"Configuring PCA9685.....");
     if (PCA9685_init() != ESP_OK) {
-    error_code = 11;
+    error_code = 6;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-  
   ESP_LOGI(TAG_INIT,"Проверка связи с INA219.....");
   if (INA219_communication_check() != ESP_OK) {
-    error_code = 10;
+    error_code = 7;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2602,14 +2612,14 @@ static void init(void * pvParameters)
 #ifdef USING_HOLYBRO_M9N
   ESP_LOGI(TAG_INIT,"Проверка связи с FL3195.....");
   if (FL3195_communication_check() != ESP_OK) {
-    error_code = 10;
+    error_code = 9;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Настройка FL3195.....");
   if (FL3195_configuration() != ESP_OK) {
-    error_code = 8;
+    error_code = 10;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2618,21 +2628,21 @@ static void init(void * pvParameters)
 
   ESP_LOGI(TAG_INIT,"Проверка связи с IST8310.....");
   if (IST8310_communication_check() != ESP_OK) {
-    error_code = 10;
+    error_code = 11;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Настройка IST8310.....");
     if (IST8310_configuration() != ESP_OK) {
-    error_code = 11;
+    error_code = 12;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Производим тест IST8310.....");
   if (IST8310_selftest() != ESP_OK) {
-    error_code = 4;
+    error_code = 13;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2647,13 +2657,13 @@ static void init(void * pvParameters)
 
   ESP_LOGI(TAG_INIT,"Проверка связи с MPU#1.....");
   if (MPU6000_communication_check(MPU6000_1) != ESP_OK) {
-    error_code = 2;
+    error_code = 14;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}  }
   
   ESP_LOGI(TAG_INIT,"Проверка связи с MPU#2.....");
   if (MPU6000_communication_check(MPU6000_2) != ESP_OK) {
-    error_code = 3;
+    error_code = 16;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2674,14 +2684,14 @@ static void init(void * pvParameters)
 */
   ESP_LOGI(TAG_INIT,"Настройка MPU#1.....");
   if (MPU6000_init(MPU6000_1) != ESP_OK) {
-    error_code = 6;
+    error_code = 15;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Настройка MPU#2.....");
   if (MPU6000_init(MPU6000_2) != ESP_OK) {
-    error_code = 7;
+    error_code = 17;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2696,7 +2706,7 @@ static void init(void * pvParameters)
   
   ESP_LOGI(TAG_INIT,"Считываем JEDEC ID.....");
   if (W25N_read_JEDEC_ID() != ESP_OK) {
-    error_code = 9;
+    error_code = 18;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2705,7 +2715,7 @@ static void init(void * pvParameters)
   W25N_write_status_register(W25N_PROT_REG_SR1, 0x00);         //disable protection
   W25N_write_status_register(W25N_CONFIG_REG_SR2, 0b00011000); //as default
 
-  if (!(MCP23017_get_inputs_state() & 0b00000010))    //DI1 - reading memory
+  if (!(MCP23017_get_inputs_state() & 0b00000010))       //DI1 - считывание логов
   {
     ESP_LOGI(TAG_INIT,"Установлена перемычка DI1, через 10 секунд начинаем считывание логов из памяти.....");
     vTaskDelay(10000/portTICK_PERIOD_MS);
@@ -2843,7 +2853,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача контроля и управления MCP23017 успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача контроля и управления MCP23017 не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2854,7 +2864,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача для управления PCA9685 успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для управления PCA9685 не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2865,7 +2875,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных GPS успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для считывания данных GPS не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2878,7 +2888,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных с магнетометра успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для считывания данных с магнетометра не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2891,7 +2901,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача для получения данных с пульта управления успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для получения данных с пульта управления не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2904,7 +2914,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача для отправки телеметрии на пульт управления успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для отправки телеметрии на пульт управления не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2916,7 +2926,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача контроля загруженности процессора успешно создана на ядре 0\n");
   else {
   ESP_LOGE(TAG_INIT,"Задача контроля загруженности процессора не создана\n");
-  error_code = 1;
+  error_code = 2;
   xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
   while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
 }
@@ -2930,7 +2940,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача для получения данных от лидара успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для получения данных от лидара не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2944,7 +2954,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача считывания данных с INA219 успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача считывания данных с INA219 не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2955,7 +2965,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача моргания полетными огнями успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача моргания полетными огнями не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2974,11 +2984,10 @@ static void init(void * pvParameters)
     }
   else {
     ESP_LOGE(TAG_INIT,"Задача записи логов во внешнюю flash-память не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-        
+  }       
 #endif
 
   ESP_LOGI(TAG_INIT,"Создаем задачу основного полетного цикла (Main_flying_cycle)..... ");
@@ -2987,7 +2996,7 @@ static void init(void * pvParameters)
     ESP_LOGI(TAG_INIT,"Задача основного полетного цикла успешно создана на ядре 1\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача основного полетного цикла не создана\n");
-    error_code = 1;
+    error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -2995,7 +3004,8 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Создаем и запускаем таймер контроля зависания основного полетного цикла.....");
   create_and_start_general_suspension_timer();
   ESP_LOGI(TAG_INIT,"Таймер контроля зависания основного полетного цикла запущен\n");
-        
+
+//все задачи созданы, убиваем задачу инициализаци         
   vTaskDelete(NULL);
   
 }

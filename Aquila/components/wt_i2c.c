@@ -6,6 +6,8 @@
 #include "INA219.h"
 #include "IST8310.h"
 #include "FL3195.h"
+#include "MS5611.h"
+#include "inttypes.h"
 
 i2c_master_bus_handle_t i2c_internal_bus_handle;
 i2c_master_bus_handle_t i2c_external_bus_handle;
@@ -15,6 +17,7 @@ i2c_master_dev_handle_t MCP23017_dev_handle;
 i2c_master_dev_handle_t INA219_dev_handle;
 i2c_master_dev_handle_t IST8310_dev_handle;
 i2c_master_dev_handle_t FL3195_dev_handle;
+i2c_master_dev_handle_t MS5611_dev_handle;
 
 //инициализация i2c
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
@@ -80,12 +83,30 @@ void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
     .scl_speed_hz = I2C_IST8310_FREQ_HZ,
     };
 
+    i2c_device_config_t MS5611_dev_config = {
+    .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+    .device_address = MS5611_ADDRESS,
+    .scl_speed_hz = I2C_MS5611_FREQ_HZ,
+    };
+
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_external_bus_handle, &FL3195_dev_config, &FL3195_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_external_bus_handle, &IST8310_dev_config, &IST8310_dev_handle));
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_external_bus_handle, &MS5611_dev_config, &MS5611_dev_handle));
 }
 
 
 //запись в i2c
+esp_err_t i2c_write_command(i2c_master_dev_handle_t i2c_dev, uint8_t command)
+{
+    esp_err_t ret;
+    uint8_t write_buf;
+    
+    write_buf = command;
+    ret = i2c_master_transmit(i2c_dev, command, 1, 0);
+    
+    return ret;
+}
+
 esp_err_t i2c_write_byte_to_address(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address, uint8_t data_to_write)
 {
     esp_err_t ret;
@@ -144,7 +165,7 @@ uint16_t i2c_read_2_bytes_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t 
     esp_err_t ret; 
     
     ret = i2c_master_transmit_receive(i2c_dev, &reg_address, 1, where_to_read_to, 2, 0);
-    result = (where_to_read_to[0] << 8) + where_to_read_to[1];  
+    result = (where_to_read_to[1] << 8) + where_to_read_to[0];  
 
     return result;
 }

@@ -7,7 +7,7 @@
 
 extern char *TAG_PCA9685;
 extern i2c_master_dev_handle_t PCA9685_dev_handle;
-extern i2c_master_bus_handle_t i2c_internal_bus_handle;
+//extern i2c_master_bus_handle_t i2c_internal_bus_handle;
 
 esp_err_t PCA9685_communication_check()
 {

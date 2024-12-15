@@ -1,21 +1,21 @@
 #ifndef WT_ALLDEFS_H
 #define WT_ALLDEFS_H
 
-//#define USING_W25N 
-//#define USING_HOLYBRO_M9N
-#define USING_LIDAR_UART
-//#define USING_PERFORMANCE_MESUREMENT
+//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+//#define USING_HOLYBRO_M9N                                         //активируем использование GPS, компаса и RGB светодиода на модуле HOLYBRO M9N 
+#define USING_LIDAR_UART                                            //активируем использование лидара Benewake Tfmini-S
+//#define USING_PERFORMANCE_MESUREMENT                              //запускаем задачу, которая выводит на печать процент азнимаемого процессорного времени по каждой задаче
 
 
 //GPIO и параметры SPI для подключения IMU
+#define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
 #define IMU_SPI_MOSI            (16)                                //GPIO на который подключен MOSI SPI для IMU
 #define IMU_SPI_MISO            (14)                                //GPIO на который подключен MISO SPI для IMU
 #define IMU_SPI_SCLK            (17)                                //GPIO на который подключен SCLK SPI для IMU
-#define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
 #define GPIO_CS_MPU6000_1       (18)                                //GPIO для CS IMU1
 #define GPIO_CS_MPU6000_2       (15)                                //GPIO для CS IMU2
 #define IMU_CONFIG_SPI_FREQ_HZ  (1000000)                           //частота SPI при настройке MPU6000
-#define IMU_WORK_SPI_FREQ_HZ    (20000000)                           //частота SPI при чтении данных с MPU6000
+#define IMU_WORK_SPI_FREQ_HZ    (20000000)                          //частота SPI при чтении данных с MPU6000
 
 //GPIO и параметры SPI для подключения флэш-памяти W25N
 #define GP_SPI                  (SPI2_HOST)                         //HSPI - 2, VSPI - 3
@@ -25,7 +25,7 @@
 #define GPIO_CS_W25N01          (41)
 #define W25N01_SPI_FREQ_HZ      (75000000)                          //частота SPI для флэш памяти для логов 
 
-#define SPI_READ_FLAG           (0x80)                              //используется в ряде случаев для чтения регистров
+#define SPI_READ_FLAG           (0x80)                              //используется для чтения регистров
 
 //GPIO и параметры "внутреннего" I2C, куда подключены PCA9685, MCP23017, INA219
 #define I2C_INT_SDA                       (34)                      //GPIO для SDA 
@@ -47,7 +47,8 @@
 #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)                       //параметры для инициализации интерфейса 
 #define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)       
 #define I2C_IST8310_FREQ_HZ               (400000)                  //скорости I2С для соответствующих компонентов
-#define I2C_FL3195_FREQ_HZ                (400000)                                                                   
+#define I2C_FL3195_FREQ_HZ                (400000)
+#define I2C_MS5611_FREQ_HZ                (400000)                                                                   
 #define I2C_EXT_PORT                      (1)                       //номер используемого порта I2C для "внешней" шины
 
 //GPIO и параметры UART для канала связи с пультом
@@ -134,7 +135,7 @@ struct data_from_gps_to_main_struct {
 
 //GPIO и параметры для модуля ШИМ (LEDC) для управления моторами
 #define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT)             //разрешение таймера для управления ШИМ
-#define ENGINE_PWM_MIN_DUTY                     (6553)                          //минимальная длительности ШИМ сигнала 1мс: ((2 ^ 14) - 1) * 400 (Гц) = 6553,2
+#define ENGINE_PWM_MIN_DUTY                     (6553)                          //минимальная длительности ШИМ сигнала 1мс: ((2 ^ 14) - 1) / 2,5мс (400Гц) = 6553,2
 #define ENGINE_PWM_FREQUENCY                    (400)                           //частота ШИМ сигнала, Гц
 #define ENGINE_PWM_TIMER                        (LEDC_TIMER_0)                  //используемый таймер
 #define ENGINE_PWM_MODE                         (LEDC_LOW_SPEED_MODE)           //режим работы ШИМ
@@ -178,12 +179,7 @@ struct data_from_gps_to_main_struct {
 //если в течение столько мс не приходит прерывание от IMU считаем его зависшим                             
 #define IMU_SUSPENSION_TIMER_DELAY_MS           (2)                             
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
-#ifdef USING_MAG_DATA                                      
-  #define NUMBER_OF_MAGNETOMETER_CALIBRATION_COUNTS        (15000)  
-#else
-  #define NUMBER_OF_MAGNETOMETER_CALIBRATION_COUNTS  (1)
-#endif
-#define PID_LOOPS_RATIO                              (5)                             //соотношение между внутренним и внешним циклом PID
+#define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
 
 //GPIO
 #define A0                                            (4)
@@ -204,7 +200,6 @@ struct data_from_gps_to_main_struct {
 #define LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE        (4096)
 #define INA219_READ_AND_PROCESS_DATA_STACK_SIZE       (4096) 
 #define MAG_READ_AND_PROCESS_DATA_STACK_SIZE          (4096)
-#define RGB_LED_CONTROL_STACK_SIZE                    (2048)
 #define WRITING_LOGS_TO_FLASH_STACK_SIZE              (4096)
 
 #endif
