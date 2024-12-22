@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include "esp_err.h"
 
-#define MS5611_ADDRESS                0x76	// was 0x77
+#define MS5611_ADDRESS                0x77	// если CBS на +, адрес 0х76. Если CBS на земле адрес 0x77
 #define MS5611_CMD_RESET              0x1E
 #define MS5611_CMD_READ_PROM          0xA0  //A2
 #define MS5611_CMD_ADC_CONV 		  0x40
@@ -18,12 +18,10 @@
 #define MS5611_CMD_ADC_4096 		  0x08 // ADC OSR=4096
 
 esp_err_t MS5611_communication_check();
-void MS5611_I2C_reset();
+esp_err_t MS5611_I2C_reset();
 esp_err_t MS5611_I2C_PROM_read();
 void MS5611_I2C_request_D1();
 void MS5611_I2C_request_D2(); 
 uint32_t MS5611_I2C_read(); 
-
-
 
 #endif

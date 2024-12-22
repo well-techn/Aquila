@@ -1,10 +1,11 @@
 #ifndef WT_ALLDEFS_H
 #define WT_ALLDEFS_H
 
-//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_HOLYBRO_M9N                                         //активируем использование GPS, компаса и RGB светодиода на модуле HOLYBRO M9N 
 #define USING_LIDAR_UART                                            //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                              //запускаем задачу, которая выводит на печать процент азнимаемого процессорного времени по каждой задаче
+//#define USING_MS5611
 
 
 //GPIO и параметры SPI для подключения IMU
@@ -184,8 +185,8 @@ struct data_from_gps_to_main_struct {
 //GPIO
 #define A0                                            (4)
 #define A1                                            (5)
-#define A2                                            (6)
-#define A3                                            (7)
+#define A2                                            (6)                       //кнопка аварийной остановки
+#define A3                                            (7)                       //светодиод кнопки авариной остановки 
 
 //объем стэков для задач
 #define MCP23017_MONITORING_AND_CONTROL_STACK_SIZE    (4096)

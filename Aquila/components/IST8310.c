@@ -109,7 +109,7 @@ esp_err_t IST8310_read_data(uint8_t *buffer)
 esp_err_t IST8310_read_cross_axis_data()
 {
   esp_err_t ret = ESP_FAIL;
-  uint8_t cross_axis_raw_values[18];              //cross axis coefficient, to be read once from new chip
+  uint8_t cross_axis_raw_values[18];              //cross axis coefficient, считываются однократно с нового чипа
   int16_t Y_matrix[3][3] = {{0,  0,  0},    
                             {0,  0,  0},
                             {0,  0,  0}};

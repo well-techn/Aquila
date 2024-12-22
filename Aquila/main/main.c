@@ -181,6 +181,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN ,0);
     gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN ,0);
     gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
+    gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
   }  
   
   if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //сигнал от IMU1
@@ -232,6 +233,7 @@ static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)
   gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN ,0);
   gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN ,0);
   gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
+  gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
 }
 
 
@@ -280,6 +282,10 @@ static void configure_IOs()
   gpio_reset_pin(GP_SPI_MOSI);
   gpio_set_direction(GP_SPI_MOSI, GPIO_MODE_OUTPUT);
   gpio_set_pull_mode(GP_SPI_MOSI, GPIO_PULLUP_ENABLE);
+
+  gpio_reset_pin(A3);
+  gpio_set_direction(A3, GPIO_MODE_OUTPUT);
+  gpio_set_level(A3, 1);
     
 }
 //настройка пинов, которые используются для прерываний
@@ -303,9 +309,9 @@ static void configure_pins_for_interrupt()
     .intr_type = GPIO_INTR_POSEDGE
   }; 
 
-  ESP_ERROR_CHECK(gpio_reset_pin(MCP23017_INTERRUPT_PIN));
+  ESP_ERROR_CHECK(gpio_reset_pin(A2));              //на A2 подключен кнопка аварийной остановки на Holybro M9N 
   gpio_config_t INT_3 = {
-    .pin_bit_mask = 1ULL << MCP23017_INTERRUPT_PIN,
+    .pin_bit_mask = 1ULL << A2,
     .mode = GPIO_MODE_INPUT,
     .pull_up_en = GPIO_PULLUP_DISABLE,
     .pull_down_en = GPIO_PULLDOWN_ENABLE,
@@ -1219,12 +1225,13 @@ static void PCA9685_control(void * pvParameters)
 //Принимает на вход данные на запись из main_flyibg_cycle и записывает их в Winbond 
 static void writing_logs_to_flash(void * pvParameters)
 {
-  uint8_t buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
+  //uint8_t buffer[LOGS_BYTES_PER_STRING] = {0x0D};
+  uint8_t* buffer;
   uint16_t column_address = 0;
   uint16_t page_address = 0;
   while(1) 
   {
-    if (xQueueReceive(W25N01_queue, buffer, portMAX_DELAY))
+    if (xQueueReceive(W25N01_queue, &buffer, portMAX_DELAY))
     {
       W25N_random_program_data_load(column_address, buffer, LOGS_BYTES_PER_STRING);   //loading data to page buffer
       column_address = column_address + LOGS_BYTES_PER_STRING;
@@ -1524,14 +1531,14 @@ static void main_flying_cycle(void * pvParameters)
   float INA219_fresh_data[4];
   
 #ifdef USING_W25N 
-  //logging related variables
-  uint8_t logs_buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
+  //переменные для логирования
+  static uint8_t logs_buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
   uint64_t start_time = 0;
   uint32_t timestamp = 0;
   uint8_t *p_to_uint8 = NULL;
   uint8_t flags_byte = 0;
 #endif
-
+uint16_t command_for_PCA9685 = 0x0200;
 
   void Convert_Q_to_degrees(void) {
     
@@ -1550,7 +1557,7 @@ static void main_flying_cycle(void * pvParameters)
     if (roll > 90) roll -= 360.0;
     
     yaw = atan2(a12, a22) * 57.29577951;
-    yaw -= 9.4; // compensation of declination if using magnetometer, if not using - does not matter
+    yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если не используем - без разницы, вреда не наносит
 
   }
 
@@ -2050,7 +2057,7 @@ while(1)
       
       gpio_set_level(LED_RED, 0);
 
-      large_counter++;
+      large_counter++;                //увеличиваем глобальный счетчик циклов 
 
       if (IMU_interrupt_status == 14) //all is ok
       {
@@ -2242,22 +2249,26 @@ if (!(calibration_flag))
         }
 //выполняем преобразование из кватерниона в углы Эйлера       
         Convert_Q_to_degrees();
-      }
-//увеличиваем глобальный счетчик циклов        
-        large_counter++;
+      }     
+
 //производим запрос данных от INA219 (раз в 1000 циклов, то есть раз в секунду) 
         if ((large_counter % 1000) == 0) xTaskNotifyGive(task_handle_INA219_read_and_process_data);
         
 //далее место где удобно что-то выводить, печатать 
 
-        //if ((large_counter % 500) == 0) ESP_LOGI(TAG_FLY,"%0.2f, %0.2f, %0.2f, %0.2f", rc_fresh_data.received_throttle, pid_pitch_rate, pid_roll_rate, pid_yaw_rate);
+        //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f", q0, q1, q2, q3, pitch, roll, yaw);
 /*        if ((large_counter % 5000) == 0) 
         {
           UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
           ESP_LOGW(TAG_FLY,"High watermark %d",  uxHighWaterMark);
-        }
-*/        
-        
+        }       
+            if ((large_counter % 2000) == 0) {
+              command_for_PCA9685 +=20;
+              if (command_for_PCA9685 > 0x0260) command_for_PCA9685 = 0x0201;
+              xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);}
+
+*/
+        //if (large_counter > 10000) {vTaskDelay(1000/portTICK_PERIOD_MS);}   
 
         //if ((large_counter % 100) == 0) 
         //printf("%0.7f\n", accel_converted_1[0]);
@@ -2407,11 +2418,14 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
 
 //подготавливаем данные для записи в логи и записываем по flash
 #ifdef USING_W25N
+uint8_t* pointer = &logs_buffer;
+
   if ((large_counter % 50) == 0) 
   {       
         timestamp = get_time() - start_time;
         prepare_logs();
-        xQueueSend(W25N01_queue, logs_buffer, NULL);
+        //xQueueSend(W25N01_queue, logs_buffer, NULL);
+        xQueueSend(W25N01_queue, &pointer, NULL);
   }
 #endif
 
@@ -2464,6 +2478,30 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Настройка внешнего i2c.....");
   i2c_init_external(I2C_EXT_SDA, I2C_EXT_SCL, I2C_EXT_PORT);
   ESP_LOGI(TAG_INIT,"Внешний i2c настроен\n");
+
+#ifdef USING_MS5611
+  ESP_LOGI(TAG_MS5611,"Проверка связи с MS5611.....");
+  if (MS5611_communication_check() != ESP_OK) {
+    error_code = 3;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  ESP_LOGI(TAG_MS5611,"Сброс MS5611.....");
+  if (MS5611_I2C_reset() != ESP_OK) {
+    error_code = 3;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+ ESP_LOGI(TAG_MS5611,"Считывание PROM MS5611.....");
+  if (MS5611_I2C_PROM_read() != ESP_OK) {
+    error_code = 3;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+#endif
 
   ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
   if (MCP23017_communication_check() != ESP_OK) {
@@ -2589,7 +2627,7 @@ static void init(void * pvParameters)
       while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
     }
 
-    ESP_LOGI(TAG_INIT,"Configuring PCA9685.....");
+    ESP_LOGI(TAG_INIT,"Настройка PCA9685.....");
     if (PCA9685_init() != ESP_OK) {
     error_code = 6;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
@@ -2609,6 +2647,7 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
+
 #ifdef USING_HOLYBRO_M9N
   ESP_LOGI(TAG_INIT,"Проверка связи с FL3195.....");
   if (FL3195_communication_check() != ESP_OK) {
@@ -2719,7 +2758,7 @@ static void init(void * pvParameters)
   {
     ESP_LOGI(TAG_INIT,"Установлена перемычка DI1, через 10 секунд начинаем считывание логов из памяти.....");
     vTaskDelay(10000/portTICK_PERIOD_MS);
-    if (xTaskCreate(reading_logs_from_external_flash,"reading_logs_from_external_flash",4096,NULL,0,NULL) == pdPASS)//task with 0 priority, same as idle
+    if (xTaskCreate(reading_logs_from_external_flash,"reading_logs_from_external_flash",4096,NULL,0,NULL) == pdPASS)//задача с приоритетом 0, как IDLE
     ESP_LOGI(TAG_INIT,"Создана задача для считывания логов из внешней flash-памяти\n");
     while (1) {vTaskDelay(500/portTICK_PERIOD_MS);}  
   }
@@ -2728,8 +2767,8 @@ static void init(void * pvParameters)
     W25N_erase_all();
   }
   
-  ESP_LOGI(TAG_INIT,"Создаем очередь для записи логов на внешнюю flash-память.....");
-  W25N01_queue = xQueueCreate(5, LOGS_BYTES_PER_STRING);
+  //W25N01_queue = xQueueCreate(5, LOGS_BYTES_PER_STRING);
+  W25N01_queue = xQueueCreate(5, sizeof(uint8_t*));
   if (W25N01_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для записи логов на внешнюю flash-память не создана\n");
     error_code = 1;
@@ -2739,7 +2778,7 @@ static void init(void * pvParameters)
     else ESP_LOGI(TAG_INIT,"Очередь для записи логов на внешнюю flash-память успешно создана\n");
 #endif  
 
-  ESP_LOGI(TAG_INIT,"Создаем очередь для управления PCA9685.....");
+  ESP_LOGI(TAG_INIT,"Создаем очередь для управления PCA9685.....");       //в эту очередь пишутся команды на управление PCA9685
   PCA9685_queue = xQueueCreate(10, sizeof(uint16_t));
   if (PCA9685_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для управления PCA9685 не создана\n");
@@ -2751,8 +2790,8 @@ static void init(void * pvParameters)
 
 #ifdef USING_HOLYBRO_M9N
   
-  ESP_LOGI(TAG_INIT,"Создание очереди для передачи данных от магнетометра в main_flying_cycle.....");
-  magnetometer_queue = xQueueCreate(9, 3 * sizeof(float));       //9 values 6 bytes each (3 x 2)
+  ESP_LOGI(TAG_INIT,"Создание очереди для передачи данных от магнетометра в main_flying_cycle....."); //очередь через которую магнетометр передает данные в main 
+  magnetometer_queue = xQueueCreate(9, 3 * sizeof(float));                                            //9 values 6 bytes each (3 x 2)
   if (magnetometer_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи данных от магнетометра в main_flying_cycle не создана\n");
     error_code = 1;
@@ -2762,7 +2801,7 @@ static void init(void * pvParameters)
     else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от магнетометра в main_flying_cycle успешно создана\n");
   #endif
 
-  ESP_LOGI(TAG_INIT,"Создаем семафор для контроля доступа к внешнему i2c.....");
+  ESP_LOGI(TAG_INIT,"Создаем семафор для контроля доступа к внешнему i2c.....");                       //семафор, арбитрирующий доступ к внешней шине i2c 
   semaphore_for_i2c_external = xSemaphoreCreateBinaryStatic(&semaphore_for_i2c_external_buffer);
   if (semaphore_for_i2c_external == NULL) {
     ESP_LOGE(TAG_INIT,"Семафор для контроля доступа к внешнему i2c не создан\n");
@@ -2772,9 +2811,9 @@ static void init(void * pvParameters)
   }
   else ESP_LOGI(TAG_INIT,"Семафор для контроля доступа к внешнему i2c успешно создан\n");
 
-  xSemaphoreGive(semaphore_for_i2c_external);   //The semaphore is created in the 'empty' state, meaning the semaphore must first be given
+  xSemaphoreGive(semaphore_for_i2c_external);        //The semaphore is created in the 'empty' state, meaning the semaphore must first be given
 
-  ESP_LOGI(TAG_INIT,"Создаем семафор для контроля доступа к внутреннему i2c.....");
+  ESP_LOGI(TAG_INIT,"Создаем семафор для контроля доступа к внутреннему i2c.....");                     //семафор, арбитрирующий доступ к внутренней шине i2c 
   semaphore_for_i2c_internal = xSemaphoreCreateBinaryStatic(&semaphore_for_i2c_internal_buffer);
   if (semaphore_for_i2c_internal == NULL) {
     ESP_LOGE(TAG_INIT,"Семафор для контроля доступа к внутреннему i2c не создан\n");

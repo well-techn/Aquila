@@ -32,13 +32,13 @@ esp_err_t PCA9685_init()
                                               {PCA9685_MODE1,     0b10100001},          // Set MODE1 enable restart, autoinc, normal mode
                                               {PCA9685_MODE2,     0b00000100}};         //Set MODE2 outputs change on ACK, bidi
 
-for (i=0; i<4; i++)   //writing predefined configuration 
+for (i=0; i<4; i++)   //записываем указанную выше конфигурацию
 {
   i2c_write_byte_to_address(PCA9685_dev_handle, PCA9685_configuration_data[i][0], PCA9685_configuration_data[i][1]);  
   ets_delay_us(500);
 }
 
-for (i=1; i<4; i++) //checking against predefined configuration  
+for (i=1; i<4; i++) //проверяем записанные значения, опуская проверку PCA9685_MODE1
 {
   if (i2c_read_byte_from_address(PCA9685_dev_handle, PCA9685_configuration_data[i][0]) != (PCA9685_configuration_data[i][1] & 0b01111111)) //for MODE1
   {
@@ -52,9 +52,12 @@ for (i=1; i<4; i++) //checking against predefined configuration
   return err;
 }
 
+//функция записыввает на вывод <output> сигнал с коэффициентом заполнения, указанном в <value_in_percents>. Период сигнала зашит при настройке в PCA9685_PRESCALE.
+//например, для вывода на вывод 0 импульса 1мс (это 1/20 от периода 20ms, то есть 5%), записываем PCA9685_send(5, 0)
+//для вывода на вывод 4 импульса 2мс (это 1/10 от периода 20ms, то есть 10%), записываем PCA9685_send(10, 4)
 void PCA9685_send(uint8_t value_in_percents, uint8_t output) 
 {
-  uint16_t pulse_length;// temp variable for PWM
+  uint16_t pulse_length;
   uint8_t data_to_write[4];
 
   pulse_length = (uint16_t) (value_in_percents * 40.95);

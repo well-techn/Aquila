@@ -57,6 +57,8 @@ esp_err_t FL3195_configuration()
       return err;
 }
 
+//устанавливает пэттерн. 
+//pulse_length - частота моргания и далее 3 цваета, от 0 до 255
 void FL3195_set_pattern(uint8_t pulse_length, uint8_t color_red,uint8_t color_green,uint8_t color_blue) //pulse_length 1 - fast, 5 - slow
 {
  //P1 time and cycle

@@ -102,7 +102,7 @@ esp_err_t i2c_write_command(i2c_master_dev_handle_t i2c_dev, uint8_t command)
     uint8_t write_buf;
     
     write_buf = command;
-    ret = i2c_master_transmit(i2c_dev, command, 1, 0);
+    ret = i2c_master_transmit(i2c_dev, &write_buf, 1, 0);
     
     return ret;
 }
@@ -165,7 +165,7 @@ uint16_t i2c_read_2_bytes_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t 
     esp_err_t ret; 
     
     ret = i2c_master_transmit_receive(i2c_dev, &reg_address, 1, where_to_read_to, 2, 0);
-    result = (where_to_read_to[1] << 8) + where_to_read_to[0];  
+    result = (where_to_read_to[0] << 8) + where_to_read_to[1];  
 
     return result;
 }
