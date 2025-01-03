@@ -1,7 +1,7 @@
 #ifndef WT_ALLDEFS_H
 #define WT_ALLDEFS_H
 
-#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_HOLYBRO_M9N                                         //активируем использование GPS, компаса и RGB светодиода на модуле HOLYBRO M9N 
 #define USING_LIDAR_UART                                            //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                              //запускаем задачу, которая выводит на печать процент азнимаемого процессорного времени по каждой задаче

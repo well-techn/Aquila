@@ -344,9 +344,9 @@ static void gps_uart_config()
     ESP_ERROR_CHECK(uart_param_config(GPS_UART, &gps_uart_config));
     ESP_ERROR_CHECK(uart_set_pin(GPS_UART, GPS_UART_TX_PIN, GPS_UART_RX_PIN, GPS_UART_RTS_PIN, GPS_UART_CTS_PIN));
 
-    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(GPS_UART, '*', 1, 9, 0, 0));                 //creating pattern detection
-    ESP_ERROR_CHECK(uart_pattern_queue_reset(GPS_UART, GPS_UART_PATTERN_DETECTION_QUEUE_SIZE));          //allocating queue  
-    uart_flush(GPS_UART);                                                                           //resetting incoming buffer
+    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(GPS_UART, '*', 1, 9, 0, 0));                 //активируем прерывание по обнаружению пэттерна
+    ESP_ERROR_CHECK(uart_pattern_queue_reset(GPS_UART, GPS_UART_PATTERN_DETECTION_QUEUE_SIZE));     //привязываем очередь 
+    uart_flush(GPS_UART);                                                                           //очищаем FIFO RX буфер
 }
 #endif
 static void remote_control_uart_config(void)
@@ -365,9 +365,9 @@ static void remote_control_uart_config(void)
     ESP_ERROR_CHECK(uart_param_config(REMOTE_CONTROL_UART, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(REMOTE_CONTROL_UART, RC_UART_TX_PIN, RC_UART_RX_PIN, RC_UART_RTS_PIN, RC_UART_CTS_PIN));
 
-    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(REMOTE_CONTROL_UART, 0xFF, 1, 5, 0, 0));                 //creating pattern detection
-    ESP_ERROR_CHECK(uart_pattern_queue_reset(REMOTE_CONTROL_UART, RC_UART_PATTERN_DETECTION_QUEUE_SIZE));          //allocating queue  
-    uart_flush(REMOTE_CONTROL_UART);                                                                           //resetting incoming buffer  
+    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(REMOTE_CONTROL_UART, 0xFF, 1, 5, 0, 0));                 //активируем режим обнаружения пэттерна, в частности байта 0xFF, который является концом строки 
+    ESP_ERROR_CHECK(uart_pattern_queue_reset(REMOTE_CONTROL_UART, RC_UART_PATTERN_DETECTION_QUEUE_SIZE));      //сбрасываем очередь
+    uart_flush(REMOTE_CONTROL_UART);                                                                           //сбрасываем буфер
 }
 
 
@@ -870,46 +870,43 @@ static void RC_read_and_process_data(void * pvParameters)
   {
     if(xQueueReceive(remote_control_queue_for_events, (void * )&remote_control_uart_event, (TickType_t)portMAX_DELAY)) 
     {     
-      switch (remote_control_uart_event.type) 
+      switch (remote_control_uart_event.type)                   //проверяем тип события, полученного от UART 
       {
-        case UART_PATTERN_DET:
-          pos = uart_pattern_pop_pos(REMOTE_CONTROL_UART);
-          //printf("P: %d\n",pos);
-          //ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
-          if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-1))
+        case UART_PATTERN_DET:                                  //если это то что надо - 
+          pos = uart_pattern_pop_pos(REMOTE_CONTROL_UART);      //запрашиваем на какой позиции в буфере обнаружен символ конца строки
+          ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
+          if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-1))    //если это не то место, где он должен быть - значит пакет поступил не полностью из-за какого-то сбоя, 
           {
-            //printf("P: %d\n",pos);
-            //int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 0);
-            //for (uint8_t j=0;j<read_len;j++) printf ("%02x ",incoming_message_buffer_remote[j]);
-            //printf("\n");
-            uart_flush_input(REMOTE_CONTROL_UART); 
+            uart_flush_input(REMOTE_CONTROL_UART);              //очищаем входящий буфер и очередь  
             xQueueReset(remote_control_queue_for_events);
             //ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);  
           }
-          else 
+          else                                                 //если все ок     
           {
-            int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);
+            int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);      //считываем данные из буфера в локальную переменную
             ESP_LOGD(TAG_RC, "Received in total %d bytes", read_len);
-
+//проверяем покет на целостность по заголовку и контрольной сумме
             if ((incoming_message_buffer_remote[0] == RC_MESSAGE_HEADER) 
             && (incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-2)))
             {
               ESP_LOGD(TAG_RC, "CRC passed");
+//очищаем буфер
               uart_flush(REMOTE_CONTROL_UART);
+//моргаем одним из светодиодов на плате
               if (LED_status) {gpio_set_level(LED_GREEN, 0); LED_status=0;}
               else {gpio_set_level(LED_GREEN, 1);LED_status=1;}
-              
+//собираем полученные данные в переменные              
               received_throttle = (incoming_message_buffer_remote[1] << 8) | incoming_message_buffer_remote[2];
               received_roll = ((incoming_message_buffer_remote[3] << 8) | incoming_message_buffer_remote[4]);               
               received_pitch = ((incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6]);                
               received_yaw = ((incoming_message_buffer_remote[7] << 8) | incoming_message_buffer_remote[8]);
               remote_control_data.mode = ~incoming_message_buffer_remote[10];
-
-              remote_control_data.received_throttle = 7836.0f + 48.98f * sqrt((double)received_throttle); //7836.0f + 81.86248443f * sqrt((double)received_throttle);
+//начинаем приводить их к желаемому виду
+              remote_control_data.received_throttle = 7836.0f + 48.98f * sqrt((double)received_throttle);
 
               if ((received_pitch > 360)&&( received_pitch < 1800)) remote_control_data.received_pitch = 0.02083333f*(float)received_pitch - 37.5f;
                 else if ((received_pitch > 2245) && (received_pitch < 3741)) remote_control_data.received_pitch  = 0.02005348*(float)received_pitch - 45.020053f;
-                else if (received_pitch >= 3741) remote_control_data.received_pitch  = 30.0;  //degrees
+                else if (received_pitch >= 3741) remote_control_data.received_pitch  = 30.0;  //градусы наклона
                 else if (received_pitch <= 360) remote_control_data.received_pitch  = -30.0;
                 else remote_control_data.received_pitch = 0;
 //reversed signs             
@@ -921,11 +918,11 @@ static void RC_read_and_process_data(void * pvParameters)
 
               if ((received_yaw > 200)&&( received_yaw < 1848)) remote_control_data.received_yaw = -0.06068f*(float)received_yaw + 112.13592;
                 else if ((received_yaw < 3896)&&( received_yaw > 2248)) remote_control_data.received_yaw = -0.06068f*(float)received_yaw + 136.40777;
-                else if (received_yaw >= 3896) remote_control_data.received_yaw = -100.0;     //degrees per s
+                else if (received_yaw >= 3896) remote_control_data.received_yaw = -100.0;     //градусы в секунду
                 else if (received_yaw <= 200) remote_control_data.received_yaw = 100.0;
                 else remote_control_data.received_yaw = 0;
 
-//filtering a bit received values to get smoother response              
+//слегка подфильтровываем значения от джойстиков        
               remote_control_data.received_throttle = remote_control_data.received_throttle * RC_FILTER_COEFF + rc_throttle_old * (1 - RC_FILTER_COEFF);
               rc_throttle_old = remote_control_data.received_throttle;
 
@@ -938,7 +935,7 @@ static void RC_read_and_process_data(void * pvParameters)
               remote_control_data.received_yaw = remote_control_data.received_yaw * RC_FILTER_COEFF + rc_yaw_old * (1 - RC_FILTER_COEFF);
               rc_yaw_old = remote_control_data.received_yaw;
 
-
+//формируем значения trim (не используется далее, но пусть будет)
               if (incoming_message_buffer_remote[9] & 0b00001000) {                            //if roll negative values
               trim_roll = (((~(incoming_message_buffer_remote[9] & 0b00001111)) & 0b00001111) + 1) * -1;}
               else trim_roll = incoming_message_buffer_remote[9] & 0b00001111;
@@ -946,26 +943,28 @@ static void RC_read_and_process_data(void * pvParameters)
               if (incoming_message_buffer_remote[9] & 0b10000000) {                            //if pitch negative values
               trim_pitch = (((~((incoming_message_buffer_remote[9] >> 4) & 0b00001111)) & 0b00001111)  + 1) * -1;}
               else trim_pitch = (incoming_message_buffer_remote[9] >> 4) & 0b00001111; 
-            
-              if ((remote_control_data.received_throttle < 8400) && (remote_control_data.mode & 0x0001)) remote_control_data.engines_start_flag = 1;
-              if (!(remote_control_data.mode & 0x01)) {remote_control_data.engines_start_flag = 0; remote_control_data.altitude_hold_flag = 0; set_allowed = 0;}
 
+//если ручка газа в нижнем положении и включен тумблер "старт двигателей" установить флаг engines_start_flag        
+              if ((remote_control_data.received_throttle < 8400) && (remote_control_data.mode & 0x0001)) remote_control_data.engines_start_flag = 1;
+//если тумблер "старт двигателей" выключен - обнуляем бит engines_start_flag при любом положении ручки газа                
+              if (!(remote_control_data.mode & 0x01)) {remote_control_data.engines_start_flag = 0; remote_control_data.altitude_hold_flag = 0; set_allowed = 0;}
+//если  тумблер включен "удержание высоты" при запущенных двигателях - устанавливаем флаг altitude_hold_flag 
               if ((remote_control_data.mode & 0x02) && (set_allowed == 1) && (remote_control_data.engines_start_flag)) remote_control_data.altitude_hold_flag = 1;
+//в противном случае обнуляем этот флаг              
               if (!(remote_control_data.mode & 0x02)) {remote_control_data.altitude_hold_flag = 0; set_allowed = 1;}
-              
+//при изменении положения тумблера 4 отправить в очередь задачи управления PCA9685 команду на изменение сигнала
               if ((remote_control_data.mode & 0x08) ^ (mode_old & 0x08))  {
                 if (remote_control_data.mode & 0x08) command_for_PCA9685 = 0x0103;
                 else command_for_PCA9685 = 0x011A;
-              
               xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
-              
               }
-                
+//отправляем сформированную структуру с обработанными данными от пульта в main_flying_cycle                
               xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);
+//обнуляем на всякий случай буфер
               for (i=0;i<NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2;i++) incoming_message_buffer_remote[i] = 0;           
               
               mode_old = remote_control_data.mode;
-
+//каждый 3й раз пробуждаем задачу отправки телеметрии на пульт
               remote_packets_counter++;
               if (remote_packets_counter == 3)
               {
