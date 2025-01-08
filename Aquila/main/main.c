@@ -21,6 +21,7 @@
 #include "esp_random.h"
 #include <rom/ets_sys.h>
 #include "soc/gpio_reg.h"
+#include "mbedtls/aes.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
@@ -37,6 +38,7 @@
 #include "IST8310.h"
 #include "FL3195.h"
 #include "MS5611.h"
+#include "AES_crypto.h"
 
 /********************************************************************     СЕКЦИЯ 1     ***********************************************************************************************/
 /**************************************************************************************************************************************************************************************/
@@ -367,6 +369,7 @@ static void remote_control_uart_config(void)
 
     ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(REMOTE_CONTROL_UART, 0xFF, 1, 5, 0, 0));                 //активируем режим обнаружения пэттерна, в частности байта 0xFF, который является концом строки 
     ESP_ERROR_CHECK(uart_pattern_queue_reset(REMOTE_CONTROL_UART, RC_UART_PATTERN_DETECTION_QUEUE_SIZE));      //сбрасываем очередь
+    uart_disable_intr_mask(REMOTE_CONTROL_UART, (0x1 << 8));                                                   //UART_INTR_RXFIFO_TOUT
     uart_flush(REMOTE_CONTROL_UART);                                                                           //сбрасываем буфер
 }
 
@@ -995,7 +998,9 @@ static void RC_read_and_process_data(void * pvParameters)
           xQueueReset(remote_control_queue_for_events);
           break;
 
-        case UART_DATA: break;
+        case UART_DATA: 
+          ESP_LOGW(TAG_RC, "data");
+        break;
        
         case UART_BREAK:
           ESP_LOGW(TAG_RC, "uart rx break");
