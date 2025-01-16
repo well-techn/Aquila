@@ -696,96 +696,99 @@ static void gps_read_and_process_data(void * pvParameters)
   struct data_from_gps_to_main_struct gps_data;
   uint8_t gps_status_old = 5;
 
-  ESP_LOGI(TAG_GPS,"Configuring GPS UART.....");
+  ESP_LOGI(TAG_GPS,"Настраиваем GPS UART.....");
   gps_uart_config();
-  ESP_LOGI(TAG_GPS,"GPS UART configured");
+  ESP_LOGI(TAG_GPS,"UART для GPS настроен");
        
   while(1) {
-  if(xQueueReceive(gps_queue_for_events, (void * )&gps_uart_event, (TickType_t)portMAX_DELAY))
+  if(xQueueReceive(gps_queue_for_events, (void * )&gps_uart_event, (TickType_t)portMAX_DELAY))      //ждем сообщений от UART
   {
     switch (gps_uart_event.type) {
             case UART_PATTERN_DET:
                 pos = uart_pattern_pop_pos(GPS_UART);
                 ESP_LOGD(TAG_GPS, "[UART PATTERN DETECTED] pos: %d", pos);
-                if (pos > 130) {
+                if (pos > 130) {                                                                    //длина не может быть больше 130 байт для RMC
                   uart_flush_input(GPS_UART); 
                   xQueueReset(gps_queue_for_events);
                   }
                 else 
                   {
-                    int read_len = uart_read_bytes(GPS_UART, incoming_message_buffer_gps, pos+3, portMAX_DELAY);
-                    ESP_LOGD(TAG_GPS, "Received in total %d bytes", read_len);
+                  uint8_t read_len = uart_read_bytes(GPS_UART, incoming_message_buffer_gps, pos+3, portMAX_DELAY);  //при обнаружении * нужно считать еще 2 символа
+                  ESP_LOGD(TAG_GPS, "Из FIFO считано %d байт", read_len);
                     //for (i=0; i<read_len; i++) printf ("%c", incoming_message_buffer_gps[i]);
-                    j = 0;
-                    while ((incoming_message_buffer_gps[0] != '$') && (j < read_len)) {
-                      for (i=0; i<read_len; i++) incoming_message_buffer_gps[i] = incoming_message_buffer_gps[i+1];
+                 j = 0;
+                  while ((incoming_message_buffer_gps[0] != '$') && (j < read_len)) {                               //выравниваем пока первый символ не станет $ (можно опустить)
+                    for (i=0; i<read_len; i++) incoming_message_buffer_gps[i] = incoming_message_buffer_gps[i+1];
                       j++;
                      }
-                    if (incoming_message_buffer_gps[4] == 'M') 
+                   if (incoming_message_buffer_gps[4] == 'M')        // примитивная проверка на $GNRMC
                       {
-                      uart_flush(GPS_UART);
+                      uart_flush(GPS_UART);                           //очищаем сразу FIFO
                       i = 1;
                       j = 0;
                       XOR = 0;
                       XOR_ch = 0;
                       asteriks_place = 0;
               
-                      while((asteriks_place == 0)) {// && (i <= (read_len-3))) {
-                          if (incoming_message_buffer_gps[i] == ',') {coma_places[j] = i; j++;}                   //counting commas and fixinging their numbers 
+                      while((asteriks_place == 0)) {                                                        //пока не обнаружим *
+                          if (incoming_message_buffer_gps[i] == ',') {coma_places[j] = i; j++;}             //подсчитываем запятые и заносим их в массив coma_places
                           if (incoming_message_buffer_gps[i] == '*') asteriks_place = i;
-                          if (asteriks_place == 0) XOR = XOR^incoming_message_buffer_gps[i];                          //calculating XOR of the message until * is found 
+                          if (asteriks_place == 0) XOR = XOR^incoming_message_buffer_gps[i];                //вычисляем XOR (контрольную сумму) всего что находится до *  
                           i++;               
                       }
-                      
-                      if (incoming_message_buffer_gps[asteriks_place+1] <= 0x39) XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] & 0x0F) << 4;  //discovering if digit or letter
-                      else XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] - 55) << 4;
-                      if (incoming_message_buffer_gps[asteriks_place+2] <= 0x39) XOR_ch |= (incoming_message_buffer_gps[asteriks_place+2] & 0x0F);
+//формируем численную контрольную сумму из полученных чаров   
+                      if (incoming_message_buffer_gps[asteriks_place+1] <= 0x39) XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] & 0x0F) << 4;  //если за * следует символ числа преобразуем его в цифру
+                      else XOR_ch = (incoming_message_buffer_gps[asteriks_place+1] - 55) << 4;                                                          //если символ буквы
+                      if (incoming_message_buffer_gps[asteriks_place+2] <= 0x39) XOR_ch |= (incoming_message_buffer_gps[asteriks_place+2] & 0x0F);      //то же самое со вторым символом контрольной суммы
                       else XOR_ch |= (incoming_message_buffer_gps[asteriks_place+2] - 55);
-                  
-                      if (XOR == XOR_ch) {
+//если полученная из сообщения и вычисленная контрольная сумма совпадают
+                      if (XOR == XOR_ch) {                                                                            
                         //for (i=0;i<90;i++) printf("%c",incoming_message_buffer_gps[i] );
                         //printf("\n");
-                        if  ((incoming_message_buffer_gps[asteriks_place-3] == 'A')||(incoming_message_buffer_gps[asteriks_place-3] == 'D')) //if GPS mode A or D
+//проверяем если режим GPS A или D
+                        if  ((incoming_message_buffer_gps[asteriks_place-3] == 'A')||(incoming_message_buffer_gps[asteriks_place-3] == 'D')) 
                         { 
                         //Latitude, the format is ddmm.mmmmmmm
                         //Longitude, the format is dddmm.mmmmmmm
-
+//пересчитываем чары в цифры
+//сначала целые градусы
                         latitude = (incoming_message_buffer_gps[coma_places[2]+1] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[2]+2] & 0x0F);
                         longtitude = (incoming_message_buffer_gps[coma_places[4]+2] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[4]+3] & 0x0F);
-
-                        gps_data.latitude_d = ((incoming_message_buffer_gps[coma_places[2]+3] & 0x0F)*1000000 + (incoming_message_buffer_gps[coma_places[2]+4] & 0x0F)*(long)100000 + (incoming_message_buffer_gps[coma_places[2]+6] & 0x0F)*10000 + (incoming_message_buffer_gps[coma_places[2]+7] & 0x0F)*1000 + (incoming_message_buffer_gps[coma_places[2]+8] & 0x0F)*100 + (incoming_message_buffer_gps[coma_places[2]+9] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[2]+10] & 0x0F)) *10 / 6;
+//затем минуты
+                        gps_data.latitude_d = ((incoming_message_buffer_gps[coma_places[2]+3] & 0x0F)*1000000 + (incoming_message_buffer_gps[coma_places[2]+4] & 0x0F)*(long)100000 + (incoming_message_buffer_gps[coma_places[2]+6] & 0x0F)*10000 + (incoming_message_buffer_gps[coma_places[2]+7] & 0x0F)*1000 + (incoming_message_buffer_gps[coma_places[2]+8] & 0x0F)*100 + (incoming_message_buffer_gps[coma_places[2]+9] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[2]+10] & 0x0F)) * 10 / 6;
                         gps_data.latitude_d += latitude * 10000000;
-
-                        gps_data.longtitude_d = ((incoming_message_buffer_gps[coma_places[4]+4] & 0x0F)*1000000 + (incoming_message_buffer_gps[coma_places[4]+5] & 0x0F)*100000 + (incoming_message_buffer_gps[coma_places[4]+7] & 0x0F)*(long)10000 + (incoming_message_buffer_gps[coma_places[4]+8] & 0x0F)*1000 + (incoming_message_buffer_gps[coma_places[4]+9] & 0x0F)*100 + (incoming_message_buffer_gps[coma_places[4]+10] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[4]+11] & 0x0F)) *10 / 6;
+//формируем одну переменную типа 123.456789123
+                        gps_data.longtitude_d = ((incoming_message_buffer_gps[coma_places[4]+4] & 0x0F)*1000000 + (incoming_message_buffer_gps[coma_places[4]+5] & 0x0F)*100000 + (incoming_message_buffer_gps[coma_places[4]+7] & 0x0F)*(long)10000 + (incoming_message_buffer_gps[coma_places[4]+8] & 0x0F)*1000 + (incoming_message_buffer_gps[coma_places[4]+9] & 0x0F)*100 + (incoming_message_buffer_gps[coma_places[4]+10] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[4]+11] & 0x0F)) * 10 / 6;
                         gps_data.longtitude_d += longtitude * 10000000;
                         ESP_LOGI(TAG_GPS,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_data.latitude_d, gps_data.longtitude_d);
-
+//статус ставим в 1 если считаем данные достоверными
                         gps_data.status = 1;
-
+//отправляем сформированную структуру в очередь
                         xQueueSend(gps_to_main_queue, (void *) &gps_data, NULL);
-
-                        for (i=1;i<67;i++) incoming_message_buffer_gps[i] = 0;
+//очищаем локальный буфер
+                        for (i = 1;i < NUMBER_OF_BYTES_TO_RECEIVE_FROM_GPS; i++) incoming_message_buffer_gps[i] = 0;
                         }
-                        else {ESP_LOGW(TAG_GPS,"Mode mismatch"); gps_data.status = 0;}
-                      } else {ESP_LOGW(TAG_GPS, "CRC mismatch"); gps_data.status = 0;}
-                    } else {ESP_LOGW(TAG_GPS,"Message out of phase"); gps_data.status = 0;}
-                  
+                        else {ESP_LOGW(TAG_GPS,"Несовпадение режима"); gps_data.status = 0;}            //режим не А и не D
+                      } else {ESP_LOGW(TAG_GPS, "Ошибка CRC"); gps_data.status = 0;}            //не сошлась контрольная сумма
+                    } else {ESP_LOGW(TAG_GPS,"Сообщение не опознано"); gps_data.status = 0;}       //какое-то левое сообщение или запутались в длине сообщения
+//если статус GPS поменялся по отношению к предыдущему, то отправляем соответствующую команду на RGB светодиод на Holybro
+//обязательно через семафор, так как на этой шине есть еще устройства                 
                   if (gps_data.status != gps_status_old )
                   {
-                    if (gps_data.status) 
+                    if (gps_data.status)                                    //если статус 1 
                       {
                         if (xSemaphoreTake(semaphore_for_i2c_external, ( TickType_t ) 10) == pdTRUE)
                         {
-                          FL3195_set_pattern(3, 0,255,0);
+                          FL3195_set_pattern(3, 0,255,0);                    //то цвет зеленый
                           xSemaphoreGive(semaphore_for_i2c_external);
                         }
                       }
                     
-                    else 
+                    else                                                      //если статус 0 
                     {
                       if (xSemaphoreTake(semaphore_for_i2c_external, ( TickType_t ) 10) == pdTRUE)
                         {
-                          FL3195_set_pattern(3, 255,0,0);
+                          FL3195_set_pattern(3, 255,0,0);                    //то цвет красный
                           xSemaphoreGive(semaphore_for_i2c_external);
                         }
                     }
@@ -795,8 +798,9 @@ static void gps_read_and_process_data(void * pvParameters)
                   }
                 uart_flush(GPS_UART);
                 xQueueReset(gps_queue_for_events);
+
                 break;
-            
+//остальные события UART, которые особо не интерсуют            
             case UART_DATA: break;
 
             case UART_FIFO_OVF:
@@ -2316,12 +2320,12 @@ if (!(calibration_flag))
 //и оповещаем задачу моргания полетными огнями моргать в аварийном режиме (режим "0")
           xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
         }
-#ifdef USING_GPS
+#ifdef USING_HOLYBRO_M9N
 //получаем свежие данные из очереди от GPS
         if (xQueueReceive(gps_to_main_queue, &gps_fresh_data, 0)) 
         {
-          //ESP_LOGI(TAG_FLY,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_fresh_data.latitude_d, gps_fresh_data.longtitude_d);
-        }; 
+          ESP_LOGI(TAG_FLY,"Широта %" PRIu64 " Долгота %" PRIu64, gps_fresh_data.latitude_d, gps_fresh_data.longtitude_d);
+        } 
 #endif
 
 //получаем свежие данные из очереди от лидара
@@ -2340,14 +2344,14 @@ if (!(calibration_flag))
           vertical_velocity_old = vertical_velocity;
           //printf ("raw %d, real %02f\n", lidar_fresh_data.height,current_altitude);
           //printf ("%0.4f, %d\n", current_altitude, vertical_velocity);  
-          }; 
+          } 
 #endif
 
 //получаем свежие данные из очереди от INA219
 if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
       {
         //ESP_LOGE(TAG_FLY, "V: %0.4fV, I: %0.4fA, P: %0.4fW, A: %0.8f",INA219_fresh_data[0], INA219_fresh_data[1], INA219_fresh_data[2], INA219_fresh_data[3]);
-      };
+      }
 
 //далее разбираемся с полетным режимом
 // если двигатели запущены - понимаем стоит ли режим удержания высоты. Если да - замещаем полученное от пульта значение газа вычисленным автоматически на основание данных от лидара 
