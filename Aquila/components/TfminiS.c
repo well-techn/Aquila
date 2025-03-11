@@ -2,65 +2,69 @@
 #include "wt_i2c.h"
 #include "TfminiS.h"
 #include "wt_alldef.h"
-#include "driver/uart.h"
+#include "esp_log.h"
 
-void tfs_i2c_write(uint8_t i2c_port, uint8_t *data_to_write)
-{
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, 0x20 | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write(cmd, data_to_write,sizeof(data_to_write), ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    esp_err_t ret = i2c_master_cmd_begin(i2c_port, cmd, 1 / portTICK_PERIOD_MS);
-    if (ret == ESP_FAIL) printf ("no req ack\n");
-    i2c_cmd_link_delete(cmd);
-}
 
-void tfs_i2c_read(uint8_t i2c_port, uint8_t *where_to_read_to)
-{
-    esp_err_t ret; 
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();    
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, 0x20 | READ_BIT, ACK_CHECK_EN);
-    
-    i2c_master_start(cmd);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_ACK);
-    i2c_master_read_byte(cmd, where_to_read_to, I2C_MASTER_NACK);
-    i2c_master_stop(cmd);
-    
-    ret = i2c_master_cmd_begin(i2c_port, cmd, 1 / portTICK_PERIOD_MS);
-    if (ret == ESP_FAIL) printf ("no resp ack\n");
-    i2c_cmd_link_delete(cmd);
-}
+extern i2c_master_dev_handle_t TFSMINI_dev_handle;
+extern i2c_master_bus_handle_t i2c_internal_bus_handle;
+extern i2c_master_bus_handle_t i2c_external_bus_handle;
 
-void tfs_set_to_UART()
+extern char *TAG_LIDAR;
+
+esp_err_t tfs_set_to_UART()
 {
+    esp_err_t ret = ESP_FAIL;
     uint8_t command[] = {0x5A, 0x05, 0x0A, 0x00, 0x69};
-    tfs_i2c_write(I2C_EXT_PORT, command);
+    ret = i2c_write_long_command(TFSMINI_dev_handle, command, 4);
+    return ret;
 }
 
-void tfs_save()
+
+esp_err_t tfs_save()
 {
+    esp_err_t ret = ESP_FAIL;
     uint8_t command[] = {0x5A, 0x04, 0x11, 0x6F};
-    tfs_i2c_write(I2C_EXT_PORT, command);
+    ret = i2c_write_long_command(TFSMINI_dev_handle, command, 4);
+    return ret;
 }
 
-void tfs_reset_to_factory()
+
+esp_err_t tfs_reset_to_factory()
 {
+    esp_err_t ret = ESP_FAIL;
     uint8_t command[] = {0x5A, 0x04, 0x10, 0x6E};
-    tfs_i2c_write(I2C_EXT_PORT, command);
+    ret = i2c_write_long_command(TFSMINI_dev_handle, command, 4);
+    return ret;
 }
 
-void tfs_request_data()
+esp_err_t tfminis_communication_check()
 {
-    uint8_t command[] = {0x5A, 0x05, 0x00, 0x01, 0x06};
-    tfs_i2c_write(I2C_EXT_PORT, command);
+    esp_err_t ret = ESP_FAIL;
+    ret = checking_address_at_the_bus(i2c_internal_bus_handle, TFMINIS_I2C_ADDRESS);
+    if (ret == ESP_OK)  ESP_LOGI(TAG_LIDAR,"Связь с Tfmini-S установлена");
+    else ESP_LOGE(TAG_LIDAR,"Связь с Tfmini-S не установлена\n"); 
+
+    return ret;
 }
+
+esp_err_t tfs_request_data()
+{
+    esp_err_t ret = ESP_FAIL;
+    uint8_t request_data_frame_command[] = {0x5A, 0x05, 0x00, 0x01, 0x60};   //5A 05 0A MODE SU 
+    ret = i2c_write_long_command(TFSMINI_dev_handle, request_data_frame_command, 5);
+    return ret;
+}
+
+esp_err_t tfs_read_result(uint8_t* where_to_write)
+{
+    esp_err_t ret = ESP_FAIL;
+    ret = i2c_read_bytes(TFSMINI_dev_handle, 9, where_to_write);
+    return ret;
+}
+
+
+
+
+
+
 

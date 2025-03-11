@@ -4,8 +4,7 @@ C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/save-defconfi
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/gen_project_binary.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/app.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/erase_flash.dir
-C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/uf2.dir
-C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/uf2-app.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/merge-bin.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/monitor.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/_project_elf_src.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/bootloader.elf.dir
@@ -15,6 +14,8 @@ C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/size-componen
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/dfu.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/dfu-list.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/dfu-flash.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/uf2.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/uf2-app.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/edit_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/CMakeFiles/rebuild_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/CMakeFiles/edit_cache.dir
@@ -54,6 +55,8 @@ C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/efuse/CMakeFiles
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/efuse/CMakeFiles/efuse_test_table.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/efuse/CMakeFiles/edit_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/efuse/CMakeFiles/rebuild_cache.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_security/CMakeFiles/edit_cache.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_security/CMakeFiles/rebuild_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_system/CMakeFiles/__idf_esp_system.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_system/CMakeFiles/edit_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_system/CMakeFiles/rebuild_cache.dir
@@ -62,6 +65,8 @@ C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_hw_support/C
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_hw_support/CMakeFiles/rebuild_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_hw_support/port/esp32s3/CMakeFiles/edit_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_hw_support/port/esp32s3/CMakeFiles/rebuild_cache.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_hw_support/lowpower/CMakeFiles/edit_cache.dir
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_hw_support/lowpower/CMakeFiles/rebuild_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_common/CMakeFiles/__idf_esp_common.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_common/CMakeFiles/edit_cache.dir
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/bootloader/esp-idf/esp_common/CMakeFiles/rebuild_cache.dir

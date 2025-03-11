@@ -1,7 +1,7 @@
 #ifndef MPU6000_h
 #define MPU6000_h
 
-#include "driver/spi_master.h"
+#include "spi_master.h"
 
 #define MPU6000_XGOFFS_TC        0x00 // Bit 7 PWR_MODE, bits 6:1 XG_OFFS_TC, bit 0 OTP_BNK_VLD
 #define MPU6000_YGOFFS_TC        0x01

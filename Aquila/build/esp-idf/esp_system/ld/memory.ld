@@ -24,14 +24,14 @@
 
  * Automatically generated file. DO NOT EDIT.
 
- * Espressif IoT Development Framework (ESP-IDF) 5.2.0 Configuration Header
+ * Espressif IoT Development Framework (ESP-IDF) 5.4.0 Configuration Header
 
  */
        
 /* List of deprecated options */
 /*
 
- * SPDX-FileCopyrightText: 2021 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2024 Espressif Systems (Shanghai) CO LTD
 
  *
 
@@ -39,12 +39,19 @@
 
  */
 /* CPU instruction prefetch padding size for flash mmap scenario */
-_esp_flash_mmap_prefetch_pad_size = 16;
+/*
+
+ * PMP region granularity size
+
+ * Software may determine the PMP granularity by writing zero to pmp0cfg, then writing all ones
+
+ * to pmpaddr0, then reading back pmpaddr0. If G is the index of the least-significant bit set,
+
+ * the PMP granularity is 2^G+2 bytes.
+
+ */
 /* CPU instruction prefetch padding size for memory protection scenario */
-_esp_memprot_prefetch_pad_size = 16;
 /* Memory alignment size for PMS */
-_esp_memprot_align_size = 256;
-_esp_mmu_block_size = (0x10000);
     /* rtc timer data (s_rtc_timer_retain_mem, see esp_clk.c files). For rtc_timer_data_in_rtc_mem section. */
 /*
 
@@ -79,7 +86,7 @@ MEMORY
 
    */
   /* IRAM for PRO CPU. */
-  iram0_0_seg (RX) : org = (0x40370000 + 0x4000), len = (((0x403CC700 - (0x40378000 - 0x3FC88000)) - 0x3FC88000) + 0x8000 - 0x4000)
+  iram0_0_seg (RX) : org = (0x40370000 + 0x4000), len = (((0x403CB700 - (0x40378000 - 0x3FC88000)) - 0x3FC88000) + 0x8000 - 0x4000)
   /* Flash mapped instruction data */
   iram0_2_seg (RX) : org = 0x42000020, len = 0x800000-0x20
   /**
@@ -102,7 +109,7 @@ MEMORY
    * Enabling Bluetooth & Trace Memory features in menuconfig will decrease the amount of RAM available.
 
    */
-  dram0_0_seg (RW) : org = (0x3FC88000), len = ((0x403CC700 - (0x40378000 - 0x3FC88000)) - 0x3FC88000)
+  dram0_0_seg (RW) : org = (0x3FC88000), len = ((0x403CB700 - (0x40378000 - 0x3FC88000)) - 0x3FC88000)
   /* Flash mapped constant data */
   drom0_0_seg (R) : org = 0x3C000020, len = 0x2000000-0x20
   /* (See iram0_2_seg for meaning of 0x20 offset in the above.) */
@@ -143,6 +150,7 @@ MEMORY
    */
   extern_ram_seg(RWX) : org = 0x3c000020 , len = 0x2000000-0x20
 }
+_diram_i_start = 0x40378000;
 _heap_start = _heap_low_start;
 /* Heap ends at top of dram0_0_seg */
 _heap_end = 0x40000000;

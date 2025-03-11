@@ -116,7 +116,9 @@
     "format": "c",
     "iomanip": "c",
     "ist8310.h": "c",
-    "requires_hosted.h": "c"
+    "requires_hosted.h": "c",
+    "ms5611.h": "c",
+    "gptimer.h": "c"
   },
   "idf.flashType": "UART",
   "idf.portWin": "COM10",

@@ -32,7 +32,7 @@ esp_err_t INA219_configuration()
 
 
                                               //4096
-  uint8_t INA219_configuration_data[2][3] = {{INA219_CALIBRATION,               0b00010000,              0b00000000},    //MSB goes first, shifted right 1 bit calibration value       
+  uint8_t INA219_configuration_data[2][3] = {{INA219_CALIBRATION,    0b00010000,              0b00000000},    //MSB goes first, shifted right 1 bit calibration value       
                                              {INA219_CONFIGURATION,  (settings >> 8), settings & 0x00FF }};   //MSB goes first, 16V, PGA/4, 
 
   for (i=0;i<2;i++) { i2c_write_2_bytes_to_address(INA219_dev_handle, INA219_configuration_data[i][0], INA219_configuration_data[i][1], INA219_configuration_data[i][2]);  //pointer to 2D massive

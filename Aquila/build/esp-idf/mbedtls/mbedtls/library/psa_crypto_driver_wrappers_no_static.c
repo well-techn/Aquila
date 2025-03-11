@@ -4,19 +4,7 @@
  *  Warning: This file is now auto-generated.
  */
 /*  Copyright The Mbed TLS Contributors
- *  SPDX-License-Identifier: Apache-2.0
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may
- *  not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
  */
 
 
@@ -99,9 +87,9 @@ psa_status_t psa_driver_wrapper_get_key_buffer_size(
     const psa_key_attributes_t *attributes,
     size_t *key_buffer_size )
 {
-    psa_key_location_t location = PSA_KEY_LIFETIME_GET_LOCATION( attributes->core.lifetime );
-    psa_key_type_t key_type = attributes->core.type;
-    size_t key_bits = attributes->core.bits;
+    psa_key_location_t location = PSA_KEY_LIFETIME_GET_LOCATION( psa_get_key_lifetime(attributes) );
+    psa_key_type_t key_type = psa_get_key_type(attributes);
+    size_t key_bits = psa_get_key_bits(attributes);
 
     *key_buffer_size = 0;
     switch( location )
@@ -147,7 +135,7 @@ psa_status_t psa_driver_wrapper_export_public_key(
     const psa_drv_se_t *drv;
     psa_drv_se_context_t *drv_context;
 
-    if( psa_get_se_driver( attributes->core.lifetime, &drv, &drv_context ) )
+    if( psa_get_se_driver( psa_get_key_lifetime(attributes), &drv, &drv_context ) )
     {
         if( ( drv->key_management == NULL ) ||
             ( drv->key_management->p_export_public == NULL ) )
@@ -237,10 +225,10 @@ psa_status_t psa_driver_wrapper_get_builtin_key(
     uint8_t *key_buffer, size_t key_buffer_size, size_t *key_buffer_length )
 {
 
-    psa_key_location_t location = PSA_KEY_LIFETIME_GET_LOCATION( attributes->core.lifetime );
+    psa_key_location_t location = PSA_KEY_LIFETIME_GET_LOCATION( psa_get_key_lifetime(attributes) );
     switch( location )
     {
-#if defined(PSA_CRYPTO_DRIVER_TEST)
+#if defined(PSA_CRYPTO_ACCELERATOR_DRIVER_PRESENT)
 
 #if (defined(PSA_CRYPTO_DRIVER_TEST) )
         case 0x7fffff:
@@ -254,7 +242,7 @@ psa_status_t psa_driver_wrapper_get_builtin_key(
 #endif
 
 
-#endif /* PSA_CRYPTO_DRIVER_TEST */
+#endif /* PSA_CRYPTO_ACCELERATOR_DRIVER_PRESENT */
         default:
             (void) slot_number;
             (void) key_buffer;

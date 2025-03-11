@@ -2,19 +2,7 @@
  *  Version feature information
  *
  *  Copyright The Mbed TLS Contributors
- *  SPDX-License-Identifier: Apache-2.0
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"); you may
- *  not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *  WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ *  SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
  */
 
 #include "common.h"
@@ -435,12 +423,18 @@ static const char * const features[] = {
 #if defined(MBEDTLS_PSA_CRYPTO_SPM)
     "PSA_CRYPTO_SPM", //no-check-names
 #endif /* MBEDTLS_PSA_CRYPTO_SPM */
+#if defined(MBEDTLS_PSA_KEY_STORE_DYNAMIC)
+    "PSA_KEY_STORE_DYNAMIC", //no-check-names
+#endif /* MBEDTLS_PSA_KEY_STORE_DYNAMIC */
 #if defined(MBEDTLS_PSA_P256M_DRIVER_ENABLED)
     "PSA_P256M_DRIVER_ENABLED", //no-check-names
 #endif /* MBEDTLS_PSA_P256M_DRIVER_ENABLED */
 #if defined(MBEDTLS_PSA_INJECT_ENTROPY)
     "PSA_INJECT_ENTROPY", //no-check-names
 #endif /* MBEDTLS_PSA_INJECT_ENTROPY */
+#if defined(MBEDTLS_PSA_ASSUME_EXCLUSIVE_BUFFERS)
+    "PSA_ASSUME_EXCLUSIVE_BUFFERS", //no-check-names
+#endif /* MBEDTLS_PSA_ASSUME_EXCLUSIVE_BUFFERS */
 #if defined(MBEDTLS_RSA_NO_CRT)
     "RSA_NO_CRT", //no-check-names
 #endif /* MBEDTLS_RSA_NO_CRT */
@@ -588,6 +582,9 @@ static const char * const features[] = {
 #if defined(MBEDTLS_BASE64_C)
     "BASE64_C", //no-check-names
 #endif /* MBEDTLS_BASE64_C */
+#if defined(MBEDTLS_BLOCK_CIPHER_NO_DECRYPT)
+    "BLOCK_CIPHER_NO_DECRYPT", //no-check-names
+#endif /* MBEDTLS_BLOCK_CIPHER_NO_DECRYPT */
 #if defined(MBEDTLS_BIGNUM_C)
     "BIGNUM_C", //no-check-names
 #endif /* MBEDTLS_BIGNUM_C */
@@ -645,6 +642,9 @@ static const char * const features[] = {
 #if defined(MBEDTLS_GCM_C)
     "GCM_C", //no-check-names
 #endif /* MBEDTLS_GCM_C */
+#if defined(MBEDTLS_GCM_LARGE_TABLE)
+    "GCM_LARGE_TABLE", //no-check-names
+#endif /* MBEDTLS_GCM_LARGE_TABLE */
 #if defined(MBEDTLS_HKDF_C)
     "HKDF_C", //no-check-names
 #endif /* MBEDTLS_HKDF_C */
@@ -735,9 +735,15 @@ static const char * const features[] = {
 #if defined(MBEDTLS_SHA256_C)
     "SHA256_C", //no-check-names
 #endif /* MBEDTLS_SHA256_C */
+#if defined(MBEDTLS_SHA256_USE_ARMV8_A_CRYPTO_IF_PRESENT)
+    "SHA256_USE_ARMV8_A_CRYPTO_IF_PRESENT", //no-check-names
+#endif /* MBEDTLS_SHA256_USE_ARMV8_A_CRYPTO_IF_PRESENT */
 #if defined(MBEDTLS_SHA256_USE_A64_CRYPTO_IF_PRESENT)
     "SHA256_USE_A64_CRYPTO_IF_PRESENT", //no-check-names
 #endif /* MBEDTLS_SHA256_USE_A64_CRYPTO_IF_PRESENT */
+#if defined(MBEDTLS_SHA256_USE_ARMV8_A_CRYPTO_ONLY)
+    "SHA256_USE_ARMV8_A_CRYPTO_ONLY", //no-check-names
+#endif /* MBEDTLS_SHA256_USE_ARMV8_A_CRYPTO_ONLY */
 #if defined(MBEDTLS_SHA256_USE_A64_CRYPTO_ONLY)
     "SHA256_USE_A64_CRYPTO_ONLY", //no-check-names
 #endif /* MBEDTLS_SHA256_USE_A64_CRYPTO_ONLY */

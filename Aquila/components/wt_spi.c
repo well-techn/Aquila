@@ -109,7 +109,7 @@ void SPI_write_byte(spi_device_handle_t spi_handle,
         .address_bits = number_of_address_bits ,
         .dummy_bits = number_of_dummy_bits ,
     }; 
-    ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_ext_t *)&e));
+    ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_t *)&e));
 }
 
 uint8_t SPI_read_byte(spi_device_handle_t spi_handle,  
@@ -133,7 +133,7 @@ uint8_t SPI_read_byte(spi_device_handle_t spi_handle,
       .address_bits = number_of_address_bits ,
       .dummy_bits = number_of_dummy_bits ,
     }; 
-  ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_ext_t *)&e));
+  ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_t *)&e));
 
   return value;
 }
@@ -161,7 +161,7 @@ void SPI_write_bytes(spi_device_handle_t spi_handle,
       .address_bits = number_of_address_bits,
       .dummy_bits = number_of_dummy_bits
     }; 
-  ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_ext_t *)&e));
+  ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_t *)&e));
 
 
 }

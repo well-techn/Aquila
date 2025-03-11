@@ -1,7 +1,7 @@
 #include "wt_i2c.h"
 #include "MCP23017.h"
 //#include "driver/i2c.h"
-#include "driver/i2c_master.h"
+#include "i2c_master.h"
 #include "wt_alldef.h"
 #include "esp_log.h"
 #include <rom/ets_sys.h>

@@ -39,6 +39,10 @@
 #include "FL3195.h"
 #include "MS5611.h"
 #include "AES_crypto.h"
+#include "filters.c"
+#include "q_operations.c"
+#include "mavlink_wt.h"
+#include "mavlink_crc.h"
 
 /********************************************************************     СЕКЦИЯ 1     ***********************************************************************************************/
 /**************************************************************************************************************************************************************************************/
@@ -53,11 +57,12 @@ const char *TAG_W25N = "W25N";
 const char *TAG_MPU6000 = "MPU6000";
 const char *TAG_MCP23017 = "MCP23017";
 const char *TAG_PCA9685 = "PCA9685";
-const char *TAG_LIDAR = "TFSmini";
+const char *TAG_LIDAR = "LIDAR";
 const char *TAG_INA219 = "INA219";
 const char *TAG_IST8310 = "IST8310";
 const char *TAG_FL3195 = "RGB_LED";
 const char *TAG_MS5611 = "MS5611";
+const char *TAG_MAV = "MAV";
 
 
 //spi handles
@@ -69,6 +74,7 @@ extern spi_device_handle_t MPU6000_2;
 extern i2c_master_bus_handle_t i2c_internal_bus_handle;
 extern i2c_master_bus_handle_t i2c_external_bus_handle;
 extern i2c_master_dev_handle_t IST8310_dev_handle;
+extern i2c_master_dev_handle_t TFSMINI_dev_handle;
 
 //семафоры
 static SemaphoreHandle_t semaphore_for_i2c_external;
@@ -95,8 +101,10 @@ static QueueHandle_t PCA9685_queue = NULL; //очередь принимающа
 static QueueHandle_t magnetometer_queue = NULL; //очередь для передачи обработанных данных из задачи обработки данных магнетометра в main_flying_cycle
 static QueueHandle_t main_to_rc_queue = NULL; //очередь для передачи данных из main_flying_cycle в задачу отправки телеметрии на пульт
 static QueueHandle_t W25N01_queue = NULL;  //очередь для передачи данных из main_flying_cycle в задачу записи логов во внешнюю флэш-память
-
 static QueueHandle_t INA219_to_main_queue = NULL; //очередь для передачи данных из задачи обработки данных от INA219 в main_flying_cycle
+static QueueHandle_t mav_queue_for_events = NULL; //очередь для побработки событий для UART Mavlink
+static QueueHandle_t main_to_mavlink_queue = NULL; //очередь для передачи данных из main в mavlink
+
 
 
 //параметры выделения памяти для статического размещения задач
@@ -136,6 +144,12 @@ StackType_t INA219_read_and_process_data_stack[INA219_READ_AND_PROCESS_DATA_STAC
 StaticTask_t writing_logs_to_flash_TCB_buffer;
 StackType_t writing_logs_to_flash_stack[WRITING_LOGS_TO_FLASH_STACK_SIZE];
 
+StaticTask_t performance_measurement_TCB_buffer;
+StackType_t performance_measurement_stack[PERFORMANCE_MEASUREMENT_STACK_SIZE];
+
+StaticTask_t mavlink_telemetry_TCB_buffer;
+StackType_t mavlink_telemetry_stack[MAVLINK_TELEMETRY_STACK_SIZE];
+
 //tasks handlers
 static TaskHandle_t task_handle_blinking_flight_lights;
 static TaskHandle_t task_handle_main_flying_cycle;
@@ -147,9 +161,8 @@ static TaskHandle_t task_handle_mag_read_and_process_data;
 static TaskHandle_t task_handle_PCA9685_control;
 static TaskHandle_t task_handle_MCP23017_monitoring_and_control;
 static TaskHandle_t task_handle_writing_logs_to_flash;
-
-
-
+static TaskHandle_t task_handle_mavlink_telemetry;
+static TaskHandle_t task_handle_lidar_read_and_process_data;
 
 /********************************************************************     СЕКЦИЯ 2     ***********************************************************************************************/
 /********************************************************************    ПРЕРЫВАНИЯ    ***********************************************************************************************/
@@ -328,7 +341,7 @@ static void configure_pins_for_interrupt()
 }
 
 
-#ifdef USING_HOLYBRO_M9N
+#ifdef USING_GPS
 //настройка UART для GPS
 static void gps_uart_config()
 {
@@ -351,6 +364,8 @@ static void gps_uart_config()
     uart_flush(GPS_UART);                                                                           //очищаем FIFO RX буфер
 }
 #endif
+
+
 static void remote_control_uart_config(void)
 {
     int intr_alloc_flags = 0;
@@ -362,25 +377,29 @@ static void remote_control_uart_config(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
+    
+    //uart_set_rx_timeout(REMOTE_CONTROL_UART, 100);
+    //https://esp32.com/viewtopic.php?f=13&t=35116
 
     ESP_ERROR_CHECK(uart_driver_install(REMOTE_CONTROL_UART, RC_RX_UART_BUFF_SIZE, RC_TX_UART_BUFF_SIZE, RC_UART_PATTERN_DETECTION_QUEUE_SIZE, &remote_control_queue_for_events, intr_alloc_flags)); 
     ESP_ERROR_CHECK(uart_param_config(REMOTE_CONTROL_UART, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(REMOTE_CONTROL_UART, RC_UART_TX_PIN, RC_UART_RX_PIN, RC_UART_RTS_PIN, RC_UART_CTS_PIN));
-
+#ifdef NO_RSSI
     ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(REMOTE_CONTROL_UART, 0xFF, 1, 5, 0, 0));                 //активируем режим обнаружения пэттерна, в частности байта 0xFF, который является концом строки 
+#endif
     ESP_ERROR_CHECK(uart_pattern_queue_reset(REMOTE_CONTROL_UART, RC_UART_PATTERN_DETECTION_QUEUE_SIZE));      //сбрасываем очередь
+#ifdef NO_RSSI
     uart_disable_intr_mask(REMOTE_CONTROL_UART, (0x1 << 8));                                                   //UART_INTR_RXFIFO_TOUT
+#endif
     uart_flush(REMOTE_CONTROL_UART);                                                                           //сбрасываем буфер
 }
 
-
-#ifdef USING_LIDAR_UART
-//настройка UART для Benewake TFmini-S
-static void lidar_uart_config()
+#ifdef USING_MAVLINK_TELEMETRY
+static void mavlink_uart_config(void)
 {
     int intr_alloc_flags = 0;
-    uart_config_t lidar_uart_config = {
-        .baud_rate = LIDAR_UART_BAUD_RATE,
+    uart_config_t uart_config = {
+        .baud_rate = MAV_UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -388,13 +407,10 @@ static void lidar_uart_config()
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(LIDAR_UART, LIDAR_UART_BUF_SIZE, 0, LIDAR_UART_PATTERN_DETECTION_QUEUE_SIZE, &lidar_queue_for_events, intr_alloc_flags)); 
-    ESP_ERROR_CHECK(uart_param_config(LIDAR_UART, &lidar_uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(LIDAR_UART, LIDAR_UART_TX_PIN, LIDAR_UART_RX_PIN, LIDAR_UART_RTS_PIN, LIDAR_UART_CTS_PIN));
-
-    ESP_ERROR_CHECK(uart_enable_pattern_det_baud_intr(LIDAR_UART, 0x59, 2, 3, 0, 0));                 //creating pattern detection
-    ESP_ERROR_CHECK(uart_pattern_queue_reset(LIDAR_UART, LIDAR_UART_PATTERN_DETECTION_QUEUE_SIZE));          //allocating queue  
-    uart_flush(LIDAR_UART);                                                                           //resetting incoming buffer
+    ESP_ERROR_CHECK(uart_driver_install(MAV_UART, MAV_RX_UART_BUF_SIZE, MAV_TX_UART_BUF_SIZE, MAV_UART_PATTERN_DETECTION_QUEUE_SIZE, &mav_queue_for_events, intr_alloc_flags)); 
+    ESP_ERROR_CHECK(uart_param_config(MAV_UART, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(MAV_UART, MAV_UART_TX_PIN, MAV_UART_RX_PIN, MAV_UART_RTS_PIN, MAV_UART_CTS_PIN));
+    uart_flush(MAV_UART);                                                                           //сбрасываем буфер
 }
 #endif
 
@@ -455,7 +471,7 @@ static void create_and_start_general_suspension_timer()
   ESP_ERROR_CHECK(gptimer_set_alarm_action(general_suspension_timer, &alarm_config));
 
   gptimer_event_callbacks_t  Suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
-      .on_alarm = general_suspension_timer_interrupt_handler,     // register user callback
+      .on_alarm = (gptimer_alarm_cb_t)general_suspension_timer_interrupt_handler,     // register user callback
   };
   ESP_ERROR_CHECK(gptimer_register_event_callbacks(general_suspension_timer, &Suspension_timer_interrupt, NULL));
 
@@ -676,7 +692,7 @@ static void mag_read_and_process_data (void * pvParameters)
 }
 #endif
 
-#ifdef USING_HOLYBRO_M9N
+#ifdef USING_GPS
 //Задача получения и обработки данных от GPS. Подразумеваем что получаем только RMC сообщения.
 //Ждет прерывания по обнаружению символа конца строки, при обнаружении разбираем полученную строку, вычленяем координаты и выдаем в очередь в сторону main_flying_cycle.
 //Управляем трехцветным светодиодом FL3195 на модуле Holybro M9N для отображения сиатуса GPS. 
@@ -760,7 +776,7 @@ static void gps_read_and_process_data(void * pvParameters)
 //формируем одну переменную типа 123.456789123
                         gps_data.longtitude_d = ((incoming_message_buffer_gps[coma_places[4]+4] & 0x0F)*1000000 + (incoming_message_buffer_gps[coma_places[4]+5] & 0x0F)*100000 + (incoming_message_buffer_gps[coma_places[4]+7] & 0x0F)*(long)10000 + (incoming_message_buffer_gps[coma_places[4]+8] & 0x0F)*1000 + (incoming_message_buffer_gps[coma_places[4]+9] & 0x0F)*100 + (incoming_message_buffer_gps[coma_places[4]+10] & 0x0F)*10 + (incoming_message_buffer_gps[coma_places[4]+11] & 0x0F)) * 10 / 6;
                         gps_data.longtitude_d += longtitude * 10000000;
-                        ESP_LOGI(TAG_GPS,"Lat is %" PRIu64 " Lon is %" PRIu64, gps_data.latitude_d, gps_data.longtitude_d);
+                        ESP_LOGI(TAG_GPS,"Lat is  %ld, Lon is %ld", gps_data.latitude_d, gps_data.longtitude_d);
 //статус ставим в 1 если считаем данные достоверными
                         gps_data.status = 1;
 //отправляем сформированную структуру в очередь
@@ -773,7 +789,9 @@ static void gps_read_and_process_data(void * pvParameters)
                     } else {ESP_LOGW(TAG_GPS,"Сообщение не опознано"); gps_data.status = 0;}       //какое-то левое сообщение или запутались в длине сообщения
 //если статус GPS поменялся по отношению к предыдущему, то отправляем соответствующую команду на RGB светодиод на Holybro
 //обязательно через семафор, так как на этой шине есть еще устройства                 
-                  if (gps_data.status != gps_status_old )
+                  
+#ifdef USING_HOLYBRO_M9N
+if (gps_data.status != gps_status_old )
                   {
                     if (gps_data.status)                                    //если статус 1 
                       {
@@ -794,7 +812,7 @@ static void gps_read_and_process_data(void * pvParameters)
                     }
                   }
                   gps_status_old = gps_data.status;
-                  
+#endif                  
                   }
                 uart_flush(GPS_UART);
                 xQueueReset(gps_queue_for_events);
@@ -866,6 +884,7 @@ static void RC_read_and_process_data(void * pvParameters)
   uint16_t command_for_PCA9685;
   uint16_t mode_old = 0;
   uint8_t LED_status = 0;
+  uint8_t start_flag_old = 0;
 
   remote_control_data.altitude_hold_flag = 0;
   
@@ -879,6 +898,8 @@ static void RC_read_and_process_data(void * pvParameters)
     {     
       switch (remote_control_uart_event.type)                   //проверяем тип события, полученного от UART 
       {
+//если не включен пакет RSSI на приемнике - работаем по обнаружению символа конца строки
+#ifdef NO_RSSI  
         case UART_PATTERN_DET:                                  //если это то что надо - 
           pos = uart_pattern_pop_pos(REMOTE_CONTROL_UART);      //запрашиваем на какой позиции в буфере обнаружен символ конца строки
           ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
@@ -886,13 +907,32 @@ static void RC_read_and_process_data(void * pvParameters)
           {
             uart_flush_input(REMOTE_CONTROL_UART);              //очищаем входящий буфер и очередь  
             xQueueReset(remote_control_queue_for_events);
-            //ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);  
+            ESP_LOGW(TAG_RC, "incorrect pos, %d", pos);  
           }
           else                                                 //если все ок     
-          {
+          {                                                                                     
             int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos+1, 1);      //считываем данные из буфера в локальную переменную
+//если получаем байт RSSI - работам просто по UART_data
+#else
+        case UART_DATA:                                 
+                  
+          ESP_ERROR_CHECK(uart_get_buffered_data_len(REMOTE_CONTROL_UART, (size_t*)&pos));  //запрашиваем сколько байт получено
+          ESP_LOGD(TAG_RC, "Получено %d байт по data", pos);
+
+          if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC + 1))                              //если не столько сколько должно быть
+          {
+            uart_flush_input(REMOTE_CONTROL_UART);              //очищаем входящий буфер и очередь  
+            xQueueReset(remote_control_queue_for_events);
+            ESP_LOGW(TAG_RC, "Некорректное кол-во байт, %d", pos);  
+          }                    
+          else                                                 //если все ок     
+            {                                                                                
+              int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos, 0);  //считываем в локальный буфер    
+
+#endif            
             ESP_LOGD(TAG_RC, "Received in total %d bytes", read_len);
-//проверяем покет на целостность по заголовку и контрольной сумме
+
+            //проверяем покет на целостность по заголовку и контрольной сумме
             if ((incoming_message_buffer_remote[0] == RC_MESSAGE_HEADER) 
             && (incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-2)))
             {
@@ -902,7 +942,8 @@ static void RC_read_and_process_data(void * pvParameters)
 //моргаем одним из светодиодов на плате
               if (LED_status) {gpio_set_level(LED_GREEN, 0); LED_status=0;}
               else {gpio_set_level(LED_GREEN, 1);LED_status=1;}
-//собираем полученные данные в переменные              
+//собираем полученные данные в переменные
+           
               received_throttle = (incoming_message_buffer_remote[1] << 8) | incoming_message_buffer_remote[2];
               received_roll = ((incoming_message_buffer_remote[3] << 8) | incoming_message_buffer_remote[4]);               
               received_pitch = ((incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6]);                
@@ -919,14 +960,14 @@ static void RC_read_and_process_data(void * pvParameters)
 //reversed signs             
               if ((received_roll > 360)&&( received_roll < 1800)) remote_control_data.received_roll = -0.02083333f*(float)received_roll + 37.5f;              
                 else if ((received_roll > 2245) && (received_roll < 3741)) remote_control_data.received_roll = -0.02005348*(float)received_roll + 45.020053f; 
-                else if (received_roll >= 3741) remote_control_data.received_roll = -30.0;
+                else if (received_roll >= 3741) remote_control_data.received_roll = -30.0;  //градусы наклона
                 else if (received_roll <= 360) remote_control_data.received_roll = 30.0;
                 else remote_control_data.received_roll = 0;
 
-              if ((received_yaw > 200)&&( received_yaw < 1848)) remote_control_data.received_yaw = -0.06068f*(float)received_yaw + 112.13592;
-                else if ((received_yaw < 3896)&&( received_yaw > 2248)) remote_control_data.received_yaw = -0.06068f*(float)received_yaw + 136.40777;
-                else if (received_yaw >= 3896) remote_control_data.received_yaw = -100.0;     //градусы в секунду
-                else if (received_yaw <= 200) remote_control_data.received_yaw = 100.0;
+              if ((received_yaw > 200)&&( received_yaw < 1848)) remote_control_data.received_yaw = -0.0910194f*(float)received_yaw + 168.203885;
+                else if ((received_yaw < 3896)&&( received_yaw > 2248)) remote_control_data.received_yaw = -0.0910194f*(float)received_yaw + 204.61165;
+                else if (received_yaw >= 3896) remote_control_data.received_yaw = -150.0;     //градусы в секунду
+                else if (received_yaw <= 200) remote_control_data.received_yaw = 150.0;
                 else remote_control_data.received_yaw = 0;
 
 //слегка подфильтровываем значения от джойстиков        
@@ -965,12 +1006,21 @@ static void RC_read_and_process_data(void * pvParameters)
                 else command_for_PCA9685 = 0x011A;
               xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
               }
+//при изменении состояния флага engine_start отправить в очередь задачи управления PCA9685 команду на изменение сигнала
+              if (remote_control_data.engines_start_flag ^ start_flag_old)  {
+                if (remote_control_data.engines_start_flag) command_for_PCA9685 = 0x015A;
+                else command_for_PCA9685 = 0x0100;
+              xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
+              }
+//копируем в структуру байт с уровнем RSSI 
+              remote_control_data.rssi_level = (int8_t)incoming_message_buffer_remote[13];
 //отправляем сформированную структуру с обработанными данными от пульта в main_flying_cycle                
               xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);
 //обнуляем на всякий случай буфер
               for (i=0;i<NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2;i++) incoming_message_buffer_remote[i] = 0;           
               
               mode_old = remote_control_data.mode;
+              start_flag_old = remote_control_data.engines_start_flag;
 //каждый 3й раз пробуждаем задачу отправки телеметрии на пульт
               remote_packets_counter++;
               if (remote_packets_counter == 3)
@@ -985,8 +1035,7 @@ static void RC_read_and_process_data(void * pvParameters)
               //for (j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);       
               uart_flush(REMOTE_CONTROL_UART);
               xQueueReset(remote_control_queue_for_events);
-            }
-            
+            }  
           }
           break;
 
@@ -1001,12 +1050,17 @@ static void RC_read_and_process_data(void * pvParameters)
           uart_flush_input(REMOTE_CONTROL_UART);
           xQueueReset(remote_control_queue_for_events);
           break;
-
+#ifdef NO_RSSI
         case UART_DATA: 
           ESP_LOGW(TAG_RC, "data");
         break;
-       
-        case UART_BREAK:
+#else
+        case UART_PATTERN_DET: 
+        ESP_LOGW(TAG_RC, "pattern");
+        break;
+#endif        
+
+case UART_BREAK:
           ESP_LOGW(TAG_RC, "uart rx break");
           uart_flush(REMOTE_CONTROL_UART);
           break;
@@ -1028,7 +1082,6 @@ static void RC_read_and_process_data(void * pvParameters)
     }
   }
 } 
-
 
 //Задача отправки телеметрии на управления. 
 //Активируется из задачи получения данных от пульта, забирает из очереди, в которую шлет main_flying_cycle, данные и отправляем их в UART.
@@ -1071,88 +1124,61 @@ static void send_data_to_RC(void * pvParameters)
 //Задача обработки данных от лидара TFSMini (Benewake)
 //ждет прерывания от обнаружения символа начала строки, считывает данные, обрабатывает и отправляем в main_flying_cycle 
 //опционально можем настраивать частоту выдачи данных с TFSmini 
-#ifdef USING_LIDAR_UART
+#ifdef USING_TFMINIS_I2C 
 static void lidar_read_and_process_data(void * pvParameters)
 {
   uint8_t incoming_message_buffer_lidar[NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR];
   uint16_t i = 0;
-  uint16_t pos = 0;
   uint8_t sum = 0;
+  uint16_t raw_height = 0;
+  uint16_t raw_height_old = 0;
+  uint16_t raw_strength = 0;
   struct data_from_lidar_to_main_struct lidar_data;
+  float height_old = 0;
+  float height_filter_pool[5] = {0};
+  float vertical_velocity_filter_pool[3] = {0.1};
 
-  uart_event_t lidar_uart_event;
-  
-  ESP_LOGI(TAG_LIDAR,"Configuring lidar UART.....");
-  lidar_uart_config();
-  ESP_LOGI(TAG_LIDAR,"lidar UART configured");
-  
-  ESP_LOGI(TAG_LIDAR,"Configuring lidar for 20Hz");
-  uint8_t set_20_Hz_command[] = {0x5A, 0x06, 0x03, 0x32, 0x00, 0x77};   //5A 06 03 *LL HH* SU format (1-1000Hz)
-  uint8_t save[] = {0x5A, 0x04, 0x11, 0x6F};
-  uart_write_bytes(LIDAR_UART, set_20_Hz_command, 6);
-  uart_write_bytes(LIDAR_UART, save, 4);
-  ESP_LOGI(TAG_LIDAR,"lidar is set for 20Hz");
-       
   while(1) {
-  if(xQueueReceive(lidar_queue_for_events, (void * )&lidar_uart_event, (TickType_t)portMAX_DELAY))
-  {
-    switch (lidar_uart_event.type) {
-        case UART_PATTERN_DET:
-                pos = uart_pattern_pop_pos(LIDAR_UART);
-                ESP_LOGD(TAG_LIDAR, "[UART PATTERN DETECTED] pos: %d", pos);
-                    int read_len = uart_read_bytes(LIDAR_UART, incoming_message_buffer_lidar, pos+9, portMAX_DELAY);
-                    ESP_LOGI(TAG_LIDAR, "Received in total %d bytes", read_len);
-                    xQueueReset(lidar_queue_for_events);
-                    uart_flush_input(LIDAR_UART); 
-                    //for (i=0; i<read_len; i++) printf ("%02x", incoming_message_buffer_lidar[i]);
-                    //printf("\n");
-                    for (i=0;i<8;i++) sum+= incoming_message_buffer_lidar[i];
-                    //printf("%02x\n",sum);
-                    if ((incoming_message_buffer_lidar[0] == 0x59) && (incoming_message_buffer_lidar[1] == 0x59) && (incoming_message_buffer_lidar[8] == sum))
-                    {
-                      lidar_data.height = (incoming_message_buffer_lidar[3] << 8) + incoming_message_buffer_lidar[2];
-                      lidar_data.strength = (incoming_message_buffer_lidar[5] << 8) + incoming_message_buffer_lidar[4];
-                      ESP_LOGI(TAG_LIDAR, "dist is %d\n",lidar_data.height);
-                      xQueueSend(lidar_to_main_queue, (void *) &lidar_data, NULL);
-                    }
-                uart_flush(LIDAR_UART);
-                xQueueReset(lidar_queue_for_events);
-                sum = 0;
-                break;
-        case UART_FIFO_OVF:
-              ESP_LOGW(TAG_LIDAR, "hw fifo overflow");
-              uart_flush_input(LIDAR_UART);
-              xQueueReset(lidar_queue_for_events);
-              break;
 
-        case UART_BUFFER_FULL:
-          ESP_LOGW(TAG_LIDAR, "ring buffer full");
-          uart_flush_input(LIDAR_UART);
-          xQueueReset(lidar_queue_for_events);
-          break;
+    if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0)
+    {
+      ESP_LOGD(TAG_LIDAR,"Отправляем запрос на получение данных");
+      xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY); 
+      tfs_request_data();
+      //xSemaphoreGive(semaphore_for_i2c_internal);                                 //тут должна быть задержка 1ms но вроде работает и без нее
+      //vTaskDelay(1/portTICK_PERIOD_MS);     //esp_rom_delay_us(uint32_t us)       //It is recommended to wait for 1ms and then read the result after sending commands.
+      //ESP_LOGD(TAG_LIDAR,"Считываем результат");
+      //xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY);  
+      tfs_read_result(incoming_message_buffer_lidar);
+      xSemaphoreGive(semaphore_for_i2c_internal);
+      sum = 0;
+      for (i=0;i<8;i++) sum+= incoming_message_buffer_lidar[i];
+          
+      if ((incoming_message_buffer_lidar[0] == 0x59) && (incoming_message_buffer_lidar[1] == 0x59) && (incoming_message_buffer_lidar[8] == sum))
+      {
+        raw_height = (incoming_message_buffer_lidar[3] << 8) + incoming_message_buffer_lidar[2];
+        raw_strength = (incoming_message_buffer_lidar[5] << 8) + incoming_message_buffer_lidar[4];
+    
+        if (((raw_height - raw_height_old) < 2) && ((raw_height  - raw_height_old) > -2)) raw_height = raw_height_old;                  //так как типичный джиттер сигнала = 2см
+        lidar_data.altitude = avg_filter_1d(height_filter_pool, (float)raw_height, sizeof(height_filter_pool) / sizeof(float));         //фильтруем скользящим средним
 
-      case UART_DATA: break;
-       
-      case UART_BREAK:
-          ESP_LOGW(TAG_LIDAR, "uart rx break");
-          break;
+        lidar_data.vertical_velocity = (lidar_data.altitude - height_old) / (1.0 / (float)LIDAR_RATE_HZ);       //на основе фильтрованной высоты вычислем скорость в см/с
         
-        case UART_PARITY_ERR:
-          ESP_LOGW(TAG_LIDAR, "uart parity error");
-          break;
-        
-        case UART_FRAME_ERR:
-          ESP_LOGW(TAG_LIDAR, "uart frame error");
-          break;
-                    
-        default:
-          ESP_LOGW(TAG_LIDAR, "unknown uart event type: %d", lidar_uart_event.type);
-          uart_flush(LIDAR_UART);
-          xQueueReset(lidar_queue_for_events);
-            break;
-    }
+        height_old = lidar_data.altitude;
+
+        //printf("%0.3f, %0.3f\n",lidar_data.altitude,lidar_data.vertical_velocity);
+        //printf("%d\n",raw_height);
+
+        if ((raw_strength < 100) || (raw_height > 65532)) lidar_data.valid = 0;
+        else lidar_data.valid = 1;
+
+        xQueueSend(lidar_to_main_queue, (void *) &lidar_data, NULL);
+        height_old = lidar_data.altitude;
+      }
+      else if (incoming_message_buffer_lidar[8] != sum) ESP_LOGW(TAG_LIDAR,"Ошибка CRC, расчетный CRC = %d, принятый %d", sum, incoming_message_buffer_lidar[8]);
+           else ESP_LOGW(TAG_LIDAR,"Ошибка заголовка (%02x, %02x)", incoming_message_buffer_lidar[0], incoming_message_buffer_lidar[1]); 
+    }   
   }
-}
 }
 #endif
 
@@ -1233,26 +1259,26 @@ static void PCA9685_control(void * pvParameters)
 //Принимает на вход данные на запись из main_flyibg_cycle и записывает их в Winbond 
 static void writing_logs_to_flash(void * pvParameters)
 {
-  //uint8_t buffer[LOGS_BYTES_PER_STRING] = {0x0D};
-  uint8_t* buffer;
+  struct logging_data_set* buffer;
   uint16_t column_address = 0;
   uint16_t page_address = 0;
   while(1) 
   {
     if (xQueueReceive(W25N01_queue, &buffer, portMAX_DELAY))
     {
-      W25N_random_program_data_load(column_address, buffer, LOGS_BYTES_PER_STRING);   //loading data to page buffer
-      column_address = column_address + LOGS_BYTES_PER_STRING;
-      if (column_address >= 1975)   //79 bytes per 1ms, 25 samples per page
-      {
+      //for (int i = 0; i<sizeof(struct logging_data_set);i++) printf("%d",buffer[i]);
+      W25N_random_program_data_load(column_address, (uint8_t*)buffer, sizeof(struct logging_data_set));   //загружаем пакет данных в буфер начиная с column_address
+      column_address = column_address + sizeof(struct logging_data_set);                        //увеличиваем colunm_address на размер пакета данных 
+      if (column_address >= (2048-sizeof(struct logging_data_set)))   //проверяем что в буфер (на эту страницу) еще что-то влезет [79 байт за 1мс, 25 пакетов на странице, 79*25 = 1975]
+      {                             //если буфер заполнен - записываем страницу и инкрементируем адрес страницы
         column_address = 0;
-        W25N_program_execute(page_address);       //65536 pages, total 26 minutes
+        W25N_program_execute(page_address);       //65536 pages, итого на 26 минут макс
         page_address++;
       }
-    if (page_address == 65535)
+    if (page_address == 65535)                    //если страницы закончились
     {
       ESP_LOGE(TAG_W25N,"Внешняя flash-память для логов переполнена, запись останавливается\n");
-      vTaskDelete(NULL);
+      vTaskDelete(NULL);                          //прекращаем запись
     } 
     }
   }
@@ -1291,8 +1317,8 @@ static void blinking_flight_lights(void * pvParameters)
   
     if (blinking_mode == 0)                 //аварийный режим (1 зеленый 1 красный)
     {
-      gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
-      gpio_set_level(RED_FLIGHT_LIGHTS, 1);
+      //gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
+      //gpio_set_level(RED_FLIGHT_LIGHTS, 1);
       vTaskDelay(50/portTICK_PERIOD_MS);
       
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 0);
@@ -1302,16 +1328,16 @@ static void blinking_flight_lights(void * pvParameters)
 
     if (blinking_mode == 1)               //штатный режим (2 зеленых 1 красный)
     {
-      gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
+      //gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
       vTaskDelay(50/portTICK_PERIOD_MS);
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 0);
       vTaskDelay(100/portTICK_PERIOD_MS);
-      gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
+      //gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
       vTaskDelay(50/portTICK_PERIOD_MS);
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 0);
       vTaskDelay(500/portTICK_PERIOD_MS);
 
-      gpio_set_level(RED_FLIGHT_LIGHTS, 1);
+      //gpio_set_level(RED_FLIGHT_LIGHTS, 1);
       vTaskDelay(50/portTICK_PERIOD_MS);
       gpio_set_level(RED_FLIGHT_LIGHTS, 0);
       vTaskDelay(750/portTICK_PERIOD_MS);
@@ -1343,7 +1369,7 @@ static void performace_monitor(void * pvParameters)
 //Активируется из main_flying_cycle, возвращает через очередь данные о напряжении АКБ, токе, мощности и затраченной энергии
 static void INA219_read_and_process_data(void * pvParameters)
 {
-  float INA219_data[4] = {0.0, 0.0, 0.0, 0.0};
+  float INA219_data[4] = {0.0, 0.0, 0.0, 0.0};  // volt, current, power, consumed
   int64_t prev_time = 0;
   int64_t current_time = 0;
   
@@ -1364,6 +1390,168 @@ static void INA219_read_and_process_data(void * pvParameters)
       }
   }
 }
+
+#ifdef USING_MAVLINK_TELEMETRY
+//Задача отправки телеметрии по mavlink. 
+//Забирает из очереди, в которую шлет main_flying_cycle, данные и отправляем их в mavlink UART.
+static void send_telemetry_via_mavlink(void * pvParameters)
+{
+  mavlink_data_set_t* p_to_mavlink_data;
+  static mavlink_heartbeat_t heartbeat;
+  static mavlink_sys_status_t sys_status;
+  static mavlink_radio_status_t rssi;
+  static mavlink_attitude_t attitude;
+  static mavlink_battery_status_t battery;
+  static mavlink_global_position_int_t gps;
+  static mavlink_gps_raw_int_t gps_raw;
+  static mavlink_rc_channels_raw_t rc_channels;
+  static mavlink_vfr_hud_t vfr_hud;
+  uint8_t seq = 0;
+
+  ESP_LOGI(TAG_MAV, "Настраиваем UART для Mavlink......");
+  mavlink_uart_config();
+  ESP_LOGI(TAG_MAV, "UART для Mavlink настроен");
+
+  //инициализируем постоянные компоненты каждого из типов заголовков
+  //для hearbeat
+  heartbeat.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  heartbeat.header.len = MAVLINK_MSG_ID_HEARTBEAT_LEN;
+  heartbeat.header.sysid = MAVLINK_MY_SYS_ID;
+  heartbeat.header.compid = MAVLINK_MY_COMP_ID;
+  heartbeat.header.msgid = MAVLINK_MSG_ID_HEARTBEAT;
+  heartbeat.type = 6;
+  heartbeat.autopilot = 8;
+  heartbeat.type = 2;            //MAV_TYPE_QUADROTOR
+  heartbeat.autopilot = 3;       //MAV_AUTOPILOT_ARDUPILOTMEGA 3
+  heartbeat.mavlink_version = 3;
+  
+ //для status
+  sys_status.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  sys_status.header.len = MAVLINK_MSG_ID_SYS_STATUS_LEN;
+  sys_status.header.sysid = MAVLINK_MY_SYS_ID;
+  sys_status.header.compid = MAVLINK_MY_COMP_ID;
+  sys_status.header.msgid = MAVLINK_MSG_ID_SYS_STATUS;
+  
+  //для RSSI
+  rssi.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  rssi.header.len = MAVLINK_MSG_ID_RADIO_STATUS_LEN;
+  rssi.header.sysid = MAVLINK_MY_SYS_ID;
+  rssi.header.compid = MAVLINK_MY_COMP_ID;
+  rssi.header.msgid = MAVLINK_MSG_ID_RADIO_STATUS;
+
+  //для ATTITUDE
+  attitude.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  attitude.header.len = MAVLINK_MSG_ID_ATTITUDE_LEN;
+  attitude.header.sysid = MAVLINK_MY_SYS_ID;
+  attitude.header.compid = MAVLINK_MY_COMP_ID;
+  attitude.header.msgid = MAVLINK_MSG_ID_ATTITUDE;
+  
+  //для BATTERY
+  battery.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  battery.header.len = MAVLINK_MSG_ID_BATTERY_STATUS_LEN;
+  battery.header.sysid = MAVLINK_MY_SYS_ID;
+  battery.header.compid = MAVLINK_MY_COMP_ID;
+  battery.header.msgid = MAVLINK_MSG_ID_BATTERY_STATUS;  
+  
+  //для GPS
+  gps.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  gps.header.len = MAVLINK_MSG_ID_GLOBAL_POSITION_INT_LEN;
+  gps.header.sysid = MAVLINK_MY_SYS_ID;
+  gps.header.compid = MAVLINK_MY_COMP_ID;
+  gps.header.msgid = MAVLINK_MSG_ID_GLOBAL_POSITION_INT;
+
+  //для GPS_RAW
+  gps_raw.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  gps_raw.header.len = MAVLINK_MSG_ID_GPS_RAW_INT_LEN;
+  gps_raw.header.sysid = MAVLINK_MY_SYS_ID;
+  gps_raw.header.compid = MAVLINK_MY_COMP_ID;
+  gps_raw.header.msgid = MAVLINK_MSG_ID_GPS_RAW_INT;
+ 
+  //для RC_CHANNELS
+  rc_channels.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  rc_channels.header.len = MAVLINK_MSG_ID_RC_CHANNELS_RAW_LEN;
+  rc_channels.header.sysid = MAVLINK_MY_SYS_ID;
+  rc_channels.header.compid = MAVLINK_MY_COMP_ID;
+  rc_channels.header.msgid = MAVLINK_MSG_ID_RC_CHANNELS_RAW;
+
+  //для VFR_HUD
+  vfr_hud.header.magic = MAVLINK_V1_MESSAGE_HEADER;
+  vfr_hud.header.len = MAVLINK_MSG_ID_VFR_HUD_LEN;
+  vfr_hud.header.sysid = MAVLINK_MY_SYS_ID;
+  vfr_hud.header.compid = MAVLINK_MY_COMP_ID;
+  vfr_hud.header.msgid = MAVLINK_MSG_ID_VFR_HUD;
+  
+ while(1)
+  {
+    if (xQueueReceive(main_to_mavlink_queue, &p_to_mavlink_data, portMAX_DELAY))
+    {
+    //копируем данные, полученные из очереди, в структуры mavlink
+        if (p_to_mavlink_data -> armed_status) heartbeat.base_mode = 128;             // https://mavlink.io/en/messages/common.html#MAV_MODE_FLAG
+        else heartbeat.base_mode = 0;                                          
+    
+        sys_status.voltage_battery = p_to_mavlink_data -> voltage_mv;
+        sys_status.current_battery = p_to_mavlink_data -> current_ca;
+        sys_status.battery_remaining = (int8_t)(0.037 * (p_to_mavlink_data -> voltage_mv) - 366.3);      //конвертируем линейной зависимостью [9.9..12.6]В в [0 - 100]%
+        
+        attitude.roll = p_to_mavlink_data -> angles[1] * PI / 180;
+        attitude.pitch = p_to_mavlink_data -> angles[0] * PI / 180;
+        attitude.yaw = p_to_mavlink_data -> angles[2] * PI / 180;
+        //printf("%f\n", attitude.yaw);
+
+        gps_raw.lat = p_to_mavlink_data -> latitude;
+        gps_raw.lon = p_to_mavlink_data -> longtitude;
+        gps_raw.fix_type = p_to_mavlink_data -> gps_status;
+
+        rc_channels.rssi = (p_to_mavlink_data -> rssi_level) * 2.55 + 255;     //преобразуем сигнал [-100..0] в [0..255]
+
+        vfr_hud.heading = p_to_mavlink_data -> angles[2]; //heading
+        vfr_hud.heading = 33; //heading
+        vfr_hud.alt = (p_to_mavlink_data -> altitude_cm / 100); //высота в метрах
+
+                
+        rssi.remrssi = p_to_mavlink_data -> rssi_level;
+        rssi.rssi = p_to_mavlink_data -> rssi_level;
+
+        battery.voltages[0] = p_to_mavlink_data -> voltage_mv;
+        battery.current_consumed = p_to_mavlink_data -> current_ca;
+        battery.current_battery = p_to_mavlink_data -> current_ca;
+        battery.battery_remaining = sys_status.battery_remaining;        //так как это параметр отсылается в нескольких сообщениях
+
+//Отправляем в UART требуемые сообщения        
+        prepare_heartbeat(&heartbeat, &seq);
+        uart_write_bytes(MAV_UART, &heartbeat, sizeof(mavlink_heartbeat_t));
+        //for (int i = 0; i<sizeof(mavlink_heartbeat_t);i++) printf ("%02x ", (uint8_t) *((uint8_t*)&heartbeat + i));
+
+        prepare_status(&sys_status, &seq);
+        uart_write_bytes(MAV_UART, &sys_status, sizeof(mavlink_sys_status_t));
+
+        prepare_attitude(&attitude, &seq);
+        uart_write_bytes(MAV_UART, &attitude, sizeof(mavlink_attitude_t));  
+
+        prepare_gps_raw(&gps_raw, &seq);
+        uart_write_bytes(MAV_UART, &gps_raw, sizeof(mavlink_gps_raw_int_t));
+
+        prepare_rc_channels(&rc_channels, &seq);
+        uart_write_bytes(MAV_UART, &rc_channels, sizeof(mavlink_rc_channels_raw_t));
+
+        prepare_vfr_hud(&vfr_hud, &seq);
+        uart_write_bytes(MAV_UART, &vfr_hud, sizeof(mavlink_vfr_hud_t));
+
+        prepare_gps(&gps, &seq);
+        uart_write_bytes(MAV_UART, &gps, sizeof(mavlink_global_position_int_t)); 
+/*        
+        prepare_rssi( &rssi, &seq);
+        uart_write_bytes(MAV_UART, &rssi, sizeof(mavlink_radio_status_t));
+        
+        prepare_battery(&battery, &seq);
+        uart_write_bytes(MAV_UART, &battery, sizeof(mavlink_battery_status_t));
+*/ 
+    }
+  }
+}
+
+#endif
+
 
 /*Задача основного полетного цикла. Единственная задача на ядре 1. 
   - Активируется по прерыванию о готовности данных от IMU.
@@ -1498,8 +1686,11 @@ static void main_flying_cycle(void * pvParameters)
 
   float engine[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY}; 
   float engine_filtered[4] = {ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY,ENGINE_PWM_MIN_DUTY};
-  float engine_filter_pool [LENGTH_OF_ESC_FILTER][6] = {0};                                   //data pool for ESC input filter
-  float accum_float = 0;;
+
+  float engine_0_filter_pool[LENGTH_OF_ESC_FILTER] = {0};
+  float engine_1_filter_pool[LENGTH_OF_ESC_FILTER] = {0}; 
+  float engine_2_filter_pool[LENGTH_OF_ESC_FILTER] = {0}; 
+  float engine_3_filter_pool[LENGTH_OF_ESC_FILTER] = {0}; 
 
   struct data_from_rc_to_main_struct rc_fresh_data;
     rc_fresh_data.mode = 0;
@@ -1508,45 +1699,58 @@ static void main_flying_cycle(void * pvParameters)
   struct data_from_main_to_rc_struct data_to_send_to_rc;
   uint32_t remote_control_lost_comm_counter = 0;
 
-#ifdef USING_HOLYBRO_M9N
+#ifdef USING_GPS
   struct data_from_gps_to_main_struct gps_fresh_data;
-  float mag_fresh_data[3];
-#endif
+#endif  
 
-//altitude hold related variables
+#ifdef USING_HOLYBRO_M9N
+  float mag_fresh_data[3];
+#endif 
+
+//переменные по режиму удержания высоты
   bool altitude_hold_mode_enabled = 0;
   float altitude_setpoint = 0;
-  float current_altitude = 0;
+  float old_altitude = 0;
+  //float count_altitude = 0;
   float error_altitude = 0;
   float previous_error_altitude = 0;
-  float Kp_alt = 3.5;//10
-  float Kd_alt = 100.0;//150
-  float Ki_alt = 0.1;//0
+  float Kp_alt = 15;              //30 (на БП)
+  float Kd_alt = 180.0;           //400 (на БП)
+  float Ki_alt = 0.055;            //0.05 (на БП)
   float pid_altitude = 0;
   float integral_alt_error = 0;
   float alt_hold_initial_throttle = 0;
-  float current_altitude_old = 0;
-  float error_vertical_velocity = 0;
+  float alt_error_change_filter_pool[7] = {0};//ALT_PID_DIF_FILTER_LENGTH
 
-#ifdef USING_LIDAR_UART
+
+#ifdef USING_TFMINIS_I2C 
     struct data_from_lidar_to_main_struct lidar_fresh_data;
-      lidar_fresh_data.height = 0;
-      lidar_fresh_data.strength = 0;
-    int16_t vertical_velocity = 0;
-    int16_t vertical_velocity_old = 0;
+      lidar_fresh_data.altitude = 0;
+      lidar_fresh_data.vertical_velocity = 0;
+      lidar_fresh_data.valid = 0;
 #endif
 
   float INA219_fresh_data[4];
+  float voltage_correction_coeff = 1.0;
   
 #ifdef USING_W25N 
   //переменные для логирования
-  static uint8_t logs_buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
+  //static uint8_t logs_buffer[LOGS_BYTES_PER_STRING] = {0x0D}; 
   uint64_t start_time = 0;
-  uint32_t timestamp = 0;
-  uint8_t *p_to_uint8 = NULL;
   uint8_t flags_byte = 0;
+  struct logging_data_set set_to_log;
+  struct logging_data_set* p_to_log_structure = &set_to_log;
 #endif
-uint16_t command_for_PCA9685 = 0x0200;
+
+
+#ifdef USING_MAVLINK_TELEMETRY
+    mavlink_data_set_t main_to_mavlink_data;
+    main_to_mavlink_data.latitude = 321857245;     //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
+    main_to_mavlink_data.longtitude = 441857249;
+    mavlink_data_set_t* p_to_mavlink_data = &main_to_mavlink_data;
+#endif
+
+  uint8_t long_cycle_flag = 0;
 
   void Convert_Q_to_degrees(void) {
     
@@ -1565,7 +1769,7 @@ uint16_t command_for_PCA9685 = 0x0200;
     if (roll > 90) roll -= 360.0;
     
     yaw = atan2(a12, a22) * 57.29577951;
-    yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если не используем - без разницы, вреда не наносит
+    yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если магнетометр не используем - без разницы, вреда не наносит
 
   }
 
@@ -1657,41 +1861,30 @@ uint16_t command_for_PCA9685 = 0x0200;
     if (pid_yaw_rate < -3000.0) pid_yaw_rate = -3000.0;
     error_yaw_rate_old = error_yaw_rate;
 
-    engine[0] = rc_fresh_data.received_throttle + pid_pitch_rate + pid_roll_rate - pid_yaw_rate;
-    engine[1] = rc_fresh_data.received_throttle + pid_pitch_rate - pid_roll_rate + pid_yaw_rate;
-    engine[2] = rc_fresh_data.received_throttle - pid_pitch_rate - pid_roll_rate - pid_yaw_rate;
-    engine[3] = rc_fresh_data.received_throttle - pid_pitch_rate + pid_roll_rate + pid_yaw_rate;
+    engine[0] = (rc_fresh_data.received_throttle + pid_pitch_rate + pid_roll_rate - pid_yaw_rate);
+    engine[1] = (rc_fresh_data.received_throttle + pid_pitch_rate - pid_roll_rate + pid_yaw_rate);
+    engine[2] = (rc_fresh_data.received_throttle - pid_pitch_rate - pid_roll_rate - pid_yaw_rate);
+    engine[3] = (rc_fresh_data.received_throttle - pid_pitch_rate + pid_roll_rate + pid_yaw_rate);
 
-    for (i=0;i<4;i++) { if (engine[i] > 13106.0) engine[i] = 13106.0;}  //upper limit
-    for (i=0;i<4;i++) { if (engine[i] < ENGINE_PWM_MIN_DUTY + 150) engine[i] = ENGINE_PWM_MIN_DUTY + 150;}    //keep motor running
+#ifdef BATTERY_COMPENSATION
+    voltage_correction_coeff = 0.9 * voltage_correction_coeff + 0.1 * (11.1 / INA219_fresh_data[0]);           //11.1 - номинальное напряжение 3S АКБ, 12,6 максимальное, 9,9 минимальное
+        
+    if (voltage_correction_coeff < (11.1/12.6)) voltage_correction_coeff = 11.1/12.6;
+    if (voltage_correction_coeff > (11.1/8.8))  voltage_correction_coeff = 11.1/8.8;
+
+    for (i=0;i<4;i++) engine[i] *= sqrt(voltage_correction_coeff);
+#endif
+
+    for (i=0;i<4;i++) { if (engine[i] > 13106.0) engine[i] = 13106.0;}                                        //верхний предел
+    for (i=0;i<4;i++) { if (engine[i] < ENGINE_PWM_MIN_DUTY + 150) engine[i] = ENGINE_PWM_MIN_DUTY + 150;}    //чтобы моторы не останавливались
   }
   
   void ESC_input_data_filter(void) {                                                                                                                    
-    uint8_t i,j;
-    for (i=0;i<LENGTH_OF_ESC_FILTER;i++) {
-        for (j=0;j<4;j++) engine_filter_pool[i][j] = engine_filter_pool[i+1][j];          //shifting values, new - higher index
-      }
-    engine_filter_pool[LENGTH_OF_ESC_FILTER-1][0] = engine[0];                            // inputing new values
-    engine_filter_pool[LENGTH_OF_ESC_FILTER-1][1] = engine[1];
-    engine_filter_pool[LENGTH_OF_ESC_FILTER-1][2] = engine[2];
-    engine_filter_pool[LENGTH_OF_ESC_FILTER-1][3] = engine[3];
-
-    for (i=0;i<LENGTH_OF_ESC_FILTER;i++) accum_float +=  engine_filter_pool[i][0];          //calculating averages
-    engine_filtered[0] = accum_float / (float)LENGTH_OF_ESC_FILTER;
-    accum_float = 0;
-
-    for (i=0;i<LENGTH_OF_ESC_FILTER;i++) accum_float +=  engine_filter_pool[i][1];
-    engine_filtered[1] = accum_float / (float)LENGTH_OF_ESC_FILTER;
-    accum_float = 0;
     
-    for (i=0;i<LENGTH_OF_ESC_FILTER;i++) accum_float +=  engine_filter_pool[i][2];
-    engine_filtered[2] = accum_float / (float)LENGTH_OF_ESC_FILTER;
-    accum_float = 0;
-    
-    for (i=0;i<LENGTH_OF_ESC_FILTER;i++) accum_float +=  engine_filter_pool[i][3];
-    engine_filtered[3] = accum_float / (float)LENGTH_OF_ESC_FILTER;
-    accum_float = 0;
-
+    engine_filtered[0] = avg_filter_1d(engine_0_filter_pool, engine[0], LENGTH_OF_ESC_FILTER);
+    engine_filtered[1] = avg_filter_1d(engine_1_filter_pool, engine[1], LENGTH_OF_ESC_FILTER);
+    engine_filtered[2] = avg_filter_1d(engine_2_filter_pool, engine[2], LENGTH_OF_ESC_FILTER);
+    engine_filtered[3] = avg_filter_1d(engine_3_filter_pool, engine[3], LENGTH_OF_ESC_FILTER);
   }
 
   void update_engines(void) {
@@ -1708,139 +1901,54 @@ uint16_t command_for_PCA9685 = 0x0200;
     ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
   }
 
+  //функция подготовка логов для записи во флеш память
 #ifdef USING_W25N 
 void prepare_logs(void) {
-    p_to_uint8 = (uint8_t*)&timestamp; 
-    logs_buffer[0] = *p_to_uint8;
-    logs_buffer[1] = *(p_to_uint8+1);
-    logs_buffer[2] = *(p_to_uint8+2);
-    logs_buffer[3] = *(p_to_uint8+3);
+  set_to_log.timestamp = get_time() - start_time;
+  for (i=0;i<4;i++) set_to_log.accel[i] = accel_raw_1[i];
+  for (i=0;i<4;i++) set_to_log.gyro[i] = gyro_raw_1[i];                                                        
+  set_to_log.q[0] = q0; 
+  set_to_log.q[1] = q1;
+  set_to_log.q[2] = q2;
+  set_to_log.q[3] = q3;  
+  set_to_log.angles[0] = pitch;
+  set_to_log.angles[1] = roll; 
+  set_to_log.angles[2] = yaw;
+  set_to_log.altitude_cm = (uint16_t)lidar_fresh_data.altitude;
+  set_to_log.voltage_mv = (uint16_t)(INA219_fresh_data[0] * 1000);
+  set_to_log.current_ca = (uint16_t)(INA219_fresh_data[1] * 100);
+  set_to_log.throttle_command = rc_fresh_data.received_throttle;
+  set_to_log.pitch_command = rc_fresh_data.received_pitch;
+  set_to_log.roll_command = rc_fresh_data.received_roll;
+  set_to_log.yaw_command = rc_fresh_data.received_yaw;
+  set_to_log.mode_command = rc_fresh_data.mode;
+  for (i=0;i<4;i++) set_to_log.engines[i] = engine[i];
+  
+  if (rc_fresh_data.engines_start_flag) flags_byte |= 0b00000001;                                 //bit0 - engine start flag
+   else flags_byte &= 0b11111110;
+  if (remote_control_lost_comm_counter == RC_NO_COMM_DELAY_MAIN_CYCLES) flags_byte |= 0b00000010; //bit1 - comm lost flag
+   else flags_byte &= 0b11111101;
+  set_to_log.flags = flags_byte;
+  set_to_log.rssi_level = rc_fresh_data.rssi_level;
+}
+#endif
 
-    p_to_uint8 = (uint8_t*)&accel_raw_1[0];     //raw accel_1 X
-    logs_buffer[4] = *p_to_uint8;
-    logs_buffer[5] = *(p_to_uint8+1);
-
-    p_to_uint8 = (uint8_t*)&accel_raw_1[1];       //raw accel_1 Y
-    logs_buffer[6] = *p_to_uint8;
-    logs_buffer[7] = *(p_to_uint8+1);
-
-    p_to_uint8 = (uint8_t*)&accel_raw_1[2];       //raw accel_1 Z
-    logs_buffer[8] = *p_to_uint8;
-    logs_buffer[9] = *(p_to_uint8+1);
-
-    p_to_uint8 = (uint8_t*)&gyro_raw_1[0];        //raw gyro_1 X
-    logs_buffer[10] = *p_to_uint8;
-    logs_buffer[11] = *(p_to_uint8+1);
-
-    p_to_uint8 = (uint8_t*)&gyro_raw_1[1];        //raw gyro_1 Y
-    logs_buffer[12] = *p_to_uint8;
-    logs_buffer[13] = *(p_to_uint8+1);
-
-    p_to_uint8 = (uint8_t*)&gyro_raw_1[2];        //raw gyro_1 Z
-    logs_buffer[14] = *p_to_uint8;
-    logs_buffer[15] = *(p_to_uint8+1);
-
-    p_to_uint8 = (uint8_t*)&q0;                    //q0
-    logs_buffer[16] = *p_to_uint8;
-    logs_buffer[17] = *(p_to_uint8+1);
-    logs_buffer[18] = *(p_to_uint8+2);
-    logs_buffer[19] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&q1;                     //q1
-    logs_buffer[20] = *p_to_uint8;
-    logs_buffer[21] = *(p_to_uint8+1);
-    logs_buffer[22] = *(p_to_uint8+2);
-    logs_buffer[23] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&q2;                     //q2
-    logs_buffer[24] = *p_to_uint8;
-    logs_buffer[25] = *(p_to_uint8+1);
-    logs_buffer[26] = *(p_to_uint8+2);
-    logs_buffer[27] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&q3;                      //q3
-    logs_buffer[28] = *p_to_uint8;
-    logs_buffer[29] = *(p_to_uint8+1);
-    logs_buffer[30] = *(p_to_uint8+2);
-    logs_buffer[31] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&pitch;
-    logs_buffer[32] = *p_to_uint8;
-    logs_buffer[33] = *(p_to_uint8+1);
-    logs_buffer[34] = *(p_to_uint8+2);
-    logs_buffer[35] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&roll;
-    logs_buffer[36] = *p_to_uint8;
-    logs_buffer[37] = *(p_to_uint8+1);
-    logs_buffer[38] = *(p_to_uint8+2);
-    logs_buffer[39] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&yaw;
-    logs_buffer[40] = *p_to_uint8;
-    logs_buffer[41] = *(p_to_uint8+1);
-    logs_buffer[42] = *(p_to_uint8+2);
-    logs_buffer[43] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_throttle;
-    logs_buffer[44] = *p_to_uint8;
-    logs_buffer[45] = *(p_to_uint8+1);
-    logs_buffer[46] = *(p_to_uint8+2);
-    logs_buffer[47] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_pitch;
-    logs_buffer[48] = *p_to_uint8;
-    logs_buffer[49] = *(p_to_uint8+1);
-    logs_buffer[50] = *(p_to_uint8+2);
-    logs_buffer[51] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_roll;
-    logs_buffer[52] = *p_to_uint8;
-    logs_buffer[53] = *(p_to_uint8+1);
-    logs_buffer[54] = *(p_to_uint8+2);
-    logs_buffer[55] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&rc_fresh_data.received_yaw;
-    logs_buffer[56] = *p_to_uint8;
-    logs_buffer[57] = *(p_to_uint8+1);
-    logs_buffer[58] = *(p_to_uint8+2);
-    logs_buffer[59] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&rc_fresh_data.mode;        
-    logs_buffer[60] = *p_to_uint8;
-    logs_buffer[61] = *(p_to_uint8+1);
-    
-    p_to_uint8 = (uint8_t*)&engine_filtered[0];
-    logs_buffer[62] = *p_to_uint8;
-    logs_buffer[63] = *(p_to_uint8+1);
-    logs_buffer[64] = *(p_to_uint8+2);
-    logs_buffer[65] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&engine_filtered[1];
-    logs_buffer[66] = *p_to_uint8;
-    logs_buffer[67] = *(p_to_uint8+1);
-    logs_buffer[68] = *(p_to_uint8+2);
-    logs_buffer[69] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&engine_filtered[2];
-    logs_buffer[70] = *p_to_uint8;
-    logs_buffer[71] = *(p_to_uint8+1);
-    logs_buffer[72] = *(p_to_uint8+2);
-    logs_buffer[73] = *(p_to_uint8+3);
-
-    p_to_uint8 = (uint8_t*)&engine_filtered[3];
-    logs_buffer[74] = *p_to_uint8;
-    logs_buffer[75] = *(p_to_uint8+1);
-    logs_buffer[76] = *(p_to_uint8+2);
-    logs_buffer[77] = *(p_to_uint8+3);
-
-    if (rc_fresh_data.engines_start_flag) flags_byte |= 0b00000001;   //bit0 - engine start flag
-      else flags_byte &= 0b11111110;
-
-    if (remote_control_lost_comm_counter == RC_NO_COMM_DELAY_MAIN_CYCLES) flags_byte |= 0b00000010; //bit1 - comm lost flag
-      else flags_byte &= 0b11111101;
-
-    logs_buffer[78] = flags_byte;
+//функция подготовки структуры с данными телеметрии для отправки в мавлинк
+#ifdef USING_MAVLINK_TELEMETRY 
+void prepare_mavlink_data(void) {
+#ifdef USING_GPS  
+  main_to_mavlink_data.latitude = gps_fresh_data.latitude_d;
+  main_to_mavlink_data.longtitude = gps_fresh_data.longtitude_d;
+  main_to_mavlink_data.gps_status = gps_fresh_data.status;
+#endif
+  main_to_mavlink_data.angles[0] = -pitch;    //для корректного отображения на камере нужны знаки -
+  main_to_mavlink_data.angles[1] = -roll; 
+  main_to_mavlink_data.angles[2] = -yaw;
+  main_to_mavlink_data.voltage_mv = (uint16_t)(INA219_fresh_data[0] * 1000);
+  main_to_mavlink_data.current_ca = (uint16_t)(INA219_fresh_data[1] * 100);
+  main_to_mavlink_data.altitude_cm = (uint16_t)lidar_fresh_data.altitude;
+  main_to_mavlink_data.rssi_level = rc_fresh_data.rssi_level;
+  main_to_mavlink_data.armed_status = rc_fresh_data.engines_start_flag;
 }
 #endif
 
@@ -2209,7 +2317,8 @@ if (!(calibration_flag))
 //В данном случае данные от IMU поступают с частотой 1кГц, углы Маджвиком считаем с частотой 200Гц (каждый 5й цикл)        
       if ((large_counter % PID_LOOPS_RATIO) == 0) {
 
-      for (i=0;i<madgwick_cycles;i++) {
+        long_cycle_flag = 1;
+        for (i=0;i<madgwick_cycles;i++) {
 //считываем время прошедшее с прошлого цифка расчета 
           ESP_ERROR_CHECK(gptimer_get_raw_count(GP_timer, &timer_value));
           ESP_ERROR_CHECK(gptimer_set_raw_count(GP_timer, 0));
@@ -2241,6 +2350,7 @@ if (!(calibration_flag))
                                 (accel_converted_accumulated_1[0] + accel_converted_accumulated_2[1]) / (2.0 * PID_LOOPS_RATIO) ,
                                 ((accel_converted_accumulated_1[2] * (-1.0)) - accel_converted_accumulated_2[2]) / (2.0 * PID_LOOPS_RATIO), 
                                 timer_value);
+    
 #endif
         }
 //если не используем модуль с компасом и GPS - запускаем маджвика без учета данных от магнетометра используя в качестве входных параметров усредненные накопленные за предыдущие циклы 
@@ -2259,12 +2369,17 @@ if (!(calibration_flag))
         Convert_Q_to_degrees();
       }     
 
-//производим запрос данных от INA219 (раз в 1000 циклов, то есть раз в секунду) 
-        if ((large_counter % 1000) == 0) xTaskNotifyGive(task_handle_INA219_read_and_process_data);
+//производим запрос данных от INA219 (раз в X циклов, то есть (1000/X) в секунду) 
+        if ((large_counter % 25) == 0) xTaskNotifyGive(task_handle_INA219_read_and_process_data);      //по результатам считывания корректируем уровень газа, поэтому очень медленно нельзя
         
+        if (((large_counter + 5) % 25) == 0) xTaskNotifyGive(task_handle_lidar_read_and_process_data);
+        //printf("%0.2f\n", voltage_correction_coeff);
 //далее место где удобно что-то выводить, печатать 
 
-        //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f, %0.3f", q0, q1, q2, q3, pitch, roll, yaw);
+//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f, %0.3f", accel_rotated[0], accel_rotated[1], accel_rotated[2], accel_rotated[3]);
+//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"fil are %0.2f, %0.2f, %0.2f, %0.2f", engine_filtered[0],engine_filtered[1],engine_filtered[2],engine_filtered[3]);
+//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"new are %0.2f, %0.2f, %0.2f, %0.2f", engine_filtered_new[0],engine_filtered_new[1],engine_filtered_new[2],engine_filtered_new[3]);        
+//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f, %0.3f,    //%0.3f, %0.3f, %0.3f", q0, q1, q2, q3, pitch, roll, yaw);
 /*        if ((large_counter % 5000) == 0) 
         {
           UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
@@ -2278,10 +2393,9 @@ if (!(calibration_flag))
 */
         //if (large_counter > 10000) {vTaskDelay(1000/portTICK_PERIOD_MS);}   
 
-        //if ((large_counter % 100) == 0) 
-        //printf("%0.7f\n", accel_converted_1[0]);
         
-        //ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
+        
+        //SP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
         //printf ("%ld\n", IMU_interrupt_status); 
         //printf(" %0.1f, %0.1f\n", yaw_setpoint, yaw);
         //printf("%d\n", data_to_send_to_rc.power_voltage_value);
@@ -2320,74 +2434,54 @@ if (!(calibration_flag))
 //и оповещаем задачу моргания полетными огнями моргать в аварийном режиме (режим "0")
           xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
         }
-#ifdef USING_HOLYBRO_M9N
+#ifdef USING_GPS
 //получаем свежие данные из очереди от GPS
         if (xQueueReceive(gps_to_main_queue, &gps_fresh_data, 0)) 
         {
-          ESP_LOGI(TAG_FLY,"Широта %" PRIu64 " Долгота %" PRIu64, gps_fresh_data.latitude_d, gps_fresh_data.longtitude_d);
+          //ESP_LOGI(TAG_FLY,"Широта %" PRIu64 " Долгота %" PRIu64, gps_fresh_data.latitude_d, gps_fresh_data.longtitude_d);
         } 
 #endif
 
 //получаем свежие данные из очереди от лидара
-#ifdef USING_LIDAR_UART        
+#ifdef USING_TFMINIS_I2C         
         if (xQueueReceive(lidar_to_main_queue, &lidar_fresh_data, 0)) {
-          ESP_LOGD(TAG_FLY,"height is %d, strength is %d", lidar_fresh_data.height, lidar_fresh_data.strength);
-          if (lidar_fresh_data.height < 900) current_altitude = lidar_fresh_data.height * cos(pitch * 0.017453292) * cos(roll * 0.017453292);// PI/180
-
-          current_altitude = 0.3 * current_altitude + 0.7 * current_altitude_old;                                 //in cm
-
-          //if (((current_altitude - current_altitude_old) < 2) && ((current_altitude - current_altitude_old) > -2)) current_altitude = current_altitude_old;
-          
-          vertical_velocity = (float)(current_altitude - current_altitude_old) / (float)(1.0 / LIDAR_RATE_HZ);    //in cm/s
-          vertical_velocity = 0.3 * vertical_velocity + 0.7 * vertical_velocity_old;
-          current_altitude_old = current_altitude;
-          vertical_velocity_old = vertical_velocity;
-          //printf ("raw %d, real %02f\n", lidar_fresh_data.height,current_altitude);
-          //printf ("%0.4f, %d\n", current_altitude, vertical_velocity);  
-          } 
+          ESP_LOGD(TAG_FLY,"высота %0.3f, вертикальная скорость %0.3f", lidar_fresh_data.altitude, lidar_fresh_data.vertical_velocity); // высота в cm
+          if (lidar_fresh_data.altitude < 900) lidar_fresh_data.altitude = lidar_fresh_data.altitude * cos(pitch * 0.017453292) * cos(roll * 0.017453292);// PI/180
+          old_altitude = lidar_fresh_data.altitude;
+      }
 #endif
 
 //получаем свежие данные из очереди от INA219
 if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
       {
-        //ESP_LOGE(TAG_FLY, "V: %0.4fV, I: %0.4fA, P: %0.4fW, A: %0.8f",INA219_fresh_data[0], INA219_fresh_data[1], INA219_fresh_data[2], INA219_fresh_data[3]);
+        //SP_LOGE(TAG_FLY, "V: %0.4fV",INA219_fresh_data[1]);
       }
 
 //далее разбираемся с полетным режимом
 // если двигатели запущены - понимаем стоит ли режим удержания высоты. Если да - замещаем полученное от пульта значение газа вычисленным автоматически на основание данных от лидара 
         if (rc_fresh_data.engines_start_flag)
-        {
-#ifdef USING_LIDAR_UART
-        if ((rc_fresh_data.altitude_hold_flag) && (lidar_fresh_data.height < 900)) 
+        {       
+#ifdef USING_TFMINIS_I2C 
+        if ((rc_fresh_data.altitude_hold_flag) && (lidar_fresh_data.altitude < 900)) 
           {
-            if (altitude_hold_mode_enabled == 0)
+            if (altitude_hold_mode_enabled == 0)                                      //если только включили режим, первый раз в цикл вошли
             {
-              altitude_setpoint = current_altitude;
+              altitude_setpoint = lidar_fresh_data.altitude;
               altitude_hold_mode_enabled = 1;
               alt_hold_initial_throttle = rc_fresh_data.received_throttle;
             }
-         error_altitude = altitude_setpoint - current_altitude;
-            integral_alt_error += Ki_alt * error_altitude;                           //+=
+          error_altitude = altitude_setpoint - lidar_fresh_data.altitude;
+            integral_alt_error += Ki_alt * error_altitude;                         
             if (integral_alt_error > 500) integral_alt_error = 500;
             if (integral_alt_error < -500) integral_alt_error = -500;
 
-            //pid_p_alt = Kp_alt * error_altitude;
-            //pid_d_alt = Kd_alt * (error_altitude - previous_error_altitude);
             pid_altitude = Kp_alt * error_altitude + Kd_alt * (error_altitude - previous_error_altitude) + integral_alt_error;
             if (pid_altitude > 3000) pid_altitude = 3000;
             if (pid_altitude < -3000) pid_altitude = -3000;
-            rc_fresh_data.received_throttle = alt_hold_initial_throttle + pid_altitude;
+            //if ((large_counter % 100) == 0) printf("%0.3f, %0.3f, %0.3f\n", Kp_alt * error_altitude, Kd_alt * (error_altitude - previous_error_altitude), integral_alt_error);
+            //if ((large_counter % 10) == 0) printf("%0.3f\n",Kd_alt * (error_altitude - previous_error_altitude));
+            rc_fresh_data.received_throttle = alt_hold_initial_throttle + pid_altitude;       //заменяем значение throttle от пульта вычисленным при помощт регулятора
             previous_error_altitude = error_altitude;
-/*          error_vertical_velocity = 0.0 - vertical_velocity;
-            integral_error_vertical_velocity += Ki_vert_vel * error_vertical_velocity;
-            if (integral_error_vertical_velocity > 500) integral_error_vertical_velocity = 500;
-            if (integral_error_vertical_velocity < -500) integral_error_vertical_velocity = -500;
-            pid_vertical_velocity = Kp_vert_vel * error_vertical_velocity + Kd_vert_vel * (error_vertical_velocity - error_vertical_velocity_old) + integral_error_vertical_velocity;
-            if (pid_vertical_velocity > 3000) pid_vertical_velocity = 3000;
-            if (pid_vertical_velocity < -3000) pid_vertical_velocitye = -3000;
-            rc_fresh_data.received_throttle = alt_hold_initial_throttle + pid_vertical_velocity;
-            error_vertical_velocity_old = error_vertical_velocity; 
-*/
           }
         else 
           {
@@ -2416,29 +2510,33 @@ if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data, 0))
         update_engines();
 //на этом цикл от считывания данных от IMU до выдачи сигналов на двигатели фактически закончен
 
-//собираем данные телеметрии и отправляем их в очередь на запись во внешнюю флэш-память
+//собираем данные телеметрии и отправляем их в очередь на отправку на пульт
         data_to_send_to_rc.pitch = pitch;
         data_to_send_to_rc.roll = roll;
         data_to_send_to_rc.yaw = yaw;
         data_to_send_to_rc.power_voltage_value = (uint16_t)(INA219_fresh_data[0]*10.0);
-        data_to_send_to_rc.altitude = (uint16_t)current_altitude;;
+        data_to_send_to_rc.altitude = (uint16_t)lidar_fresh_data.altitude;
         xQueueOverwrite(main_to_rc_queue, (void *) &data_to_send_to_rc);         
 
 //подготавливаем данные для записи в логи и записываем по flash
 #ifdef USING_W25N
-uint8_t* pointer = &logs_buffer;
-
   if ((large_counter % 50) == 0) 
   {       
-        timestamp = get_time() - start_time;
         prepare_logs();
-        //xQueueSend(W25N01_queue, logs_buffer, NULL);
-        xQueueSend(W25N01_queue, &pointer, NULL);
+        xQueueSend(W25N01_queue, &p_to_log_structure, 0);
+  }
+#endif
+
+#ifdef USING_MAVLINK_TELEMETRY
+  if ((large_counter % 200) == 0) 
+  {       
+        prepare_mavlink_data();
+        xQueueSend(main_to_mavlink_queue, &p_to_mavlink_data, 0);
   }
 #endif
 
         gpio_set_level(LED_RED, 1);
-
+        long_cycle_flag = 0;
         IMU_interrupt_status = 0;
 //сбрасываем таймер общего зависания, по сработке которого аварийно останавливаем двигатели        
         ESP_ERROR_CHECK(gptimer_set_raw_count(general_suspension_timer, 0));
@@ -2459,18 +2557,19 @@ static void init(void * pvParameters)
 
   esp_log_level_set(TAG_INIT,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FLY,ESP_LOG_INFO);  //WARN ERROR
-  esp_log_level_set(TAG_GPS,ESP_LOG_ERROR);  //WARN ERROR
+  esp_log_level_set(TAG_GPS,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_NVS,ESP_LOG_INFO);   //WARN ERROR
   esp_log_level_set(TAG_RC,ESP_LOG_INFO);    //WARN ERROR
   esp_log_level_set(TAG_PMW,ESP_LOG_WARN);   //WARN ERROR
   esp_log_level_set(TAG_W25N,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_MPU6000,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_PCA9685,ESP_LOG_INFO);  //WARN ERROR
-  esp_log_level_set(TAG_MCP23017,ESP_LOG_WARN);  //WARN ERROR
-  esp_log_level_set(TAG_LIDAR,ESP_LOG_WARN);  //WARN ERROR
+  esp_log_level_set(TAG_MCP23017,ESP_LOG_INFO);  //WARN ERROR
+  esp_log_level_set(TAG_LIDAR,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FL3195,ESP_LOG_WARN); 
+  esp_log_level_set(TAG_MAV,ESP_LOG_INFO); 
 
   printf("\n");
   ESP_LOGI(TAG_INIT,"Старт системы\n");
@@ -2512,6 +2611,9 @@ static void init(void * pvParameters)
 #endif
 
   ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
+  extern i2c_master_dev_handle_t MCP23017_dev_handle;
+  
+
   if (MCP23017_communication_check() != ESP_OK) {
     error_code = 3;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
@@ -2641,6 +2743,9 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
+  
+  ESP_LOGI(TAG_INIT,"Сбрасываем все выходы PCA9685.....");
+  for (uint8_t i = 0; i<16; i++) PCA9685_send(0, i);
 
   ESP_LOGI(TAG_INIT,"Проверка связи с INA219.....");
   if (INA219_communication_check() != ESP_OK) {
@@ -2671,8 +2776,6 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-  //FL3195_set_pattern(3, 255,0,0);
-
   ESP_LOGI(TAG_INIT,"Проверка связи с IST8310.....");
   if (IST8310_communication_check() != ESP_OK) {
     error_code = 11;
@@ -2696,6 +2799,15 @@ static void init(void * pvParameters)
 
   ESP_LOGI(TAG_INIT,"Считываем данные cross-axis calibration из IST8310.....");
   IST8310_read_cross_axis_data(); 
+#endif
+
+#ifdef USING_TFMINIS_I2C
+ESP_LOGI(TAG_INIT,"Проверка связи с Tfmini-S (по i2c).....");
+if (tfminis_communication_check() != ESP_OK) {
+  error_code = 9;
+  xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+  while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+}
 #endif
 
   ESP_LOGI(TAG_INIT,"Настраиваем оба SPI.....");
@@ -2759,8 +2871,8 @@ static void init(void * pvParameters)
   }
 
   ESP_LOGI(TAG_INIT,"Записываем status-регистры W25N.....");
-  W25N_write_status_register(W25N_PROT_REG_SR1, 0x00);         //disable protection
-  W25N_write_status_register(W25N_CONFIG_REG_SR2, 0b00011000); //as default
+  W25N_write_status_register(W25N_PROT_REG_SR1, 0x00);         //снимаем защиту от записи
+  W25N_write_status_register(W25N_CONFIG_REG_SR2, 0b00011000); //оставляем ECC включенным и Buffer Read Mode (постепенное считывание)
 
   if (!(MCP23017_get_inputs_state() & 0b00000010))       //DI1 - считывание логов
   {
@@ -2772,11 +2884,11 @@ static void init(void * pvParameters)
   }
   else {
     ESP_LOGI(TAG_INIT,"Удаляем данные с W25N.....");
-    W25N_erase_all();
+    W25N_erase_all_new();
   }
   
   //W25N01_queue = xQueueCreate(5, LOGS_BYTES_PER_STRING);
-  W25N01_queue = xQueueCreate(5, sizeof(uint8_t*));
+  W25N01_queue = xQueueCreate(5, sizeof(struct logging_data_set *));
   if (W25N01_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для записи логов на внешнюю flash-память не создана\n");
     error_code = 1;
@@ -2863,7 +2975,7 @@ static void init(void * pvParameters)
   }
     else ESP_LOGI(TAG_INIT,"Очередь для передачи телеметрии из main_flying_cycle на пульт управления успешно создана\n"); 
 
-#ifdef USING_LIDAR_UART
+#ifdef USING_TFMINIS_I2C 
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от лидара в main_flying_cycle.....");
   lidar_to_main_queue = xQueueCreate(10, sizeof(struct data_from_lidar_to_main_struct));
   if ( lidar_to_main_queue == NULL) {
@@ -2885,6 +2997,18 @@ static void init(void * pvParameters)
   }
     else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от INA219 в main_flying_cycle успешно создана\n");
 
+#ifdef USING_MAVLINK_TELEMETRY
+  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от  main_flying_cycle в Mavlink.....");
+  main_to_mavlink_queue = xQueueCreate(5, sizeof(struct mavlink_data_set *));
+  if (  main_to_mavlink_queue == NULL) {
+    ESP_LOGE(TAG_INIT,"Очередь для передачи данных от main_flying_cycle в Mavlink не создана\n");
+    error_code = 1;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от от main_flying_cycle в Mavlink успешно создана\n"); 
+#endif
+
   ESP_LOGI(TAG_INIT,"Создаем и запускаем GP timer.....");
   Create_and_start_GP_Timer ();
   ESP_LOGI(TAG_INIT,"GP timer создан и запущен\n");
@@ -2894,8 +3018,8 @@ static void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Приступаем к созданию задач\n");
 
   //core 0 deals with WiFI tasks
-  ESP_LOGI(TAG_INIT,"Создаем задачу контроля и управления MCP23017 (MCP23017_monitoring_and_control)..... ");
-  task_handle_MCP23017_monitoring_and_control = xTaskCreateStaticPinnedToCore(MCP23017_monitoring_and_control,"MCP23017_monitoring_and_control",MCP23017_MONITORING_AND_CONTROL_STACK_SIZE,NULL,1,MCP23017_monitoring_and_control_stack,&MCP23017_monitoring_and_control_TCB_buffer,0);
+
+ task_handle_MCP23017_monitoring_and_control = xTaskCreateStaticPinnedToCore(MCP23017_monitoring_and_control,"MCP23017_monitoring_and_control",MCP23017_MONITORING_AND_CONTROL_STACK_SIZE,NULL,1,MCP23017_monitoring_and_control_stack,&MCP23017_monitoring_and_control_TCB_buffer,0);
   if (task_handle_MCP23017_monitoring_and_control != NULL)
     ESP_LOGI(TAG_INIT,"Задача контроля и управления MCP23017 успешно создана на ядре 0\n");
   else {
@@ -2916,7 +3040,7 @@ static void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-#ifdef USING_HOLYBRO_M9N                
+#ifdef USING_GPS               
   ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных GPS (gps_read_and_process_data).....");
   if (xTaskCreateStaticPinnedToCore(gps_read_and_process_data, "gps_read_and_process_data", GPS_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, 3, gps_read_and_process_data_stack, &gps_read_and_process_data_TCB_buffer, 0) != NULL)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных GPS успешно создана на ядре 0\n");
@@ -2926,9 +3050,10 @@ static void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-
+#endif
   vTaskDelay(50/portTICK_PERIOD_MS);
 
+#ifdef USING_HOLYBRO_M9N
   ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных с магнетометра (mag_read_and_process_data).....");
   task_handle_mag_read_and_process_data = xTaskCreateStaticPinnedToCore(mag_read_and_process_data, "mag_read_and_process_data", MAG_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, 6, mag_read_and_process_data_stack, &mag_read_and_process_data_TCB_buffer, 0);
   if (task_handle_mag_read_and_process_data != NULL)
@@ -2968,7 +3093,7 @@ static void init(void * pvParameters)
 
 #ifdef USING_PERFORMANCE_MESUREMENT
   ESP_LOGI(TAG_INIT,"Создаем задачу контроля загруженности процессора.....");
-  task_handle_performace_measurement = xTaskCreatePinnedToCore(performace_monitor,"performace_monitor",8192 ,NULL,4,&task_handle_performace_measurement,0);
+  task_handle_performace_measurement = xTaskCreateStaticPinnedToCore(performace_monitor,"performace_monitor",8192 ,NULL,2,performance_measurement_stack, &performance_measurement_TCB_buffer,0);
   if (task_handle_performace_measurement != NULL)
     ESP_LOGI(TAG_INIT,"Задача контроля загруженности процессора успешно создана на ядре 0\n");
   else {
@@ -2981,9 +3106,10 @@ static void init(void * pvParameters)
         
   vTaskDelay(50/portTICK_PERIOD_MS);
 
-#ifdef USING_LIDAR_UART
+#ifdef USING_TFMINIS_I2C 
   ESP_LOGI(TAG_INIT,"Создавем задачу для получения данных от лидара (lidar_read_and_process_data).....");
-  if (xTaskCreateStaticPinnedToCore(lidar_read_and_process_data,"lidar_read_and_process_data",LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,3,lidar_read_and_process_data_stack,&lidar_read_and_process_data_TCB_buffer,0) != NULL)
+  task_handle_lidar_read_and_process_data = xTaskCreateStaticPinnedToCore(lidar_read_and_process_data,"lidar_read_and_process_data",LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,3,lidar_read_and_process_data_stack,&lidar_read_and_process_data_TCB_buffer,0);
+  if (task_handle_lidar_read_and_process_data != NULL)  
     ESP_LOGI(TAG_INIT,"Задача для получения данных от лидара успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для получения данных от лидара не создана\n");
@@ -2994,7 +3120,7 @@ static void init(void * pvParameters)
 
   vTaskDelay(50/portTICK_PERIOD_MS);
 #endif
-        
+       
   ESP_LOGI(TAG_INIT,"Создаем задачу считывания данных с INA219 (INA219_read_and_process_data).....");
   task_handle_INA219_read_and_process_data = xTaskCreateStaticPinnedToCore(INA219_read_and_process_data,"INA219_read_and_process_data",INA219_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,2,INA219_read_and_process_data_stack, &INA219_read_and_process_data_TCB_buffer,0);
   if ( task_handle_INA219_read_and_process_data != NULL)
@@ -3037,6 +3163,21 @@ static void init(void * pvParameters)
   }       
 #endif
 
+#ifdef USING_MAVLINK_TELEMETRY
+  ESP_LOGI(TAG_INIT,"Создаем задачу отправки телеметрии по mavink (send_telemetry_via_mavlink).....");
+  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_mavlink,"send_telemetry_via_mavlink",MAVLINK_TELEMETRY_STACK_SIZE,NULL,0,mavlink_telemetry_stack, &mavlink_telemetry_TCB_buffer,0);
+  if (task_handle_mavlink_telemetry != NULL) 
+    {
+      ESP_LOGI(TAG_INIT,"Задача отправки телеметрии по mavink успешно создана на ядре 0\n");
+    }
+  else {
+    ESP_LOGE(TAG_INIT,"Задача отправки телеметрии по mavink не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }       
+#endif
+
   ESP_LOGI(TAG_INIT,"Создаем задачу основного полетного цикла (Main_flying_cycle)..... ");
   task_handle_main_flying_cycle = xTaskCreateStaticPinnedToCore(main_flying_cycle, "Main_flying_cycle", MAIN_FLYING_CYCLE_STACK_SIZE, NULL, 24, main_flying_cycle_stack,&main_flying_cycle_TCB_buffer,1);
   if (task_handle_main_flying_cycle != NULL)
@@ -3056,8 +3197,6 @@ static void init(void * pvParameters)
   vTaskDelete(NULL);
   
 }
-
-
 
 /********************************************************************     СЕКЦИЯ 5     ***********************************************************************************************/
 /********************************************************************  СОБСТВЕННО MAIN ***********************************************************************************************/

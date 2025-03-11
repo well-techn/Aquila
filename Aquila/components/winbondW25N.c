@@ -26,7 +26,7 @@ esp_err_t W25N_read_JEDEC_ID(void) {
   esp_err_t err = ESP_FAIL;
   uint8_t buf[3] = "0";
 
-  SPI_read_bytes (W25N01, 8, W25N_READ_JEDEC_ID, 0, 0, 8, &buf, 3);
+  SPI_read_bytes (W25N01, 8, W25N_READ_JEDEC_ID, 0, 0, 8, buf, 3);
   if ((buf[0] == WINBOND_MAN_ID) && (buf[1] == W25N01GV_DEV_ID_HI) && (buf[2] == W25N01GV_DEV_ID_LO)) 
   {
     err = ESP_OK;
@@ -63,12 +63,12 @@ void W25N_write_status_register(uint8_t status_register_address, uint8_t reg_val
 }
 
 void W25N_write_enable(void) {
-  SPI_write_byte(W25N01, 0, NULL, 0, NULL, 0, W25N_WRITE_ENABLE);
+  SPI_write_byte(W25N01, 0, 0, 0, 0, 0, W25N_WRITE_ENABLE);
   ets_delay_us(1);
 }
 
 void W25N_write_disable(void) {
-  SPI_write_byte(W25N01, 0, NULL, 0, NULL, 0, W25N_WRITE_DISABLE);
+  SPI_write_byte(W25N01, 0, 0, 0, 0, 0, W25N_WRITE_DISABLE);
   ets_delay_us(1);
 }
 
@@ -91,7 +91,7 @@ void W25N_program_execute(uint16_t page_address) {
   buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
   buf[1] = (uint8_t) page_address;  //LSB
   
-  SPI_write_bytes (W25N01, 8, W25N_PROG_EXECUTE, 0, NULL, 8, buf, 2);
+  SPI_write_bytes (W25N01, 8, W25N_PROG_EXECUTE, 0, 0, 8, buf, 2);
   vTaskDelay(1/portTICK_PERIOD_MS); //700us delay tPP
 }
 
@@ -99,7 +99,7 @@ void W25N_page_data_read(uint16_t page_address) {
   uint8_t buf[2];
   buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
   buf[1] = (uint8_t) page_address;  //LSB
-  SPI_write_bytes (W25N01, 8, W25N_PAGE_DATA_READ, 0, NULL, 8, buf, 2);
+  SPI_write_bytes (W25N01, 8, W25N_PAGE_DATA_READ, 0, 0, 8, buf, 2);
   ets_delay_us(50); //verified practically
   }
 
@@ -115,7 +115,7 @@ void W25N_block_erase(uint16_t page_address) {
     uint8_t buf[2];
   buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
   buf[1] = (uint8_t) page_address;  //LSB
-  SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, NULL, 8, buf, 2);
+  SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, 0, 8, buf, 2);
   vTaskDelay(10/portTICK_PERIOD_MS); //tBE = 2..10ms
 }
 
@@ -129,12 +129,42 @@ void W25N_erase_all(void)
     W25N_write_enable();
     buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
     buf[1] = (uint8_t) page_address;  //LSB
-    SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, NULL, 8, buf, 2);
+    SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, 0, 8, buf, 2);
     vTaskDelay(10/portTICK_PERIOD_MS); //tBE = 2..10ms
-    if (W25N_read_STATUS_register() & 0b00000100) ESP_LOGE(TAG_W25N,"Ошибка стирания на странице %d\n",page_address); 
+    if (W25N_read_STATUS_register() & 0b00000100) ESP_LOGE(TAG_W25N,"Ошибка стирания на странице %d\n",page_address); //проверяем флаг Erase_fail
     page_address+=64;
   }
   ESP_LOGI(TAG_W25N,"Полная очистка успешно завершена"); 
+}
+
+void W25N_erase_all_new(void) 
+{
+  uint8_t buf[4];
+  uint16_t page_address = 0;
+  uint8_t empty_block_flag = 0;
+
+  while ((page_address < 65471) && (!(empty_block_flag)))
+  {
+    ESP_LOGI(TAG_W25N,"Считываем страницу  %d",page_address);
+    W25N_page_data_read(page_address);                                    //копируем содержимое страницы в буфер микросхемы
+    W25N_read(0, buf, 4);                                                 //считываем первые 4 байта с начала буфера
+    
+    ESP_LOGI(TAG_W25N,"Первые 4 байта %d, %d, %d, %d",buf[0],buf[1],buf[2],buf[3]);
+    
+    if ((buf[0] == 0xFF) && (buf[1] == 0xFF) && (buf[2] == 0xFF) && (buf[3] == 0xFF)) empty_block_flag = 1;  //если 4 первые байта страницы пустые - значит все что дальше пустое 
+    if (!(empty_block_flag))
+    {
+    ESP_LOGI(TAG_W25N,"Стираем блок начиная со страницы %d",page_address);
+    W25N_write_enable();
+    buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
+    buf[1] = (uint8_t) page_address;  //LSB
+    SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, 0, 8, buf, 2);
+    vTaskDelay(10/portTICK_PERIOD_MS); //tBE = 2..10ms
+    if (W25N_read_STATUS_register() & 0b00000100) ESP_LOGE(TAG_W25N,"Ошибка стирания на странице %d\n",page_address); //проверяем флаг Erase_fail
+    page_address+=64;
+    }
+  }
+  ESP_LOGI(TAG_W25N,"Полная очистка успешно завершена, было стерто %d страниц (%d блоков)\n", page_address, page_address/64);     //компенсируем крайний инкремент
 }
 
 void W25N_read_and_print_all(void) 
@@ -142,99 +172,44 @@ void W25N_read_and_print_all(void)
   uint16_t page_address = 0;
   uint16_t column_address = 0;
   uint8_t i = 0;
-
-  uint8_t receiving_logs_buffer[LOGS_BYTES_PER_STRING];
-
-  uint8_t *p_to_uint8;
-  uint16_t *p_to_uint16;
-  int16_t *p_to_int16;
-  uint32_t *p_to_uint32;
-  float *p_to_float;
-
-  uint32_t timestamp_reconstructed;
-  int16_t accel_raw_reconstructed[3];
-  int16_t gyro_raw_reconstructed[3];
-  float q0_reconstructed, q1_reconstructed, q2_reconstructed, q3_reconstructed;
-  float pitch_reconstructed, roll_reconstructed, yaw_reconstructed;
-  float rc_received_throttle_reconstructed, rc_pitch_compensated_reconstructed,rc_roll_compensated_reconstructed,rc_yaw_dir_coeff_reconstructed;
-  uint16_t rc_mode_reconstructed;
-  float engine_reconstructed[4];
+  uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)];
   uint8_t empty_timestamp_flag = 0;
+  struct logging_data_set* p_to_set_to_log;
 
-  while ((page_address < 65536)&&(empty_timestamp_flag == 0)) //65365 pages
+  while ((page_address < 65535)&&(empty_timestamp_flag == 0))             //65365 страниц на микросхеме памяти
   {
-    W25N_page_data_read(page_address);
+    W25N_page_data_read(page_address);                                    //копируем содержимое страницы в буфер микросхемы
     column_address = 0;
 
-    while ((column_address < 1975)&&(empty_timestamp_flag == 0))             //80 bytes per 1ms, 25 samples per page, 2000 bytes
+    while ((column_address < (2048 - sizeof(struct logging_data_set)))&&(empty_timestamp_flag == 0)) //пока в буфере помещается целый пакет данных
     {
-      W25N_read(column_address, receiving_logs_buffer, LOGS_BYTES_PER_STRING);
-      
-      p_to_uint32 = &receiving_logs_buffer[0];
-      timestamp_reconstructed = *p_to_uint32;
-      if (timestamp_reconstructed == 4294967295) empty_timestamp_flag = 1;
-      printf("%lu|", timestamp_reconstructed);
-      
-      p_to_int16 = &receiving_logs_buffer[4];
-      for (i=0;i<3;i++) {
-        accel_raw_reconstructed[i] = *p_to_int16;
-        p_to_int16++;
-        printf("%d|", accel_raw_reconstructed[i]);
-      }
-    
-      p_to_int16 = &receiving_logs_buffer[10];
-      for (i=0;i<3;i++) {
-        gyro_raw_reconstructed[i] = *p_to_int16;
-        p_to_int16++;
-        printf("%d|", gyro_raw_reconstructed[i]);
-      }
-    
-      p_to_float = &receiving_logs_buffer[16];
-      q0_reconstructed = *p_to_float;
-      p_to_float++;
-      q1_reconstructed = *p_to_float;
-      p_to_float++;
-      q2_reconstructed = *p_to_float;
-      p_to_float++;
-      q3_reconstructed = *p_to_float;
-      printf("%f|%f|%f|%f|", q0_reconstructed,q1_reconstructed,q2_reconstructed,q3_reconstructed);
+      W25N_read(column_address, receiving_logs_buffer, sizeof(struct logging_data_set));  //считываем первый пакет из буфера
+     
+     p_to_set_to_log = (struct logging_data_set*)receiving_logs_buffer;
 
-      p_to_float = &receiving_logs_buffer[32];
-      pitch_reconstructed = *p_to_float;
-      p_to_float++;
-      roll_reconstructed = *p_to_float;
-      p_to_float++;
-      yaw_reconstructed = *p_to_float; 
-      printf("%0.2f|%0.2f|%0.2f|", pitch_reconstructed,roll_reconstructed,yaw_reconstructed);
+     printf("%lu|", p_to_set_to_log->timestamp);
+     if (p_to_set_to_log->timestamp == 4294967295) empty_timestamp_flag = 1;      //в такое число считывается таймстэмп если ячейкм не запроганы (все FF)
+     for (i=0;i<3;i++) printf("%d|", p_to_set_to_log->accel[i]);
+     for (i=0;i<3;i++) printf("%d|", p_to_set_to_log->gyro[i]);
+     for (i=0;i<4;i++) printf("%f|", p_to_set_to_log->q[i]);
+     for (i=0;i<3;i++) printf("%0.2f|", p_to_set_to_log->angles[i]);
+     printf("%d|", p_to_set_to_log->altitude_cm);
+     printf("%d|", p_to_set_to_log->voltage_mv);
+     printf("%d|", p_to_set_to_log->current_ca);
+     printf("%0.2f|", p_to_set_to_log->throttle_command);
+     printf("%0.2f|", p_to_set_to_log->pitch_command);
+     printf("%0.2f|", p_to_set_to_log->roll_command);
+     printf("%0.2f|", p_to_set_to_log->yaw_command);
+     printf("%d|", p_to_set_to_log->mode_command);
+     for (i=0;i<4;i++) printf("%ld|", p_to_set_to_log->engines[i]);
+     printf("%d|", p_to_set_to_log->flags);
+     printf("%d|", p_to_set_to_log->rssi_level);
+     
+     printf("*\n");                                    //конец строки
 
-      p_to_float = &receiving_logs_buffer[44];
-      rc_received_throttle_reconstructed = *p_to_float;
-      p_to_float++;
-      rc_pitch_compensated_reconstructed = *p_to_float;
-      p_to_float++;
-      rc_roll_compensated_reconstructed = *p_to_float;
-      p_to_float++;
-      rc_yaw_dir_coeff_reconstructed = *p_to_float;
-      printf("%0.2f|%0.2f|%0.2f|%0.2f|", rc_received_throttle_reconstructed,rc_pitch_compensated_reconstructed,rc_roll_compensated_reconstructed,rc_yaw_dir_coeff_reconstructed);
-      
-      p_to_uint16 = &receiving_logs_buffer[60];
-      rc_mode_reconstructed = *p_to_uint16;
-      printf("%d|",rc_mode_reconstructed);
-
-      p_to_float = &receiving_logs_buffer[62];
-      for (i=0;i<4;i++) {
-        engine_reconstructed[i] = *p_to_float;
-        p_to_float++;
-        printf("%0.0f|", engine_reconstructed[i]);
-      }
-      
-      printf("%d|", receiving_logs_buffer[78]); 
-      
-      printf("*\n");
-
-      column_address+= LOGS_BYTES_PER_STRING;
+      column_address+= sizeof(struct logging_data_set);           //переход на следующий пакет в буфере микросхемы
     }
-  page_address++;
+  page_address++;                                       //переход к считыванию следующей страницы памяти
   }
   ESP_LOGI(TAG_W25N,"Считывание логов из внешней flash-памяти завершено, снимите джампер и перезапустите систему");
 }

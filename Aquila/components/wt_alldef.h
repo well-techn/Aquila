@@ -2,11 +2,14 @@
 #define WT_ALLDEFS_H
 
 //#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
-#define USING_HOLYBRO_M9N                                         //активируем использование GPS, компаса и RGB светодиода на модуле HOLYBRO M9N 
-#define USING_LIDAR_UART                                            //активируем использование лидара Benewake Tfmini-S
+//#define USING_HOLYBRO_M9N                                         //активируем использование GPS, компаса и RGB светодиода на модуле HOLYBRO M9N 
+#define USING_GPS                                        //активируем использование GPS, компаса и RGB светодиода на модуле HOLYBRO M9N 
+#define USING_TFMINIS_I2C                                            //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                              //запускаем задачу, которая выводит на печать процент азнимаемого процессорного времени по каждой задаче
 //#define USING_MS5611
-
+#define BATTERY_COMPENSATION
+#define USING_MAVLINK_TELEMETRY
+//#define NO_RSSI
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -28,12 +31,13 @@
 
 #define SPI_READ_FLAG           (0x80)                              //используется для чтения регистров
 
-//GPIO и параметры "внутреннего" I2C, куда подключены PCA9685, MCP23017, INA219
+//GPIO и параметры "внутреннего" I2C, куда подключены PCA9685, MCP23017, INA219, TFMini-S
 #define I2C_INT_SDA                       (34)                      //GPIO для SDA 
 #define I2C_INT_SCL                       (48)                      //GPIO для SCL
 #define I2C_PCA9685_FREQ_HZ               (400000)                  //скорости I2С для соответствующих компонентов
 #define I2C_MCP23017_FREQ_HZ              (400000)
 #define I2C_INA219_FREQ_HZ                (400000)
+#define I2C_TFMINIS_FREQ_HZ               (400000)
 #define I2C_INT_MASTER_TX_BUF_DISABLE     (0)                       //параметры для инициализации интерфейса                           
 #define I2C_INT_MASTER_RX_BUF_DISABLE     (0)                                           
 #define ACK_CHECK_EN                      (0x01)                       
@@ -66,7 +70,7 @@
 #define RC_UART_PATTERN_DETECTION_QUEUE_SIZE          (10)                    //длина очереди для алгоритма детектирования пэттерна (можно и меньше, с запасом)
 #define RC_MESSAGE_HEADER                             (0x4E)                  //заголовочный байт отправляемых пакетов, используется для кросс-проверки целостности данных
 #define RC_NO_COMM_DELAY_MAIN_CYCLES                  (3000)                  //если в полете дроном не будет получен новый пакет от пульта в течение этого кол-ва циклов - считаем что связь с пультом утеряна и переходим в "автономный режим"
-#define RC_NO_COMM_THROTTLE_HOVER_VALUE               (7500)                  //значение уровня "газа" в автономном режиме            
+#define RC_NO_COMM_THROTTLE_HOVER_VALUE               (9500)                  //значение уровня "газа" в автономном режиме            
 
 //структура для передачи данных от задачи обработки данных пульта в main_flying_cycle.
 //данные, полученные от пульта, обрабатываются в соответствующей задаче (RC_read_and_process_data), собираются в эту структуру
@@ -81,6 +85,7 @@ struct data_from_rc_to_main_struct {
     uint8_t trim_roll;                                                        //значение trim по roll
     uint8_t engines_start_flag;                                               //флаг запуска двигателей
     uint8_t altitude_hold_flag;                                               //флаг удержания высоты
+    int8_t rssi_level;
   };
 
 //структура для передачи данных от main_flying_cycle в задачу отправки телеметрии на пульт.
@@ -108,29 +113,49 @@ struct data_from_main_to_rc_struct {
 //структура для передачи данных от задачи обработки GPS в main_flying_cycle
 //заполняется значениями в задаче обработки данных от GPS (gps_read_and_process_data) и отправляется через очередь в main_flying_cycle
 struct data_from_gps_to_main_struct {                             
-    uint64_t latitude_d;
-    uint64_t longtitude_d;
+    uint32_t latitude_d;
+    uint32_t longtitude_d;
     uint8_t status;
   };
 
-#ifdef USING_LIDAR_UART
-//GPIO и параметры UART для работы с лидаром TFSmini
-  #define LIDAR_UART                                (1)                         //номер порта
-  #define LIDAR_UART_BAUD_RATE                      (115200)                    //скорость порта
-  #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR     (140)                       //глубина буфера для копирования данных с внутреннего буфера UART, с запасом
-  #define LIDAR_UART_BUF_SIZE                       (256)                       //размер FIFO буфера под GPS UART
-  #define LIDAR_UART_TX_PIN                         (43)                        //GPIO для TX 
-  #define LIDAR_UART_RX_PIN                         (44)                        //GPIO для RX 
-  #define LIDAR_UART_RTS_PIN                        (UART_PIN_NO_CHANGE)
-  #define LIDAR_UART_CTS_PIN                        (UART_PIN_NO_CHANGE)
-  #define LIDAR_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)                        //длина очереди для обнаружения пэттернов
-  //структура для передачи данных от задачи обработки данных лидара в main_flying_cycle.
+#ifdef USING_TFMINIS_I2C 
+#define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR    (50)  
+
+//структура для передачи данных от задачи обработки данных лидара в main_flying_cycle.
   //Заполняется данными в задаче обработке данных лидара (lidar_read_and_process_data) и отправляется через очередь в main_flying_cycle
   struct data_from_lidar_to_main_struct {                             
-      uint16_t height;                                                          //высота в см
-      uint16_t strength;                                                        //уровень сигнала
+      float altitude;                                                          //высота в см
+      float vertical_velocity;                                               //вертикальная скорость
+      uint8_t valid;                                                    //данные по высоте корректны или могут быть не корректны
     };
-  #define LIDAR_RATE_HZ                              (50)                       //частота поступления данных с лидапа
+  #define LIDAR_RATE_HZ                              (25)                       //частота поступления данных с лидара
+  #define ALT_PID_DIF_FILTER_LENGTH                  (7)
+#endif
+
+#ifdef USING_MAVLINK_TELEMETRY
+//GPIO и параметры UART для работы с mavlink
+  #define MAV_UART                                (1)                         //номер порта
+  #define MAV_UART_BAUD_RATE                      (57600)                    //скорость порта
+  #define MAV_RX_UART_BUF_SIZE                    (256)                       //размер RX FIFO буфера под Mavlink UART
+  #define MAV_TX_UART_BUF_SIZE                    (512)                       //размер TX FIFO буфера под Mavlink UART
+  #define MAV_UART_TX_PIN                         (43)                        //GPIO для TX 
+  #define MAV_UART_RX_PIN                         (44)                        //GPIO для RX 
+  #define MAV_UART_RTS_PIN                        (UART_PIN_NO_CHANGE)
+  #define MAV_UART_CTS_PIN                        (UART_PIN_NO_CHANGE)
+  #define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)                        //длина очереди для обнаружения пэттернов
+
+//Переменные, передаваемые в задачу Mavlink
+typedef struct mavlink_data_set {                             
+  uint32_t latitude;
+  uint32_t longtitude;
+  float angles[3]; //pitch, roll,yaw
+  uint16_t altitude_cm;
+  uint16_t voltage_mv;
+  uint16_t current_ca;    //сантиамреры, чтобы влезло в 2 байта
+  int8_t rssi_level;
+  uint8_t gps_status;
+  uint8_t armed_status;                                                  
+} mavlink_data_set_t;
 
 #endif
 
@@ -170,7 +195,26 @@ struct data_from_gps_to_main_struct {
 #define MADGWICK_BETA                           (0.2) //0.999
 
 //Параметры записи логов во внешнюю флэш
-#define LOGS_BYTES_PER_STRING                   (79)                            //столько байт записываем во внешнюю флэш за цикл 
+#define LOGS_BYTES_PER_STRING                   (79)                            //столько байт записываем во внешнюю флэш за цикл
+struct logging_data_set {                             
+  uint32_t timestamp;
+  int16_t accel[3];
+  int16_t gyro[3];                                                          
+  float q[4];
+  float angles[3]; //pitch, roll,yaw
+  uint16_t altitude_cm;
+  uint16_t voltage_mv;
+  uint16_t current_ca;    //сантиамреры, чтобы влезло в 2 байта
+  float throttle_command;
+  float pitch_command;
+  float roll_command;
+  float yaw_command;
+  uint16_t mode_command;
+  uint32_t engines[4];
+  uint16_t flags;
+  int8_t rssi_level;                                                  
+};
+
 
 //ниже общие параметры
 
@@ -202,5 +246,9 @@ struct data_from_gps_to_main_struct {
 #define INA219_READ_AND_PROCESS_DATA_STACK_SIZE       (4096) 
 #define MAG_READ_AND_PROCESS_DATA_STACK_SIZE          (4096)
 #define WRITING_LOGS_TO_FLASH_STACK_SIZE              (4096)
+#define PERFORMANCE_MEASUREMENT_STACK_SIZE            (8192)
+#define MAVLINK_TELEMETRY_STACK_SIZE                  (4096)
+
+#define BATTERY_CAPACITY                              (2200) //мА*ч
 
 #endif

@@ -2,7 +2,7 @@
 #define WT_SPI_H
 
 #include <stdio.h>
-#include "driver/spi_master.h"
+#include "spi_master.h"
 
 void SPI_init ();
 

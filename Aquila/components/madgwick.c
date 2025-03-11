@@ -6,8 +6,8 @@
 #include "math.h"
 #include "wt_alldef.h"
 
-volatile float q0 = 0.0; 
-volatile float q1 = 1.0; 
+volatile float q0 = 0.0; //1
+volatile float q1 = 1.0; //0
 volatile float q2 = 0.0; 
 volatile float q3 = 0.0; 
 float beta = MADGWICK_BETA;

@@ -1,14 +1,14 @@
 #ifndef TFMINIS_H
 #define TFMINIS_H
 
+#define TFMINIS_I2C_ADDRESS (0x10)
 
-
-void tfs_i2c_write(uint8_t i2c_port, uint8_t *data_to_write);
-void tfs_i2c_read(uint8_t i2c_port, uint8_t *where_to_read_to);
-void tfs_set_to_UART();
-void tfs_save();
-void tfs_request_data();
-void tfs_reset_to_factory();
+esp_err_t tfs_set_to_UART();
+esp_err_t tfs_save();
+esp_err_t tfs_request_data();
+esp_err_t tfs_read_result(uint8_t* where_to_write);
+esp_err_t tfs_reset_to_factory();
+esp_err_t tfminis_communication_check();
 
 
 #endif
