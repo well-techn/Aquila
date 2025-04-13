@@ -84,4 +84,7 @@ C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/touch_element/libtouch_elem
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/usb/libusb.a
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/wifi_provisioning/libwifi_provisioning.a
 C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/main/libmain.a
-C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/components/libcomponents.a
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/general_components/libgeneral_components.a
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/service_tasks/libservice_tasks.a
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/tasks/libtasks.a
+C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/wt_libs/libwt_libs.a

@@ -559,6 +559,21 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/components/cmake_install.cmake")
+  include("C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/general_components/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/service_tasks/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/tasks/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Users/VVE/YandexDisk/GitRepo/Aquila/build/esp-idf/wt_libs/cmake_install.cmake")
 endif()
 
