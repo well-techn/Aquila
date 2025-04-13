@@ -1,35 +1,36 @@
 | Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-S2 | ESP32-S3 |
 | ----------------- | ----- | -------- | -------- | -------- | -------- |
 
-# _Sample project_
+# Aquila - проект самодельного квадрокоптера на ESP32
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
-
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+Вхохновленный в свое время трудами Joop Brokking и в самообразовательных целях пишу проект квадрокоптера на базе ESP32 и FreeRTOS. Современный софт для дронов развивался десятилетиями и разобраться в нем непрофессионалам непросто. Этот проект начинался с уровня "IMU + палка + 2 мотора" и постепенно развился до более-менее летающего уровня. Здесь Вы не найдете никаких прорывов и научной новизны, но если Вам интересно поразбираться как может быть построен софт на базе FreeRTOS для какого-либо робота - здесь можно найти несложные и рабочие конструкции для заимствования.   
 
 
+## Элементная база
+CPU ESP32-S3-mini
+IMU MPU6000 2шт
+память для логов W25N01GVZEIG
+расширитель портов MCP23017
+ШИМ-контроллер PCA9685
+монитор напряжения и тока INA219
+компас IST8310
+лидар Benewake TFmini-S
+GPS M9N
+RGB LED FL3195
+Барометр MS5611
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
+Принципиальная схема всего этого хозяйства в сборе https://cloud.mail.ru/public/YBk3/L4gjcgRvh
+Струкрура задач FreeRTOS https://cloud.mail.ru/public/YBk3/L4gjcgRvh  
 
-## Example folder contents
 
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
+## Дополнительно
+По мере возмжности коментирую сделанное на youtube-канале @well_techn, хотя по мере развития проекта ранняя информация может отличаться от актуального кода, это, увы, неизбежно.
 
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
+## Изменения
+2025-04 - софт перегруппирован и разбит по файлам
+        - добавлен одноконтурный ПИД на удержание высоты по лидару
+        - добавлен "сервисный режим" и "сервисные задачи" - при старте с установленной перемычной заходим в терминальное меню, откуда можно выполнять калибровки, считывание догов и тд
 
-Below is short explanation of remaining files in the project folder.
+2025-03 - добавлена поддержка Mavlink в рамках вывода телеметрии на Minim-OSD
 
-```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
-```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
+
