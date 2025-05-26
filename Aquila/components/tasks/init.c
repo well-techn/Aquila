@@ -114,9 +114,6 @@ StackType_t mag_read_and_process_data_stack[MAG_READ_AND_PROCESS_DATA_STACK_SIZE
 StaticTask_t main_flying_cycle_TCB_buffer;
 StackType_t main_flying_cycle_stack[MAIN_FLYING_CYCLE_STACK_SIZE];
 
-StaticTask_t monitoring_pins_interrupt_queue_TCB_buffer;
-StackType_t monitoring_pins_interrupt_queue_stack[MONITORING_PINS_INTERRUPT_QUEUE_STACK_SIZE];
-
 StackType_t gps_read_and_process_data_stack[GPS_READ_AND_PROCESS_DATA_STACK_SIZE];
 StaticTask_t gps_read_and_process_data_TCB_buffer;
 
@@ -439,14 +436,6 @@ void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-
- ESP_LOGI(TAG_MS5611,"Считывание PROM MS5611.....");
-  if (MS5611_I2C_PROM_read() != ESP_OK) {
-    error_code = 3;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-
 #endif
 
 
@@ -471,9 +460,6 @@ void init(void * pvParameters)
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-
-  ESP_LOGI(TAG_INIT,"Считываем данные cross-axis calibration из IST8310.....");
-  IST8310_read_cross_axis_data(); 
 #endif
 
 #ifdef USING_TFMINIS_I2C
@@ -694,7 +680,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
   //core 0 deals with WiFI tasks
 
- task_handle_MCP23017_monitoring_and_control = xTaskCreateStaticPinnedToCore(MCP23017_monitoring_and_control,"MCP23017_monitoring_and_control",MCP23017_MONITORING_AND_CONTROL_STACK_SIZE,NULL,1,MCP23017_monitoring_and_control_stack,&MCP23017_monitoring_and_control_TCB_buffer,0);
+ task_handle_MCP23017_monitoring_and_control = xTaskCreateStaticPinnedToCore(MCP23017_monitoring_and_control,"MCP23017_monitoring_and_control",MCP23017_MONITORING_AND_CONTROL_STACK_SIZE,NULL,MCP23017_MONITORING_AND_CONTROL_PRIORITY,MCP23017_monitoring_and_control_stack,&MCP23017_monitoring_and_control_TCB_buffer,0);
   if (task_handle_MCP23017_monitoring_and_control != NULL)
     ESP_LOGI(TAG_INIT,"Задача контроля и управления MCP23017 успешно создана на ядре 0\n");
   else {
@@ -705,7 +691,7 @@ if (tfminis_communication_check() != ESP_OK) {
   }
 
   ESP_LOGI(TAG_INIT,"Создаем задачу для управления PCA9685 (PCA9685_control)..... ");
-  task_handle_PCA9685_control = xTaskCreateStaticPinnedToCore(PCA9685_control,"PCA9685_control",PCA9685_CONTROL_STACK_SIZE,NULL,1,PCA9685_control_stack,&PCA9685_control_TCB_buffer,0);
+  task_handle_PCA9685_control = xTaskCreateStaticPinnedToCore(PCA9685_control,"PCA9685_control",PCA9685_CONTROL_STACK_SIZE,NULL,PCA9685_CONTROL_PRIORITY,PCA9685_control_stack,&PCA9685_control_TCB_buffer,0);
   if (task_handle_PCA9685_control != NULL) 
     ESP_LOGI(TAG_INIT,"Задача для управления PCA9685 успешно создана на ядре 0\n");
   else {
@@ -717,7 +703,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_GPS               
   ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных GPS (gps_read_and_process_data).....");
-  if (xTaskCreateStaticPinnedToCore(gps_read_and_process_data, "gps_read_and_process_data", GPS_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, 3, gps_read_and_process_data_stack, &gps_read_and_process_data_TCB_buffer, 0) != NULL)
+  if (xTaskCreateStaticPinnedToCore(gps_read_and_process_data, "gps_read_and_process_data", GPS_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, GPS_READ_AND_PROCESS_DATA_PRIORITY, gps_read_and_process_data_stack, &gps_read_and_process_data_TCB_buffer, 0) != NULL)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных GPS успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для считывания данных GPS не создана\n");
@@ -728,9 +714,9 @@ if (tfminis_communication_check() != ESP_OK) {
 #endif
   vTaskDelay(50/portTICK_PERIOD_MS);
 
-#ifdef MAGNETOMETER
+#ifdef USING_MAGNETOMETER 
   ESP_LOGI(TAG_INIT,"Создаем задачу для считывания данных с магнетометра (mag_read_and_process_data).....");
-  task_handle_mag_read_and_process_data = xTaskCreateStaticPinnedToCore(mag_read_and_process_data, "mag_read_and_process_data", MAG_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, 6, mag_read_and_process_data_stack, &mag_read_and_process_data_TCB_buffer, 0);
+  task_handle_mag_read_and_process_data = xTaskCreateStaticPinnedToCore(mag_read_and_process_data, "mag_read_and_process_data", MAG_READ_AND_PROCESS_DATA_STACK_SIZE, NULL, MAG_READ_DATA_AND_SEND_TO_MAIN_PRIORITY, mag_read_and_process_data_stack, &mag_read_and_process_data_TCB_buffer, 0);
   if (task_handle_mag_read_and_process_data != NULL)
     ESP_LOGI(TAG_INIT,"Задача для считывания данных с магнетометра успешно создана на ядре 0\n");
   else {
@@ -744,7 +730,7 @@ if (tfminis_communication_check() != ESP_OK) {
   vTaskDelay(50/portTICK_PERIOD_MS);
     
   ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных с пульта управления (RC_read_and_process_data).....");
-  if (xTaskCreateStaticPinnedToCore(RC_read_and_process_data,"RC_read_and_process_data",RC_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,5,RC_read_and_process_data_stack,&RC_read_and_process_data_TCB_buffer,0) != NULL)
+  if (xTaskCreateStaticPinnedToCore(RC_read_and_process_data,"RC_read_and_process_data",RC_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,RC_READ_AND_PROCESS_DATA_PRIORITY,RC_read_and_process_data_stack,&RC_read_and_process_data_TCB_buffer,0) != NULL)
     ESP_LOGI(TAG_INIT,"Задача для получения данных с пульта управления успешно создана на ядре 0\n");
   else {
     ESP_LOGE(TAG_INIT,"Задача для получения данных с пульта управления не создана\n");
@@ -756,7 +742,7 @@ if (tfminis_communication_check() != ESP_OK) {
   vTaskDelay(50/portTICK_PERIOD_MS);
 
   ESP_LOGI(TAG_INIT,"Создаем задачу для отправки телеметрии на пульт управления.....");
-  task_handle_send_data_to_RC = xTaskCreateStaticPinnedToCore(send_data_to_RC,"send_data_to_RC",SEND_DATA_TO_RC_STACK_SIZE ,NULL,4,send_data_to_RC_stack,&send_data_to_RC_TCB_buffer,0);
+  task_handle_send_data_to_RC = xTaskCreateStaticPinnedToCore(send_data_to_RC,"send_data_to_RC",SEND_DATA_TO_RC_STACK_SIZE ,NULL,SEND_DATA_TO_RC_PRIORITY,send_data_to_RC_stack,&send_data_to_RC_TCB_buffer,0);
   if (task_handle_send_data_to_RC != NULL)
     ESP_LOGI(TAG_INIT,"Задача для отправки телеметрии на пульт управления успешно создана на ядре 0\n");
   else {
@@ -768,7 +754,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_PERFORMANCE_MESUREMENT
   ESP_LOGI(TAG_INIT,"Создаем задачу контроля загруженности процессора.....");
-  task_handle_performace_measurement = xTaskCreateStaticPinnedToCore(performance_monitor,"performance_monitor",8192 ,NULL,2,performance_measurement_stack, &performance_measurement_TCB_buffer,0);
+  task_handle_performace_measurement = xTaskCreateStaticPinnedToCore(performance_monitor,"performance_monitor",8192 ,NULL,PERFORMANCE_MEASUREMENT_PRIORITY,performance_measurement_stack, &performance_measurement_TCB_buffer,0);
   if (task_handle_performace_measurement != NULL)
     ESP_LOGI(TAG_INIT,"Задача контроля загруженности процессора успешно создана на ядре 0\n");
   else {
@@ -783,7 +769,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_TFMINIS_I2C 
   ESP_LOGI(TAG_INIT,"Создавем задачу для получения данных от лидара (lidar_read_and_process_data).....");
-  task_handle_lidar_read_and_process_data = xTaskCreateStaticPinnedToCore(lidar_read_and_process_data,"lidar_read_and_process_data",LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,3,lidar_read_and_process_data_stack,&lidar_read_and_process_data_TCB_buffer,0);
+  task_handle_lidar_read_and_process_data = xTaskCreateStaticPinnedToCore(lidar_read_and_process_data,"lidar_read_and_process_data",LIDAR_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,LIDAR_READ_AND_PROCESS_DATA_PRIORITY,lidar_read_and_process_data_stack,&lidar_read_and_process_data_TCB_buffer,0);
   if (task_handle_lidar_read_and_process_data != NULL)  
     ESP_LOGI(TAG_INIT,"Задача для получения данных от лидара успешно создана на ядре 0\n");
   else {
@@ -797,7 +783,7 @@ if (tfminis_communication_check() != ESP_OK) {
 #endif
        
   ESP_LOGI(TAG_INIT,"Создаем задачу считывания данных с INA219 (INA219_read_and_process_data).....");
-  task_handle_INA219_read_and_process_data = xTaskCreateStaticPinnedToCore(INA219_read_and_process_data,"INA219_read_and_process_data",INA219_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,2,INA219_read_and_process_data_stack, &INA219_read_and_process_data_TCB_buffer,0);
+  task_handle_INA219_read_and_process_data = xTaskCreateStaticPinnedToCore(INA219_read_and_process_data,"INA219_read_and_process_data",INA219_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,INA219_READ_AND_PROCESS_DATA_PRIORITY,INA219_read_and_process_data_stack, &INA219_read_and_process_data_TCB_buffer,0);
   if ( task_handle_INA219_read_and_process_data != NULL)
     ESP_LOGI(TAG_INIT,"Задача считывания данных с INA219 успешно создана на ядре 0\n");
   else {
@@ -808,7 +794,7 @@ if (tfminis_communication_check() != ESP_OK) {
   }
 
   ESP_LOGI(TAG_INIT,"Создаем задачу моргания полетными огнями (blinking_flight_lights).....");
-  task_handle_blinking_flight_lights = xTaskCreateStaticPinnedToCore(blinking_flight_lights,"blinking_flight_lights",BLINKING_FLIGHT_LIGHTS_STACK_SIZE,NULL,0,blinking_flight_lights_stack, &blinking_flight_lights_TCB_buffer,0);
+  task_handle_blinking_flight_lights = xTaskCreateStaticPinnedToCore(blinking_flight_lights,"blinking_flight_lights",BLINKING_FLIGHT_LIGHTS_STACK_SIZE,NULL,BLINKING_FLIGHT_LIGHTS_PRIORITY,blinking_flight_lights_stack, &blinking_flight_lights_TCB_buffer,0);
   if ( task_handle_blinking_flight_lights != NULL)
     ESP_LOGI(TAG_INIT,"Задача моргания полетными огнями успешно создана на ядре 0\n");
   else {
@@ -825,7 +811,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_W25N
   ESP_LOGI(TAG_INIT,"Создаем задачу записи логов во внешнюю flash-память (writing_logs_to_flash).....");
-  task_handle_writing_logs_to_flash = xTaskCreateStaticPinnedToCore(writing_logs_to_flash,"writing_logs_to_flash",WRITING_LOGS_TO_FLASH_STACK_SIZE,NULL,0,writing_logs_to_flash_stack, &writing_logs_to_flash_TCB_buffer,0);
+  task_handle_writing_logs_to_flash = xTaskCreateStaticPinnedToCore(writing_logs_to_flash,"writing_logs_to_flash",WRITING_LOGS_TO_FLASH_STACK_SIZE,NULL,WRITING_LOGS_TO_FLASH_PRIORITY,writing_logs_to_flash_stack, &writing_logs_to_flash_TCB_buffer,0);
   if (task_handle_writing_logs_to_flash !=NULL) 
     {
       ESP_LOGI(TAG_INIT,"Задача записи логов во внешнюю flash-память успешно создана на ядре 0\n");
@@ -838,24 +824,9 @@ if (tfminis_communication_check() != ESP_OK) {
   }       
 #endif
 
-#ifdef USING_MAVLINK_TELEMETRY
-  ESP_LOGI(TAG_INIT,"Создаем задачу отправки телеметрии по mavink (send_telemetry_via_mavlink).....");
-  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_mavlink,"send_telemetry_via_mavlink",MAVLINK_TELEMETRY_STACK_SIZE,NULL,0,mavlink_telemetry_stack, &mavlink_telemetry_TCB_buffer,0);
-  if (task_handle_mavlink_telemetry != NULL) 
-    {
-      ESP_LOGI(TAG_INIT,"Задача отправки телеметрии по mavink успешно создана на ядре 0\n");
-    }
-  else {
-    ESP_LOGE(TAG_INIT,"Задача отправки телеметрии по mavink не создана\n");
-    error_code = 2;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }       
-#endif
-
 #ifdef USING_MS5611
   ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных от барометра MS5611 (MS5611_read_and_process_data).....");
-  task_handle_MS5611_read_and_process_data = xTaskCreateStaticPinnedToCore(MS5611_read_and_process_data,"MS5611_read_and_process_data",MS5611_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,2,MS5611_read_and_process_data_stack,&MS5611_read_and_process_data_TCB_buffer,0);
+  task_handle_MS5611_read_and_process_data = xTaskCreateStaticPinnedToCore(MS5611_read_and_process_data,"MS5611_read_and_process_data",MS5611_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,MS5611_READ_AND_PROCESS_DATA_PRIORITY,MS5611_read_and_process_data_stack,&MS5611_read_and_process_data_TCB_buffer,0);
   if (task_handle_MS5611_read_and_process_data != NULL)  
     ESP_LOGI(TAG_INIT,"Задача для получения данных от MS5611 успешно создана на ядре 0\n");
   else {
@@ -869,7 +840,7 @@ if (tfminis_communication_check() != ESP_OK) {
 #endif
 
   ESP_LOGI(TAG_INIT,"Создаем задачу основного полетного цикла (Main_flying_cycle)..... ");
-  task_handle_main_flying_cycle = xTaskCreateStaticPinnedToCore(main_flying_cycle, "Main_flying_cycle", MAIN_FLYING_CYCLE_STACK_SIZE, NULL, 24, main_flying_cycle_stack,&main_flying_cycle_TCB_buffer,1);
+  task_handle_main_flying_cycle = xTaskCreateStaticPinnedToCore(main_flying_cycle, "Main_flying_cycle", MAIN_FLYING_CYCLE_STACK_SIZE, NULL, MAIN_FLYING_CYCLE_PRIORITY, main_flying_cycle_stack,&main_flying_cycle_TCB_buffer,1);
   if (task_handle_main_flying_cycle != NULL)
     ESP_LOGI(TAG_INIT,"Задача основного полетного цикла успешно создана на ядре 1\n");
   else {
@@ -879,8 +850,23 @@ if (tfminis_communication_check() != ESP_OK) {
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
+  #ifdef USING_MAVLINK_TELEMETRY
+//задержка пока загрузится minim_OSD
+  vTaskDelay(3000/portTICK_PERIOD_MS);
+  ESP_LOGI(TAG_INIT,"Создаем задачу отправки телеметрии по mavink (send_telemetry_via_mavlink).....");
+  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_mavlink,"send_telemetry_via_mavlink",MAVLINK_TELEMETRY_STACK_SIZE,NULL,MAVLINK_TELEMETRY_PRIORITY,mavlink_telemetry_stack, &mavlink_telemetry_TCB_buffer,0);
+  if (task_handle_mavlink_telemetry != NULL) 
+    {
+      ESP_LOGI(TAG_INIT,"Задача отправки телеметрии по mavink успешно создана на ядре 0\n");
+    }
+  else {
+    ESP_LOGE(TAG_INIT,"Задача отправки телеметрии по mavink не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }       
+#endif
 
-
-//все задачи созданы, убиваем задачу инициализаци         
+//все задачи созданы, убиваем задачу инициализации         
   vTaskDelete(NULL);  
 }

@@ -3,6 +3,8 @@ idf_component_register(SRCS
 "./engines_test.c"
 "./reading_logs_from_external_flash.c"
 "./imu_calibration.c"
+"./advanced_acc_calibration.c"
+"./advanced_mag_calibration.c"
 
 INCLUDE_DIRS
 "./include" 

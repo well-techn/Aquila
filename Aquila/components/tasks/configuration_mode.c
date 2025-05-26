@@ -8,6 +8,8 @@
 #include "reading_logs_from_external_flash.h"
 #include "engines_test.h"
 #include "imu_calibration.h"
+#include "advanced_acc_calibration.h"
+#include "advanced_mag_calibration.h"
 
 #define SERIAL_BUF_SIZE (1024)
 extern TaskHandle_t task_handle_init;
@@ -39,7 +41,9 @@ printf("1 -> скачивание логов\n");
 printf("2 -> калибровка IMU\n");
 printf("3 -> тестирование двигателей\n");
 printf("4 -> калибровка ESC (пока не готово)\n");
-printf("5 -> продолжить загрузку в обычном режиме\n");
+printf("5 -> продвинутая калибровка акселерометра (по magnetto)\n");
+printf("6 -> продвинутая калибровка магнетометра (по magnetto)\n");
+printf("7 -> продолжить загрузку в обычном режиме\n");
 printf("ESC -> перезапуск\n\n");
 
     while (1) {
@@ -55,7 +59,7 @@ printf("ESC -> перезапуск\n\n");
                     break;
                 
                 case '2':
-                    printf("2 - Запускаем калибровку IMU\n\n");
+                    printf("2 - Запускаем простую калибровку IMU (по уровню)\n\n");
                     xTaskCreate(imu_calibration,"imu_calibration",4096,NULL,0,NULL);   
                     break;
                 
@@ -68,14 +72,24 @@ printf("ESC -> перезапуск\n\n");
                     printf("4 - Запускаем калибровку ESC\n");
                     printf("Пока не реализовано\n");   
                     break;
-                
+
                 case '5':
-                    printf("4 - Продолжаем обычную загрузку\n");
+                    printf("5 - Запускаем продвинутую калибровку акселерометра (по magnetto)\n");
+                    xTaskCreate(advanced_acc_calibration,"advanced_acc_calibration",16384,NULL,0,NULL);   
+                    break;
+
+                case '6':
+                    printf("6 - Запускаем продвинутую калибровку магнетометра (по magnetto)\n");
+                    xTaskCreate(advanced_mag_calibration,"advanced_mag_calibration",16384,NULL,0,NULL);   
+                    break;
+                
+                case '7':
+                    printf("7 - Продолжаем обычную загрузку\n");
                     vTaskResume(task_handle_init);
                     vTaskDelete(NULL);  
                     break;
-                
-                case 0x1B:                                                          //esc
+              
+                case 0x1B:                                             //esc
                     printf("ESC - перезапускаемся\n\n");
                     esp_restart();
                     break;

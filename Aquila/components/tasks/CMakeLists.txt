@@ -42,9 +42,14 @@ idf_component_register(SRCS
 "${PROJECT_DIR}/components/general_components/winbondW25N.c"
 "${PROJECT_DIR}/components/general_components/CRCs.c"
 "${PROJECT_DIR}/components/general_components/pid.c"
+"${PROJECT_DIR}/components/general_components/advanced_math.c"
+
 "${PROJECT_DIR}/components/service_tasks/engines_test.c"
 "${PROJECT_DIR}/components/service_tasks/reading_logs_from_external_flash.c"
 "${PROJECT_DIR}/components/service_tasks/imu_calibration.c"
+"${PROJECT_DIR}/components/service_tasks/advanced_acc_calibration.c"
+"${PROJECT_DIR}/components/service_tasks/advanced_mag_calibration.c"
+
 
 
 INCLUDE_DIRS

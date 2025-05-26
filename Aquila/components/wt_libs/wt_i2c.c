@@ -171,9 +171,8 @@ esp_err_t i2c_write_bytes_to_address(i2c_master_dev_handle_t i2c_dev, uint8_t re
 uint8_t i2c_read_byte_from_address(i2c_master_dev_handle_t i2c_dev, uint8_t reg_address)
 {
     uint8_t where_to_read_to;
-    esp_err_t ret; 
-    
-    ret = i2c_master_transmit_receive(i2c_dev, &reg_address, 1, &where_to_read_to, 1, -1);
+   
+    i2c_master_transmit_receive(i2c_dev, &reg_address, 1, &where_to_read_to, 1, -1);
 
     return where_to_read_to;
 }

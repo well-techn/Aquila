@@ -175,6 +175,8 @@ void W25N_read_and_print_all(void)
   uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)];
   uint8_t empty_timestamp_flag = 0;
   struct logging_data_set* p_to_set_to_log;
+//печатаем строку заголовков
+  printf("time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|lid_str|baro_h|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode|e1|e2|e3|e4|flags|rssi|*\n");
 
   while ((page_address < 65535)&&(empty_timestamp_flag == 0))             //65365 страниц на микросхеме памяти
   {
@@ -197,7 +199,8 @@ void W25N_read_and_print_all(void)
       for (i=0;i<3;i++) printf("%0.2f|", p_to_set_to_log->angles[i]);
       printf("%d|", p_to_set_to_log->lidar_altitude_cm);
       printf("%d|", p_to_set_to_log->lidar_strength);
-      printf("%d|", p_to_set_to_log->baro_altitude_m);
+      printf("%d|", p_to_set_to_log->baro_altitude_cm);
+      printf("%d|", p_to_set_to_log->altitude_setpoint_cm);
       printf("%d|", p_to_set_to_log->voltage_mv);
       printf("%d|", p_to_set_to_log->current_ca);
       printf("%0.2f|", p_to_set_to_log->throttle_command);
@@ -229,11 +232,11 @@ esp_err_t winbond_read_write_test(void)
   W25N_block_erase(0x0000);
  
   ESP_LOGD(TAG_W25N,"Load data to buffer.....");
-  esp_fill_random(receiving_logs_buffer, LOGS_BYTES_PER_STRING);
+  esp_fill_random(receiving_logs_buffer, 50);
   ESP_LOGD(TAG_W25N,"Printing original values.....");
   for (i=0;i<10;i++) ESP_LOGD(TAG_W25N,"%02x ",receiving_logs_buffer[i]);
   
-  ESP_LOGD(TAG_W25N,"Loading data from colunm 0....");
+  ESP_LOGD(TAG_W25N,"Loading data from column 0....");
   W25N_program_data_load(0x0000, receiving_logs_buffer, 10);
   ESP_LOGD(TAG_W25N,"Executing programming to page 0");
   W25N_program_execute(0x0000);

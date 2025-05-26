@@ -55,18 +55,18 @@ void quaternion_difference(float* q_current, float* q_desired, float* q_diff)
 
 void quat_from_angle_and_axis(float angle, float* axis, float* q)
 {
-    q[0] = cos((angle/2) * PI / 180.0);
-    q[1] = axis[0] * sin((angle/2) * PI / 180.0);
-    q[2] = axis[1] * sin((angle/2) * PI / 180.0);
-    q[3] = axis[2] * sin((angle/2) * PI / 180.0);
+    q[0] = cos((angle/2) * M_PI / 180.0);
+    q[1] = axis[0] * sin((angle/2) * M_PI / 180.0);
+    q[2] = axis[1] * sin((angle/2) * M_PI / 180.0);
+    q[3] = axis[2] * sin((angle/2) * M_PI / 180.0);
 }
 
 void angle_and_axis_from_quat(float* q, float* angle, float* axis)
 {
-    *angle = 2 * acos(q[0]) * 180 / PI;
-    axis[1] = q[1] / sin((*angle/2) * PI / 180.0);
-    axis[2] = q[2] / sin((*angle/2) * PI / 180.0);
-    axis[3] = q[3] / sin((*angle/2) * PI / 180.0);
+    *angle = 2 * acos(q[0]) * 180 / M_PI;
+    axis[1] = q[1] / sin((*angle/2) * M_PI / 180.0);
+    axis[2] = q[2] / sin((*angle/2) * M_PI / 180.0);
+    axis[3] = q[3] / sin((*angle/2) * M_PI / 180.0);
 }
 
 void calculate_desired_quat_from_angles_and_yaw_rate(float pitch, float roll, float yaw_rate_degrees, float time, float* q_desired)

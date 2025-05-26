@@ -17,6 +17,7 @@ idf_component_register(SRCS
 "mavlink_wt.c"
 "timing.c"
 "pid.c"
+"advanced_math.c"
 
 
 INCLUDE_DIRS 

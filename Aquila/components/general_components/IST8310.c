@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include <rom/ets_sys.h>
+#include <advanced_math.h>
 
 extern i2c_master_dev_handle_t IST8310_dev_handle;
 extern i2c_master_bus_handle_t i2c_external_bus_handle;
@@ -106,29 +107,64 @@ esp_err_t IST8310_read_data(uint8_t *buffer)
   return i2c_read_bytes_from_address(IST8310_dev_handle, IST8310_OUTPUT_X_L_REG, 6, buffer);
 }
 
-esp_err_t IST8310_read_cross_axis_data()
+esp_err_t IST8310_generate_cross_axis_matrix(float result[][3])
 {
   esp_err_t ret = ESP_FAIL;
-  uint8_t cross_axis_raw_values[18];              //cross axis coefficient, считываются однократно с нового чипа
+  uint8_t cross_axis_raw_values[18];
   int16_t Y_matrix[3][3] = {{0,  0,  0},    
                             {0,  0,  0},
                             {0,  0,  0}};
-  
+  float X_matrix[3][3] = {{0,  0,  0},    
+                          {0,  0,  0},
+                          {0,  0,  0}};
+
+  float X_inv[3][3] = {{0,  0,  0},    
+                       {0,  0,  0},
+                       {0,  0,  0}};
+
+  float fifty_matrix[3][3] = {{50,  0,  0},    
+                              {0,  50,  0},
+                              {0,  0,  50}};
+
     ret = i2c_read_bytes_from_address(IST8310_dev_handle, IST8310_CROSS_AXIS_REG, 18, cross_axis_raw_values);
+/*
+    Y_matrix[0][0] = cross_axis_raw_values[1] << 8 | cross_axis_raw_values[0];
+    Y_matrix[0][1] = cross_axis_raw_values[3] << 8 | cross_axis_raw_values[2];
+    Y_matrix[0][2] = cross_axis_raw_values[5] << 8 | cross_axis_raw_values[4];
+    Y_matrix[1][0] = cross_axis_raw_values[7] << 8 | cross_axis_raw_values[6];
+    Y_matrix[1][1] = cross_axis_raw_values[9] << 8 | cross_axis_raw_values[8];
+    Y_matrix[1][2] = cross_axis_raw_values[11] << 8 | cross_axis_raw_values[10];
+    Y_matrix[2][0] = cross_axis_raw_values[13] << 8 | cross_axis_raw_values[12];
+    Y_matrix[2][1] = cross_axis_raw_values[15] << 8 | cross_axis_raw_values[14];
+    Y_matrix[2][2] = cross_axis_raw_values[17] << 8 | cross_axis_raw_values[16];
+*/
+    Y_matrix[0][0] = cross_axis_raw_values[1] << 8 | cross_axis_raw_values[0];
+    Y_matrix[1][0] = cross_axis_raw_values[3] << 8 | cross_axis_raw_values[2];
+    Y_matrix[2][0] = cross_axis_raw_values[5] << 8 | cross_axis_raw_values[4];
+    Y_matrix[0][1] = cross_axis_raw_values[7] << 8 | cross_axis_raw_values[6];
+    Y_matrix[1][1] = cross_axis_raw_values[9] << 8 | cross_axis_raw_values[8];
+    Y_matrix[2][1] = cross_axis_raw_values[11] << 8 | cross_axis_raw_values[10];
+    Y_matrix[0][2] = cross_axis_raw_values[13] << 8 | cross_axis_raw_values[12];
+    Y_matrix[1][2] = cross_axis_raw_values[15] << 8 | cross_axis_raw_values[14];
+    Y_matrix[2][2] = cross_axis_raw_values[17] << 8 | cross_axis_raw_values[16];
 
-    Y_matrix[1][1] = cross_axis_raw_values[1] << 8 | cross_axis_raw_values[0];
-    Y_matrix[1][2] = cross_axis_raw_values[3] << 8 | cross_axis_raw_values[2];
-    Y_matrix[1][3] = cross_axis_raw_values[5] << 8 | cross_axis_raw_values[4];
-    Y_matrix[2][1] = cross_axis_raw_values[7] << 8 | cross_axis_raw_values[6];
-    Y_matrix[2][2] = cross_axis_raw_values[9] << 8 | cross_axis_raw_values[8];
-    Y_matrix[2][3] = cross_axis_raw_values[11] << 8 | cross_axis_raw_values[10];
-    Y_matrix[3][1] = cross_axis_raw_values[13] << 8 | cross_axis_raw_values[12];
-    Y_matrix[3][2] = cross_axis_raw_values[15] << 8 | cross_axis_raw_values[14];
-    Y_matrix[3][3] = cross_axis_raw_values[17] << 8 | cross_axis_raw_values[16];
+    for (uint8_t i = 0; i<3; i++)
+    {
+      for (uint8_t j = 0; j<3; j++) X_matrix[i][j] = (float)Y_matrix[i][j] * 3/20;
+    }
 
-    ESP_LOGW(TAG_IST8310,"%d,%d,%d",Y_matrix[1][1],Y_matrix[2][1],Y_matrix[3][1]);
-    ESP_LOGW(TAG_IST8310,"%d,%d,%d",Y_matrix[1][2],Y_matrix[2][2],Y_matrix[3][2]);
-    ESP_LOGW(TAG_IST8310,"%d,%d,%d",Y_matrix[1][3],Y_matrix[2][3],Y_matrix[3][3]);
+    invert3x3(X_matrix[0], X_inv[0]);
+
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            for (int u = 0; u < 3; u++)
+                result[i][j] += fifty_matrix[i][u] * X_inv[u][j];
+        }
+      }
+
+  //ESP_LOGW(TAG_IST8310,"%f,%f,%f",result[0][0],result[1][0],result[2][0]);
+  //ESP_LOGW(TAG_IST8310,"%f,%f,%f",result[0][1],result[1][1],result[2][1]);
+  //ESP_LOGW(TAG_IST8310,"%f,%f,%f",result[0][2],result[1][2],result[2][2]);
 
     return ret;    
 }

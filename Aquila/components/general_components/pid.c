@@ -1,5 +1,7 @@
 // Инициализация PID-регулятора
 #include "pid.h"
+#include "inttypes.h"
+#include "stdio.h"
 
 void PID_Init(PIDController_t *pid, float kp, float ki, float kd, float integral_limit, float pid_limit) {
     pid->kp = kp;
@@ -12,16 +14,16 @@ void PID_Init(PIDController_t *pid, float kp, float ki, float kd, float integral
 }
 
 // Вычисление управляющего воздействия
-float PID_Compute(PIDController_t *pid, float setpoint, float measured_value, float throttle, float throttle_limit) {
+float PID_Compute(PIDController_t *pid, float setpoint, float measured_value, float throttle) {
     float error = setpoint - measured_value;  // Ошибка регулирования
     pid->integral_error += pid->ki * error;         // Интегральная составляющая
     if  (pid->integral_error > pid->integral_limit) pid->integral_error = pid->integral_limit;
     if  (pid->integral_error < -pid->integral_limit) pid->integral_error = -pid->integral_limit;               
     float derivative = (error - pid->prev_error);  // Дифференциальная составляющая
 
-    if (throttle < throttle_limit) 
+    if (throttle < pid->throttle_limit) 
     {
-        pid->integral_error = 0;              //чтобы не накапливалось пока стоит
+        pid->integral_error = 0;              //чтобы не накапливалось пока стоит на земле
         derivative = 0;
     }
 
@@ -31,6 +33,7 @@ float PID_Compute(PIDController_t *pid, float setpoint, float measured_value, fl
     if  (output < -pid->pid_limit) output = -pid->pid_limit; 
 
     pid->prev_error = error;  // Сохраняем текущую ошибку для следующего вызова
+    if (pid->print_results) printf("%0.2f, %0.2f, %0.2f, %0.2f, %0.2f\n",error, pid->kp * error, derivative, pid->integral_error, output);
     return output;
 }
 

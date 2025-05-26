@@ -19,7 +19,7 @@
 
 esp_err_t MS5611_communication_check();
 esp_err_t MS5611_I2C_reset();
-esp_err_t MS5611_I2C_PROM_read();
+esp_err_t MS5611_I2C_PROM_read(uint16_t* MS5611_PROM);
 void MS5611_I2C_request_D1();
 void MS5611_I2C_request_D2(); 
 uint32_t MS5611_I2C_read(); 

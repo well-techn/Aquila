@@ -1,5 +1,8 @@
 
 #include <inttypes.h>
+#include <filters.h>
+#include <math.h>
+#include <stdio.h>
 
 // среднее арифметическое из массива
 float avg_filter_1d(float* array, float new_data_point, uint8_t filter_length)
@@ -61,4 +64,95 @@ float median_filter (float* i_arr, float new_element, int window_size)
     
     float result = quickselect(op_arr, 0, window_size-1, window_size/2);
     return result;
+}
+
+void Kalman_2d_predict(float acceleration, KalmanFilter2d_t* this)
+{
+    //вспомогательная переменная "время в квадрате" для уменьшения операций умножения
+    float t2 = this->dt * this->dt;
+    
+    //прогноз координаты
+    this->h = this->h + this->v * this->dt + 0.5f * acceleration * t2;
+	this->v = this->v + acceleration * this->dt;
+    
+    //предсказание неопределенности прогноза
+    //вспомогательная переменная для уменьшения операций умножения 
+    float temp = this->sigma2_accel * t2;
+    this->P[0][0] = this->P[0][0] + (this->P[1][0] + this->P[0][1] + (this->P[1][1] + 0.25 * temp) * this->dt) * this->dt;
+	this->P[0][1] = this->P[0][1] + (this->P[1][1] + 0.5 * temp) * this->dt;
+	this->P[1][0] = this->P[1][0] + (this->P[1][1] + 0.5 * temp) * this->dt;
+	this->P[1][1] = this->P[1][1] + temp;   
+}
+
+void Kalman_2d_update(float baro_height, KalmanFilter2d_t* this)
+{
+    //printf("%0.2f, %0.2f, ", this->h, baro_height);
+        
+    float y = baro_height - this->h;
+    
+    //считаем коэффициент Калмана
+    float S_inv = 1.0f / (this->P[0][0] + this->sigma2_baro);
+    this->K[0] = this->P[0][0] * S_inv;
+    this->K[1] = this->P[1][0] * S_inv;
+    
+    //расчет результата
+    this->h += this->K[0] * y;
+	this->v += this->K[1] * y;
+
+    //printf("%0.2f\n", this->h);
+    
+    //вычисление точности результата
+     this->P[0][0] = this->P[0][0] - this->K[0] * this->P[0][0];
+	 this->P[0][1] = this->P[0][1] - this->K[0] * this->P[0][1];
+	 this->P[1][0] = this->P[1][0] - this->K[1] * this->P[0][0];
+	 this->P[1][1] = this->P[1][1] - this->K[1] * this->P[0][1];
+}
+
+void Butterworth_init(float f_sampling, float f_cut, Butterworth_t* this) 
+{
+    
+    float omega = 2.0 * M_PI * f_cut / f_sampling; // Нормированная частота
+    float theta = omega / 2.0;
+    float sn = sin(theta);
+    float cs = cos(theta);
+    float alpha = sn / (2.0 * sqrt(2.0)); // Для порядка 2
+
+    // Коэффициенты передаточной функции
+    float b0_raw = (1.0 - cs) / 2.0;
+    float b1_raw = 1.0 - cs;
+    float b2_raw = (1.0 - cs) / 2.0;
+    float a0_raw = 1.0 + alpha;
+    float a1_raw = -2.0 * cs;
+    float a2_raw = 1.0 - alpha;
+
+    // финально коэффициенты
+    this->coef_in_0 = b0_raw / a0_raw;
+    this->coef_in_1 = b1_raw / a0_raw;
+    this->coef_in_2 = b2_raw / a0_raw;
+    this->coef_out_1 = a1_raw / a0_raw;
+    this->coef_out_2 = a2_raw/ a0_raw;
+    
+    //исходные значения буфера
+    this->prev_in_1 = 0;
+    this->prev_in_2 = 0;
+    this->prev_out_1 = 0;
+    this->prev_out_2 = 0;
+}
+
+float Butterworth_filter(float input, Butterworth_t* state) 
+{
+    float output = 
+        state->coef_in_0 * input + 
+        state->coef_in_1 * state->prev_in_1 + 
+        state->coef_in_2 * state->prev_in_2 - 
+        state->coef_out_1 * state->prev_out_1 - 
+        state->coef_out_2 * state->prev_out_2;
+
+    // Обновление состояний
+    state->prev_in_2 = state->prev_in_1;
+    state->prev_in_1 = input;
+    state->prev_out_2 = state->prev_out_1;
+    state->prev_out_1 = output;
+
+    return output;
 }

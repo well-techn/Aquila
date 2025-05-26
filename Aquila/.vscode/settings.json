@@ -134,10 +134,15 @@
     "ranges": "c",
     "span": "c",
     "usb_serial_jtag.h": "c",
-    "task.h": "c"
+    "task.h": "c",
+    "expected": "c",
+    "advanced_acc_calibration.h": "c",
+    "rope": "c",
+    "variant": "c",
+    "advanced_mag_calibration.h": "c"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM10",
+  "idf.portWin": "COM9",
   "idf.adapterTargetName": "esp32s3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"

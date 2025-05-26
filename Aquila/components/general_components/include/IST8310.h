@@ -51,7 +51,7 @@ esp_err_t IST8310_communication_check();
 esp_err_t IST8310_configuration();
 void IST8310_request_data();
 esp_err_t IST8310_read_data(uint8_t *buffer);
-esp_err_t IST8310_read_cross_axis_data();
+esp_err_t IST8310_generate_cross_axis_matrix(float result[][3]);
 
 
 

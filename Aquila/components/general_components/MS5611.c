@@ -25,11 +25,10 @@ esp_err_t MS5611_I2C_reset()
     return i2c_write_command(MS5611_dev_handle, MS5611_CMD_RESET); 
 }
 
-//считываем PROM и проверяем по CRC, алгоритм расчета СКС из AN520
-esp_err_t MS5611_I2C_PROM_read()
+//считываем PROM и проверяем по CRC, алгоритм расчета CRC из AN520
+esp_err_t MS5611_I2C_PROM_read(uint16_t* MS5611_PROM)
 {
-   esp_err_t ret = ESP_FAIL;
-   uint16_t MS5611_PROM[8] = {2148, 45040, 48704, 28052, 26033, 32077, 28075, 32101};           
+   esp_err_t ret = ESP_FAIL;   
    uint16_t cnt = 0;;                                                                              // simple counter
    uint16_t n_rem = 0x00;                                                           // crc reminder
    uint16_t crc_read = 0;                                                                // original value of the crc
@@ -55,7 +54,7 @@ esp_err_t MS5611_I2C_PROM_read()
      n_rem = (0x0000F & (n_rem >> 12));                                                         // final 4-bit reminder is CRC code
      MS5611_PROM[7] = crc_read;                                                              // restore the crc_read to its original place
                                                                  
-     ESP_LOGI(TAG_MS5611, "CRC is %d ",n_rem);
+     ESP_LOGI(TAG_MS5611, "CRC = %d ",n_rem);
      ESP_LOGI(TAG_MS5611, "4 младшие бита PROM[7] %d ",(MS5611_PROM[7] & 0x000F));
 
      if ((MS5611_PROM[7] & 0x000F) == n_rem) ret = ESP_OK;                                   //если 4 последние бита PROM[7] равны подсчитанному CRC Значит все ок

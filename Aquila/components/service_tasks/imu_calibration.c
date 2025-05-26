@@ -5,6 +5,8 @@
 #include "wt_alldef.h"
 #include "wt_spi.h"
 #include <rom/ets_sys.h>
+#include "math.h"
+#include "string.h" 
 
 extern spi_device_handle_t MPU6000_1;
 extern spi_device_handle_t MPU6000_2;
@@ -198,5 +200,6 @@ void imu_calibration (void *pvParameters)
     counter++;
     if ((counter % 1000) == 0) printf("%d\n", counter/1000);
   }
-
 }
+
+

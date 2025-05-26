@@ -47,7 +47,7 @@ esp_err_t MCP23017_init() {
         ets_delay_us(500);
     }
 
-    for (i=0; i<13; i++) {                              //checking against predefined configuration  
+    for (i=0; i<13; i++) {                              //проверяем относительно заданной конфигурации
         reg_value = i2c_read_byte_from_address(MCP23017_dev_handle, MCP23017_configuration_data[i][0]);
         if (reg_value != MCP23017_configuration_data[i][1]) 
         {
@@ -56,7 +56,7 @@ esp_err_t MCP23017_init() {
         }
 }
 
-if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"MCP23017 настроен\n");
+if (err == ESP_OK) ESP_LOGI(TAG_MCP23017,"MCP23017 настроена\n");
     else  ESP_LOGE(TAG_MCP23017,"Ошибка настройки MCP23017\n");
 
     return err;

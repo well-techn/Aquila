@@ -14,7 +14,7 @@ extern char *TAG_MS5611;
 
 void MS5611_read_and_process_data(void * pvParameters)
 {
-  uint16_t MS5611_PROM[8] = {2116, 51467, 50692, 31930, 28256, 31666, 27448, 5320};
+  uint16_t MS5611_PROM[8] = {1, 2, 3, 4, 5, 6, 7, 8};
   uint32_t MS5611_raw_pressure = 0;
   uint32_t MS5611_raw_temperature = 0;
   int32_t MS5611_dT = 0;
@@ -27,6 +27,11 @@ void MS5611_read_and_process_data(void * pvParameters)
   double MS_5611_ground_pressure = 0;;
   float altitude_baro_cm_filter_pool[5] = {0,0,0,0,0};
   float altitude_baro_cm = 0;
+
+  ESP_LOGI(TAG_MS5611,"Считывание PROM MS5611.....");
+  if (MS5611_I2C_PROM_read(MS5611_PROM) != ESP_OK) {
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
 
   while(1) 
   {
@@ -95,11 +100,11 @@ void MS5611_read_and_process_data(void * pvParameters)
             } 
             else
             {
-              altitude_baro_cm = (MS_5611_ground_pressure - MS5611_P) * 8.33;       //1mBar*100 = 8.3см Относительная высота = разность давлений *8.3см
+              altitude_baro_cm = (MS_5611_ground_pressure - MS5611_P) * 8.33;       //1mBar*100 = 8.3см Относительная высота = разность давлений * 8.3см
               if (altitude_baro_cm < 0) altitude_baro_cm = 0;
               //ESP_LOGI(TAG_MS5611,"Баро высота %fсм\n", MS5611_P, MS5611_TEMP);
               altitude_baro_cm = avg_filter_1d(altitude_baro_cm_filter_pool, altitude_baro_cm, 5);
-              printf("%0.2f, %0.2f\n", MS5611_P, MS5611_TEMP);
+              //printf("%0.2f, %0.2f\n", MS5611_P, MS5611_TEMP);
               //printf("%d\n", altitude_baro_cm);
               //printf("%0.3f, %0.3f\n", MS5611_P,altitude_baro_cm);
               xQueueSend(MS5611_to_main_queue, &altitude_baro_cm, NULL); 

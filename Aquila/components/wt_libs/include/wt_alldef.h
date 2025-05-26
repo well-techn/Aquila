@@ -3,16 +3,18 @@
 
 #include <inttypes.h>
 
-#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
-#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
+//#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент азнимаемого процессорного времени по каждой задаче
-//#define USING_MS5611
+#define USING_MS5611
 #define BATTERY_COMPENSATION
-#define USING_MAVLINK_TELEMETRY
+//#define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI
+#define ADVANCED_ACCEL_CALIBRATION
+//#define MEMORY_CONSUMPTION_MESUREMENT
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -126,9 +128,10 @@ struct data_from_gps_to_main_struct {
 #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR    (50)  
 
 //структура для передачи данных от задачи обработки данных лидара в main_flying_cycle.
-  //Заполняется данными в задаче обработке данных лидара (lidar_read_and_process_data) и отправляется через очередь в main_flying_cycle
+//Заполняется данными в задаче обработке данных лидара (lidar_read_and_process_data) и отправляется через очередь в main_flying_cycle
   struct data_from_lidar_to_main_struct {                             
       float altitude;                                                   //высота в см
+      float vertical_velocity;
       uint16_t strength;                                                //качество сигнала                                                         
       uint8_t valid;                                                    //данные по высоте корректны или могут быть не корректны
     };
@@ -195,11 +198,9 @@ typedef struct mavlink_data_set {
 
 //Параметры IMU и фильтра Маджвика
 #define SMPL                                    (0)                             //IMU sample rate = 1000Hz/ 1+SMPL
-#define PI                                      (3.1415926536)
 #define MADGWICK_BETA                           (0.2) //0.999
 
 //Параметры записи логов во внешнюю флэш
-#define LOGS_BYTES_PER_STRING                   (79)                            //столько байт записываем во внешнюю флэш за цикл
 struct logging_data_set {                             
   uint32_t timestamp;
   int16_t accel[3];
@@ -208,9 +209,10 @@ struct logging_data_set {
   float angles[3]; //pitch, roll,yaw
   uint16_t lidar_altitude_cm;
   uint16_t lidar_strength;
-  uint16_t baro_altitude_m;
+  uint16_t baro_altitude_cm;
+  uint16_t altitude_setpoint_cm;
   uint16_t voltage_mv;
-  uint16_t current_ca;    //сантиамреры, чтобы влезло в 2 байта
+  uint16_t current_ca;    //сантиамперы, чтобы влезло в 2 байта
   float throttle_command;
   float pitch_command;
   float roll_command;
@@ -231,6 +233,8 @@ struct logging_data_set {
 #define IMU_SUSPENSION_TIMER_DELAY_MS           (2)                             
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
 #define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
+#define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по метолу magnetto 
+#define NUMBER_OF_ACC_INPUTS                    (50)                           //кол-во векторов для расчета калибровки акселерометра по метолу magnetto 
 
 //GPIO
 #define A0                                            (4)
@@ -243,7 +247,6 @@ struct logging_data_set {
 #define PCA9685_CONTROL_STACK_SIZE                    (4096)
 #define MAG_READ_DATA_AND_SEND_TO_MAIN_STACK_SIZE     (4096)
 #define MAIN_FLYING_CYCLE_STACK_SIZE                  (8192)
-#define MONITORING_PINS_INTERRUPT_QUEUE_STACK_SIZE    (4096)
 #define GPS_READ_AND_PROCESS_DATA_STACK_SIZE          (4096)
 #define RC_READ_AND_PROCESS_DATA_STACK_SIZE           (4096)
 #define SEND_DATA_TO_RC_STACK_SIZE                    (4096)
@@ -256,6 +259,28 @@ struct logging_data_set {
 #define MAVLINK_TELEMETRY_STACK_SIZE                  (4096)
 #define MS5611_READ_AND_PROCESS_DATA_STACK_SIZE       (4096)
 
+//приоритеты задач
+#define MCP23017_MONITORING_AND_CONTROL_PRIORITY      (1)
+#define PCA9685_CONTROL_PRIORITY                      (1)
+#define MAG_READ_DATA_AND_SEND_TO_MAIN_PRIORITY       (6)
+#define MAIN_FLYING_CYCLE_PRIORITY                    (24)
+#define GPS_READ_AND_PROCESS_DATA_PRIORITY            (3)
+#define RC_READ_AND_PROCESS_DATA_PRIORITY             (5)
+#define SEND_DATA_TO_RC_PRIORITY                      (4)
+#define BLINKING_FLIGHT_LIGHTS_PRIORITY               (0)
+#define LIDAR_READ_AND_PROCESS_DATA_PRIORITY          (3)
+#define INA219_READ_AND_PROCESS_DATA_PRIORITY         (2) 
+#define MAG_READ_AND_PROCESS_DATA_PRIORITY            (6)
+#define WRITING_LOGS_TO_FLASH_PRIORITY                (0)
+#define PERFORMANCE_MEASUREMENT_PRIORITY              (2)
+#define MAVLINK_TELEMETRY_PRIORITY                    (0)
+#define MS5611_READ_AND_PROCESS_DATA_PRIORITY         (2)
+
 #define BATTERY_CAPACITY                              (2200) //мА*ч
+#define VERT_ACC_FILTER_F_CUT                         (8.0)  
+
+#define ACCEL_SIGMA2                                  (5)//10
+#define BARO_SIGMA2                                   (1)
+
 
 #endif

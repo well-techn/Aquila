@@ -97,8 +97,41 @@ static void NVS_read_write_test(void * pvParameters)
     }
 }
 
+/*
+        //if (large_counter > 10000) {vTaskDelay(1000/portTICK_PERIOD_MS);}   
+        if ((large_counter % 1000) == 0)
+        {
+          uint32_t time_start = get_time();
+          //printf("Target %f, %f, %f\n", rc_fresh_data.received_pitch, rc_fresh_data.received_roll,yaw_setpoint);
+          //printf("Target Q ");
+          calculate_desired_quat_from_3_angles(rc_fresh_data.received_pitch, rc_fresh_data.received_roll, yaw_setpoint, q_from_RC);
+          //for (int i = 0; i<4;i++) printf("%f ", q_from_RC[i]);
+          //printf("\n");
+          //printf("Current Q %f, %f, %f, %f\n", q0, q1, q2, q3);
+          q_current[0] = q0;
+          q_current[1] = q1;
+          q_current[2] = q2;
+          q_current[3] = q3;
+          //printf("Q_difference ");
+          quaternion_difference(q_current, q_from_RC, q_difference);
+          //for (int i = 0; i<4;i++) printf("%f ", q_difference[i]);
+          //printf("\n");
+
+          angle_and_axis_from_quat(q_difference, &q_angle, q_axis);
+          printf("Angle: %f ", q_angle);
+          printf("Axis: ");
+          for (int i = 1; i<4;i++) printf("%f ", q_axis[i]);
+          printf("\n");
+
+          printf("%f, %f, %f", q_angle * q_axis[1],q_angle * q_axis[2], q_angle * q_axis[3]);
+          printf("\n\n");
+
+          uint32_t time_finish = get_time();
+          //printf("%ld\n", time_finish - time_start);
 
 
+        }
+*/ 
 
 
 

@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 #include "driver/uart.h"
+#include "math.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
@@ -12,6 +13,7 @@ extern  char *TAG_MAV;
 extern QueueHandle_t mav_queue_for_events;
 extern QueueHandle_t main_to_mavlink_queue;
 
+#ifdef USING_MAVLINK_TELEMETRY
 
 void mavlink_uart_config(void)
 {
@@ -132,9 +134,9 @@ void send_telemetry_via_mavlink(void * pvParameters)
         sys_status.current_battery = p_to_mavlink_data -> current_ca;
         sys_status.battery_remaining = (int8_t)(0.037 * (p_to_mavlink_data -> voltage_mv) - 366.3);      //конвертируем линейной зависимостью [9.9..12.6]В в [0 - 100]%
         
-        attitude.roll = p_to_mavlink_data -> angles[1] * PI / 180;
-        attitude.pitch = p_to_mavlink_data -> angles[0] * PI / 180;
-        attitude.yaw = p_to_mavlink_data -> angles[2] * PI / 180;
+        attitude.roll = p_to_mavlink_data -> angles[1] * M_PI / 180;
+        attitude.pitch = p_to_mavlink_data -> angles[0] * M_PI / 180;
+        attitude.yaw = p_to_mavlink_data -> angles[2] * M_PI / 180;
         //printf("%f\n", attitude.yaw);
 
         gps_raw.lat = p_to_mavlink_data -> latitude;
@@ -144,10 +146,8 @@ void send_telemetry_via_mavlink(void * pvParameters)
         rc_channels.rssi = (p_to_mavlink_data -> rssi_level) * 2.55 + 255;     //преобразуем сигнал [-100..0] в [0..255]
 
         vfr_hud.heading = p_to_mavlink_data -> angles[2]; //heading
-        vfr_hud.heading = 33; //heading
         vfr_hud.alt = (p_to_mavlink_data -> altitude_cm / 100); //высота в метрах
-
-                
+                  
         rssi.remrssi = p_to_mavlink_data -> rssi_level;
         rssi.rssi = p_to_mavlink_data -> rssi_level;
 
@@ -188,3 +188,5 @@ void send_telemetry_via_mavlink(void * pvParameters)
     }
   }
 }
+
+#endif
