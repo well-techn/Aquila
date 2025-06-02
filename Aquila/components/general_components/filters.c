@@ -71,11 +71,11 @@ void Kalman_2d_predict(float acceleration, KalmanFilter2d_t* this)
     //вспомогательная переменная "время в квадрате" для уменьшения операций умножения
     float t2 = this->dt * this->dt;
     
-    //прогноз координаты
+    //прогноз (обычные уравнения)
     this->h = this->h + this->v * this->dt + 0.5f * acceleration * t2;
 	this->v = this->v + acceleration * this->dt;
     
-    //предсказание неопределенности прогноза
+    //неопределенность прогноза
     //вспомогательная переменная для уменьшения операций умножения 
     float temp = this->sigma2_accel * t2;
     this->P[0][0] = this->P[0][0] + (this->P[1][0] + this->P[0][1] + (this->P[1][1] + 0.25 * temp) * this->dt) * this->dt;
@@ -86,20 +86,16 @@ void Kalman_2d_predict(float acceleration, KalmanFilter2d_t* this)
 
 void Kalman_2d_update(float baro_height, KalmanFilter2d_t* this)
 {
-    //printf("%0.2f, %0.2f, ", this->h, baro_height);
-        
     float y = baro_height - this->h;
     
     //считаем коэффициент Калмана
     float S_inv = 1.0f / (this->P[0][0] + this->sigma2_baro);
-    this->K[0] = this->P[0][0] * S_inv;
-    this->K[1] = this->P[1][0] * S_inv;
+    this->K[0] = this->P[0][0] * S_inv; //для координаты
+    this->K[1] = this->P[1][0] * S_inv; //для скорости
     
     //расчет результата
     this->h += this->K[0] * y;
 	this->v += this->K[1] * y;
-
-    //printf("%0.2f\n", this->h);
     
     //вычисление точности результата
      this->P[0][0] = this->P[0][0] - this->K[0] * this->P[0][0];

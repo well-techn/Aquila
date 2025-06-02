@@ -293,16 +293,18 @@ void main_flying_cycle(void * pvParameters)
   int16_t gyro_1_offset[3] = {0,0,0};
   int16_t gyro_2_offset[3] = {0,0,0};
 
-  double accel_1_bias[3] = {138.323561, 20.672667, 666.631035};
-  double accel_1_A_inv[3][3] = {{ 0.993331,-0.001726,-0.000439},
-                               {-0.001726,0.992472,0.001561},
-                               {-0.000439,0.001561,0.994423}};
+  double accel_1_bias[3] = {0,0,0};
+  double accel_1_A_inv[3][3] = {{0,0,0},
+                                {0,0,0},
+                                {0,0,0}};
   
-  double accel_2_bias[3] = {179.468033,55.813704,-210.231042};
-  double accel_2_A_inv[3][3] = {{0.993529,0.001136,0.000271},
-                               {0.001136,0.989604,0.003473},
-                               {0.000271,0.003473,0.990961}};
+  double accel_2_bias[3] = {0,0,0};
+  double accel_2_A_inv[3][3] = {{0,0,0},
+                                {0,0,0},
+                                {0,0,0}};
    
+  float accel_1_wo_hb[3] = {0.0,0.0,0.0};
+  float accel_2_wo_hb[3] = {0.0,0.0,0.0};
   float gyro_1_converted[3] = {0.0,0.0,0.0};
   float accel_1_converted[3] = {0.0,0.0,0.0};
   float gyro_2_converted[3] = {0.0,0.0,0.0};
@@ -644,10 +646,12 @@ void prepare_logs(void) {
   set_to_log.angles[2] = yaw;
 #ifdef USING_TFMINIS_I2C
   set_to_log.lidar_altitude_cm = (uint16_t)lidar_altitude_corrected;
-  set_to_log.lidar_strength = lidar_fresh_data.strength;
+  //set_to_log.lidar_strength = lidar_fresh_data.strength;
 #endif
 #ifdef USING_MS5611
   set_to_log.baro_altitude_cm = (uint16_t)baro_altitude_cm;
+  set_to_log.kalman_altitude_cm = (uint16_t)Kalm_vert.h;
+  set_to_log.kalman_velocity_cm = (int16_t)Kalm_vert.v;
 #endif
   set_to_log.altitude_setpoint_cm = (uint16_t)altitude_setpoint;
   set_to_log.voltage_mv = (uint16_t)(INA219_fresh_data[0] * 1000);
@@ -1076,18 +1080,18 @@ while(1)
 #ifdef ADVANCED_ACCEL_CALIBRATION
 //применяем к акселерометру калибровку по методу Magnetto при помощи вычисленных калибровочных коэффициентов bias и матрицы A_inv в сервисном режиме
 //убираем bias      
-      for (i=0;i<3;i++) accel_1_converted[i] = (float)accel_raw_1[i] - (float)accel_1_bias[i];
+      for (i=0;i<3;i++) accel_1_wo_hb[i] = (float)accel_raw_1[i] - (float)accel_1_bias[i];
 
 //умножаем матрицу A_inv на показания      
-      accel_1_converted[0] = (float)accel_1_A_inv[0][0]*accel_1_converted[0] + (float)accel_1_A_inv[0][1]*accel_1_converted[1] + (float)accel_1_A_inv[0][2]*accel_1_converted[2];
-      accel_1_converted[1] = (float)accel_1_A_inv[1][0]*accel_1_converted[0] + (float)accel_1_A_inv[1][1]*accel_1_converted[1] + (float)accel_1_A_inv[1][2]*accel_1_converted[2];
-      accel_1_converted[2] = (float)accel_1_A_inv[2][0]*accel_1_converted[0] + (float)accel_1_A_inv[2][1]*accel_1_converted[1] + (float)accel_1_A_inv[2][2]*accel_1_converted[2];
+      accel_1_converted[0] = (float)accel_1_A_inv[0][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[0][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[0][2]*accel_1_wo_hb[2];
+      accel_1_converted[1] = (float)accel_1_A_inv[1][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[1][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[1][2]*accel_1_wo_hb[2];
+      accel_1_converted[2] = (float)accel_1_A_inv[2][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[2][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[2][2]*accel_1_wo_hb[2];
       
-      for (i=0;i<3;i++) accel_2_converted[i] = accel_raw_2[i] - accel_2_bias[i];
+      for (i=0;i<3;i++) accel_2_wo_hb[i] = accel_raw_2[i] - accel_2_bias[i];
       
-      accel_2_converted[0] = accel_2_A_inv[0][0]*accel_2_converted[0] + accel_2_A_inv[0][1]*accel_2_converted[1] + accel_2_A_inv[0][2]*accel_2_converted[2];
-      accel_2_converted[1] = accel_2_A_inv[1][0]*accel_2_converted[0] + accel_2_A_inv[1][1]*accel_2_converted[1] + accel_2_A_inv[1][2]*accel_2_converted[2];
-      accel_2_converted[2] = accel_2_A_inv[2][0]*accel_2_converted[0] + accel_2_A_inv[2][1]*accel_2_converted[1] + accel_2_A_inv[2][2]*accel_2_converted[2];
+      accel_2_converted[0] = accel_2_A_inv[0][0]*accel_2_wo_hb[0] + accel_2_A_inv[0][1]*accel_2_wo_hb[1] + accel_2_A_inv[0][2]*accel_2_wo_hb[2];
+      accel_2_converted[1] = accel_2_A_inv[1][0]*accel_2_wo_hb[0] + accel_2_A_inv[1][1]*accel_2_wo_hb[1] + accel_2_A_inv[1][2]*accel_2_wo_hb[2];
+      accel_2_converted[2] = accel_2_A_inv[2][0]*accel_2_wo_hb[0] + accel_2_A_inv[2][1]*accel_2_wo_hb[1] + accel_2_A_inv[2][2]*accel_2_wo_hb[2];
       
       for (i=0;i<3;i++) 
           {
@@ -1216,7 +1220,6 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
 //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f", pitch, roll, yaw);
 //if ((large_counter % 1000) == 0) printf("%0.1f\n", lidar_fresh_data.altitude); // баро высота в cm
 
-
 //получаем свежие данные из очереди от пульта управления. Если данные успешно получены - информируем задачу моргания полетными огнями что моргаем в штатном режиме (режим "1")
     
         if (xQueueReceive(remote_control_to_main_queue, &rc_fresh_data, 0)) 
@@ -1259,16 +1262,17 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
 #endif
 
 #ifdef USING_MS5611         
-        if (large_counter > 8000) Kalman_2d_predict((accel_z_ave_rotated_filtered - 1.0)*9.81, &Kalm_vert);
+        if (large_counter > 8000) Kalman_2d_predict((accel_z_ave_rotated_filtered - 1.0) * 981, &Kalm_vert);  //в сантиметрах
+        if (Kalm_vert.h < 0) Kalm_vert.h = 0;
         //if ((large_counter % 50) == 0) printf("%0.2f, %0.2f\n", (accel_z_ave_rotated_filtered - 1.0)*9.81, Kalm_vert.v);
 
         if (xQueueReceive(MS5611_to_main_queue, &baro_altitude_cm, 0)) 
         {
           if (large_counter > 8000)   
           {
-            Kalman_2d_update(baro_altitude_cm / 100.0, &Kalm_vert);
+            Kalman_2d_update(baro_altitude_cm, &Kalm_vert);
             if (Kalm_vert.h < 0) Kalm_vert.h = 0;
-            printf("%0.2f, %0.2f\n", baro_altitude_cm / 100.0, Kalm_vert.h); // баро высота в cm
+            //printf("%0.2f, %0.2f\n", baro_altitude_cm / 100.0, Kalm_vert.h); // баро высота в cm
             //printf("%0.2f, %0.2f\n", accel_z_ave_rotated_filtered, Kalm_vert.v); // баро высота в cm
           }
         }
@@ -1314,6 +1318,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
             altitude_hold_mode_enabled = 0; 
             alt_hold_pid.prev_error = 0;
             alt_hold_pid.integral_error = 0;
+            altitude_setpoint = 0;
           }
 #endif  
 
@@ -1330,7 +1335,6 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
           pitch_pid_rate.prev_error = roll_pid_rate.prev_error = yaw_pid_rate.prev_error = 0;
           integral_yaw_error_angle = error_yaw_angle_old = 0;
           engine[0] = engine[1] = engine[2] = engine[3] = ENGINE_PWM_MIN_DUTY;
-
           altitude_hold_mode_enabled = 0;
         }
 //фильтруем вычисленные ПИД регулятором данные        

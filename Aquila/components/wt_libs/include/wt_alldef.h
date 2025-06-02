@@ -3,15 +3,15 @@
 
 #include <inttypes.h>
 
-//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
-//#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
-//#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент азнимаемого процессорного времени по каждой задаче
+#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
+#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+//#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
 #define USING_MS5611
 #define BATTERY_COMPENSATION
-//#define USING_MAVLINK_TELEMETRY
+#define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI
 #define ADVANCED_ACCEL_CALIBRATION
 //#define MEMORY_CONSUMPTION_MESUREMENT
@@ -208,8 +208,10 @@ struct logging_data_set {
   float q[4];
   float angles[3]; //pitch, roll,yaw
   uint16_t lidar_altitude_cm;
-  uint16_t lidar_strength;
+  //uint16_t lidar_strength;
   uint16_t baro_altitude_cm;
+  uint16_t kalman_altitude_cm;
+  int16_t kalman_velocity_cm;
   uint16_t altitude_setpoint_cm;
   uint16_t voltage_mv;
   uint16_t current_ca;    //сантиамперы, чтобы влезло в 2 байта

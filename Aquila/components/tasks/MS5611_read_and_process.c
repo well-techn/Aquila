@@ -86,15 +86,15 @@ void MS5611_read_and_process_data(void * pvParameters)
      
        MS5611_P = ((MS5611_raw_pressure * MS5611_SENS)/pow(2,21)- MS5611_OFF)/pow(2,15);
        ESP_LOGD(TAG_MS5611,"pressure %f\n", MS5611_P);
-
-       if (first_reads_counter < 30) 
+//считаем средний уровень за первые 50 отсчетов
+       if (first_reads_counter < 50) 
        {
         MS_5611_ground_pressure += MS5611_P;
         first_reads_counter++;
        }
-       else if (first_reads_counter == 30)
+       else if (first_reads_counter == 50)
             {
-              MS_5611_ground_pressure = MS_5611_ground_pressure / 30.0;
+              MS_5611_ground_pressure = MS_5611_ground_pressure / 50.0;
               ESP_LOGW(TAG_MS5611,"Давление на уровне точки старта %0.3f",MS_5611_ground_pressure);
               first_reads_counter++;
             } 
@@ -102,15 +102,9 @@ void MS5611_read_and_process_data(void * pvParameters)
             {
               altitude_baro_cm = (MS_5611_ground_pressure - MS5611_P) * 8.33;       //1mBar*100 = 8.3см Относительная высота = разность давлений * 8.3см
               if (altitude_baro_cm < 0) altitude_baro_cm = 0;
-              //ESP_LOGI(TAG_MS5611,"Баро высота %fсм\n", MS5611_P, MS5611_TEMP);
               altitude_baro_cm = avg_filter_1d(altitude_baro_cm_filter_pool, altitude_baro_cm, 5);
-              //printf("%0.2f, %0.2f\n", MS5611_P, MS5611_TEMP);
-              //printf("%d\n", altitude_baro_cm);
-              //printf("%0.3f, %0.3f\n", MS5611_P,altitude_baro_cm);
               xQueueSend(MS5611_to_main_queue, &altitude_baro_cm, NULL); 
-            } 
-
-                            
+            }                         
     } 
   }
 }

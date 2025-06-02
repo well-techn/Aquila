@@ -176,7 +176,7 @@ void W25N_read_and_print_all(void)
   uint8_t empty_timestamp_flag = 0;
   struct logging_data_set* p_to_set_to_log;
 //печатаем строку заголовков
-  printf("time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|lid_str|baro_h|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode|e1|e2|e3|e4|flags|rssi|*\n");
+  printf("time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode|e1|e2|e3|e4|flags|rssi|*\n");
 
   while ((page_address < 65535)&&(empty_timestamp_flag == 0))             //65365 страниц на микросхеме памяти
   {
@@ -198,8 +198,10 @@ void W25N_read_and_print_all(void)
       for (i=0;i<4;i++) printf("%f|", p_to_set_to_log->q[i]);
       for (i=0;i<3;i++) printf("%0.2f|", p_to_set_to_log->angles[i]);
       printf("%d|", p_to_set_to_log->lidar_altitude_cm);
-      printf("%d|", p_to_set_to_log->lidar_strength);
+      //printf("%d|", p_to_set_to_log->lidar_strength);
       printf("%d|", p_to_set_to_log->baro_altitude_cm);
+      printf("%d|", p_to_set_to_log->kalman_altitude_cm);
+      printf("%d|", p_to_set_to_log->kalman_velocity_cm);
       printf("%d|", p_to_set_to_log->altitude_setpoint_cm);
       printf("%d|", p_to_set_to_log->voltage_mv);
       printf("%d|", p_to_set_to_log->current_ca);

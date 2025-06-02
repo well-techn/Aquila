@@ -142,7 +142,7 @@
     "advanced_mag_calibration.h": "c"
   },
   "idf.flashType": "UART",
-  "idf.portWin": "COM9",
+  "idf.portWin": "COM10",
   "idf.adapterTargetName": "esp32s3",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"

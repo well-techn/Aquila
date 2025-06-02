@@ -49,7 +49,7 @@ void advanced_mag_calibration (void *pvParameters)
 
    while (i < NUMBER_OF_MAG_INPUTS)
     {
-      printf("%d\n", i);
+      printf("Считываем вектор %d\n", i);
      // считываем показания
       IST8310_request_data();
       vTaskDelay(50/portTICK_PERIOD_MS);   //50ms чтобы можно было успевать ворочать
@@ -60,7 +60,7 @@ void advanced_mag_calibration (void *pvParameters)
       magn_data[2] = mag_raw_values[5] << 8 | mag_raw_values[4]; //Z
       //printf ("%d,%d,%d\n",magn_data[0], magn_data[1], magn_data[2]);
 
-      //выравниваем оси по алгоритму, заложенному в самомо магнетометре
+      //выравниваем оси по алгоритму, заложенному в самом магнетометре
       magn_data_axis_corrected[0] = cross_axis[0][0]*magn_data[0] + cross_axis[0][1]*magn_data[1] + cross_axis[0][2]*magn_data[2];
       magn_data_axis_corrected[1] = cross_axis[1][0]*magn_data[0] + cross_axis[1][1]*magn_data[1] + cross_axis[1][2]*magn_data[2];
       magn_data_axis_corrected[2] = cross_axis[2][0]*magn_data[0] + cross_axis[2][1]*magn_data[1] + cross_axis[2][2]*magn_data[2];
