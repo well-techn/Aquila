@@ -12,12 +12,15 @@
 #include "inttypes.h"
 #include "driver/gpio.h"
 #include "nvs.h"
+#ifdef TELNET_CONF_MODE
+  #include <lwip/sockets.h>
+#endif
 
 extern spi_device_handle_t MPU6000_1;
 extern spi_device_handle_t MPU6000_2;
 extern const char *TAG_SERVICE;
 
-void advanced_acc_calibration()
+void advanced_acc_calibration(void *pvParameters)
 {
     float input_data_1[NUMBER_OF_ACC_INPUTS][3];
     float input_data_2[NUMBER_OF_ACC_INPUTS][3];
@@ -28,35 +31,66 @@ void advanced_acc_calibration()
 
     uint8_t sensor_data_1[20] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
     uint8_t sensor_data_2[20] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
+   
+#ifdef TELNET_CONF_MODE
 
+    char message_to_print[100];
+    uint8_t pos = 0;
+    int16_t *client_fd = pvParameters;
+#endif
+
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "Проверка связи с MPU#1.....\r\n", sizeof("Проверка связи с MPU#1.....\r\n"), 0);
+#endif
     ESP_LOGI(TAG_SERVICE, "Проверка связи с MPU#1.....");
     if (MPU6000_communication_check(MPU6000_1) != ESP_OK) vTaskDelete(NULL);
-   
+
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "Проверка связи с MPU#2.....\r\n", sizeof("Проверка связи с MPU#2.....\r\n"), 0);
+#endif
     ESP_LOGI(TAG_SERVICE, "Проверка связи с MPU#2.....");
     if (MPU6000_communication_check(MPU6000_2) != ESP_OK) vTaskDelete(NULL);
-   
 
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "Настройка MPU#1.....\r\n", sizeof("Настройка MPU#1.....\r\n"), 0);
+#endif
     ESP_LOGI(TAG_SERVICE, "Настройка MPU#1.....");
     if (MPU6000_init(MPU6000_1) != ESP_OK) vTaskDelete(NULL);
 
-
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "Настройка MPU#2.....\r\n", sizeof("Настройка MPU#2.....\r\n"), 0);
+#endif
     ESP_LOGI(TAG_SERVICE, "Настройка MPU#2.....");
     if (MPU6000_init(MPU6000_2) != ESP_OK) vTaskDelete(NULL);
 
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "Перенастройка SPI на 20МГц.....\r\n", sizeof("Перенастройка SPI на 20МГц.....\r\n"), 0);
+#endif
     ESP_LOGI(TAG_SERVICE, "Перенастройка SPI на 20МГц.....");
     SPI_change_MPUs_speed();
     ESP_LOGI(TAG_SERVICE, "Оба SPI перенастроены");
-
-    ESP_LOGI(TAG_SERVICE, "Начинаем калибровку IMU");
+   
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "Начинаем калибровку IMU\r\n", sizeof("Начинаем калибровку IMU\r\n"), 0);
+#endif
+ ESP_LOGI(TAG_SERVICE, "Начинаем калибровку IMU");
     i = 0;
 
     while (i < NUMBER_OF_ACC_INPUTS)
     {
+#ifdef TELNET_CONF_MODE
+        pos = sprintf(message_to_print, "\r\nВектор #%d\r\n", i);
+        send(*client_fd, message_to_print, pos, 0);        
+#endif
         printf("Вектор #%d\n", i);
         // обратный отсчет
         for (uint8_t j = 5; j > 0; j--)
         {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+#ifdef TELNET_CONF_MODE
+        pos = sprintf(message_to_print, "%d ", j);
+        send(*client_fd, message_to_print, pos, 0);        
+#endif
             printf("%d\n", j);
         }
 
@@ -76,12 +110,25 @@ void advanced_acc_calibration()
 
         i++;
         printf("Сохранен\n\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Сохранен\r\n", sizeof("Сохранен\r\n"), 0);   
+#endif
     }
 
-    printf("Записанный массив данных \n\n");
+    printf("Записанный массив данных\n\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Записанный массив данных\r\n", sizeof("Записанный массив данных\r\n"), 0);   
+#endif
     for (int i = 0; i < NUMBER_OF_ACC_INPUTS; i++)
-        printf("{%0.1f, %0.1f, %0.1f},  {%0.1f, %0.1f, %0.1f},\n", input_data_1[i][0], input_data_1[i][1], input_data_1[i][2],
+        {
+            printf("{%0.1f, %0.1f, %0.1f},  {%0.1f, %0.1f, %0.1f},\n", input_data_1[i][0], input_data_1[i][1], input_data_1[i][2],
                input_data_2[i][0], input_data_2[i][1], input_data_2[i][2]);
+#ifdef TELNET_CONF_MODE
+        pos = sprintf(message_to_print, "{%0.1f, %0.1f, %0.1f},  {%0.1f, %0.1f, %0.1f},\r\n", input_data_1[i][0], input_data_1[i][1], input_data_1[i][2],
+                                            input_data_2[i][0], input_data_2[i][1], input_data_2[i][2]);
+        send(*client_fd, message_to_print, pos, 0);        
+#endif            
+        }
 
     //выделяем память под матицы для расчетов для акселерометра 1
     A_1 = (double *)malloc(3 * 3 * sizeof(double));
@@ -89,7 +136,23 @@ void advanced_acc_calibration()
 
     // вычисляем корректировочные параметры для акселерометра 1
     printf("\nНачинаем расчет корректировочных коэффициентов для акселерометра 1\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "\nНачинаем расчет корректировочных коэффициентов для акселерометра 1\n", sizeof("\nНачинаем расчет корректировочных коэффициентов для акселерометра 1\n"), 0);   
+#endif
     calculation_B_and_Ainv_with_exclusion(input_data_1, A_1, B, 8192, 0, NUMBER_OF_ACC_INPUTS);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "\r\nКоректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКоректировочные значения сдвигов (bias):\r\n"), 0);
+        pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
+        send(*client_fd, message_to_print, pos, 0);
+        
+       
+        send(*client_fd, "\r\nКорректирующая матрица Ainv\r\n", sizeof("\r\nКорректирующая матрица Ainv\r\n"), 0);
+            for (uint8_t i = 0; i < 3; i++)
+            {
+               pos = sprintf(message_to_print, "%9.6lf %9.6lf %9.6lf\r\n", A_1[i * 3], A_1[i * 3 + 1], A_1[i * 3 + 2]);
+               send(*client_fd, message_to_print, pos, 0); 
+            }
+#endif
 
     esp_err_t err = nvs_flash_init();   
     ESP_ERROR_CHECK( err );
@@ -120,7 +183,24 @@ void advanced_acc_calibration()
     
     // вычисляем корректировочные параметры для акселерометра 2
     printf("\nНачинаем расчет корректировочных коэффициентов для акселерометра 2\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "\nНачинаем расчет корректировочных коэффициентов для акселерометра 2\n", sizeof("\nНачинаем расчет корректировочных коэффициентов для акселерометра 2\n"), 0);   
+#endif
     calculation_B_and_Ainv_with_exclusion(input_data_2, A_1, B, 8192, 0, NUMBER_OF_ACC_INPUTS);
+
+    #ifdef TELNET_CONF_MODE
+        send(*client_fd, "\r\nКоректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКоректировочные значения сдвигов (bias):\r\n"), 0);
+        pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
+        send(*client_fd, message_to_print, pos, 0);
+        
+       
+        send(*client_fd, "\r\nКорректирующая матрица Ainv\r\n", sizeof("\r\nКорректирующая матрица Ainv\r\n"), 0);
+            for (uint8_t i = 0; i < 3; i++)
+            {
+               pos = sprintf(message_to_print, "%9.6lf %9.6lf %9.6lf\r\n", A_1[i * 3], A_1[i * 3 + 1], A_1[i * 3 + 2]);
+               send(*client_fd, message_to_print, pos, 0); 
+            }
+#endif
 
     //Записываем accel_2_bias[0] - accel_2_bias[2]
     p_uint64 = (uint64_t*)&B[0];
@@ -142,13 +222,30 @@ void advanced_acc_calibration()
     printf("\n[Результат калибровки] = Ainv * ([Исх. вектор] - bias)\r\n");
 
     printf("Сохраняем данные в NVS ... ");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "\r\nСохраняем данные в NVS ...\r\n", sizeof("\r\nСохраняем данные в NVS ...\r\n"), 0);   
+#endif
     err = nvs_commit(NVS_handle);
-    if (err == ESP_OK) printf("Данные сохранены\n");
-        else printf("Ошибка сохранения данных!\n");
+    if (err == ESP_OK) 
+    {
+        printf("Данные сохранены\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Данные сохранены\r\n", sizeof("Данные сохранены\r\n"), 0);   
+#endif
+    }
+        else 
+        {
+            printf("Ошибка сохранения данных!\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Ошибка сохранения данных!\r\n", sizeof("Ошибка сохранения данных!\r\n"), 0);   
+#endif
+        }
     nvs_close(NVS_handle);
   
     printf("Для перезапуска нажмите ESC\r\n");
-
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Для перезапуска нажмите ESC (придется переподключиться к WiFi)\r\n", sizeof("\r\nДля перезапуска нажмите ESC (придется переподключиться к WiFi)\r\n"), 0);   
+#endif
     free(A_1);
     free(B);
 

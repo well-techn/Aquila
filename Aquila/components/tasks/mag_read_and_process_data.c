@@ -117,10 +117,6 @@ void mag_read_and_process_data (void * pvParameters)
 
   IST8310_generate_cross_axis_matrix(cross_axis);
 
-
-
-
-
   while(1) {
     
     if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0)

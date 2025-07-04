@@ -12,6 +12,9 @@
 #include "inttypes.h"
 #include "driver/gpio.h"
 #include "nvs.h"
+#ifdef TELNET_CONF_MODE
+  #include <lwip/sockets.h>
+#endif
 
 extern SemaphoreHandle_t semaphore_for_i2c_external;
 extern QueueHandle_t magnetometer_queue;
@@ -32,23 +35,44 @@ void advanced_mag_calibration (void *pvParameters)
   uint16_t i = 0;
 
   uint64_t* p_uint64;
+#ifdef TELNET_CONF_MODE
+    char message_to_print[100];
+    uint8_t pos = 0;
+    int16_t *client_fd = pvParameters;
+#endif
 
+#ifdef TELNET_CONF_MODE
+  send(*client_fd, "Проверка связи с IST8310.....\r\n", sizeof("Проверка связи с IST8310.....\r\n"), 0);
+#endif
   ESP_LOGI(TAG_SERVICE,"Проверка связи с IST8310.....");
   if (IST8310_communication_check() != ESP_OK) vTaskDelete(NULL);
 
+#ifdef TELNET_CONF_MODE
+  send(*client_fd, "Настройка IST8310.....\r\n", sizeof("Настройка IST8310.....\r\n"), 0);
+#endif
   ESP_LOGI(TAG_SERVICE,"Настройка IST8310.....");
     if (IST8310_configuration() != ESP_OK) vTaskDelete(NULL);
 
+#ifdef TELNET_CONF_MODE
+  send(*client_fd, "Производим тест IST8310.....\r\n", sizeof("Производим тест IST8310.....\r\n"), 0);
+#endif
   ESP_LOGI(TAG_SERVICE,"Производим тест IST8310.....");
   if (IST8310_selftest() != ESP_OK) vTaskDelete(NULL);
 
+#ifdef TELNET_CONF_MODE
+  send(*client_fd, "Считываем данные cross-axis calibration из IST8310.....\r\n", sizeof("Считываем данные cross-axis calibration из IST8310.....\r\n"), 0);
+#endif
   ESP_LOGI(TAG_SERVICE,"Считываем данные cross-axis calibration из IST8310.....");
   IST8310_generate_cross_axis_matrix(cross_axis);
 
+#ifdef TELNET_CONF_MODE
+  send(*client_fd, "Начинаем калибровку магнетометра, вращайте коптер\r\n", sizeof("Начинаем калибровку магнетометра, вращайте коптер\r\n"), 0);
+#endif
   ESP_LOGI(TAG_SERVICE,"Начинаем калибровку магнетометра");
 
    while (i < NUMBER_OF_MAG_INPUTS)
     {
+
       printf("Считываем вектор %d\n", i);
      // считываем показания
       IST8310_request_data();
@@ -70,19 +94,54 @@ void advanced_mag_calibration (void *pvParameters)
         input_data[i][j] = magn_data_axis_corrected[j];
       }
       i++;
+
+#ifdef TELNET_CONF_MODE
+      if (i % 50 == 0)
+      {
+              pos = sprintf(message_to_print, "\r[***** %d%% ******]",(i * 100/NUMBER_OF_IMU_CALIBRATION_COUNTS));
+              send(*client_fd, message_to_print, pos, 0);
+      } 
+#endif      
     }
 
     printf("Записанный массив данных \n\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Записанный массив данных\r\n", sizeof("Записанный массив данных\r\n"), 0);   
+#endif
+
     for (i = 0; i < NUMBER_OF_MAG_INPUTS; i++)
-        printf("(%0.3f, %0.3f, %0.3f)\n", input_data[i][0], input_data[i][1], input_data[i][2]);
+        {
+          printf("(%0.3f, %0.3f, %0.3f)\n", input_data[i][0], input_data[i][1], input_data[i][2]);
+#ifdef TELNET_CONF_MODE
+          pos = sprintf(message_to_print, "(%0.3f, %0.3f, %0.3f)\n", input_data[i][0], input_data[i][1], input_data[i][2]);
+          send(*client_fd, message_to_print, pos, 0);        
+#endif
+        } 
 
 
     //выделяем память под матицы для расчетов для акселерометра 1
     A_1 = (double *)malloc(3 * 3 * sizeof(double));
     B = (double *)malloc(3 * sizeof(double));
 
+#ifdef TELNET_CONF_MODE
+  send(*client_fd, "Начинаем расчет корректировочных коэффициентов для магнетометра\r\n", sizeof("Начинаем расчет корректировочных коэффициентов для магнетометра\r\n"), 0);
+#endif
     printf("\nНачинаем расчет корректировочных коэффициентов для магнетометра\n");
     calculation_B_and_Ainv_with_exclusion(input_data, A_1, B, 150, 0, NUMBER_OF_MAG_INPUTS);
+
+#ifdef TELNET_CONF_MODE
+    send(*client_fd, "\r\nКоректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКоректировочные значения сдвигов (bias):\r\n"), 0);
+    pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
+    send(*client_fd, message_to_print, pos, 0);
+    
+    
+    send(*client_fd, "\r\nКорректирующая матрица Ainv\r\n", sizeof("\r\nКорректирующая матрица Ainv\r\n"), 0);
+        for (uint8_t i = 0; i < 3; i++)
+        {
+            pos = sprintf(message_to_print, "%9.6lf %9.6lf %9.6lf\r\n", A_1[i * 3], A_1[i * 3 + 1], A_1[i * 3 + 2]);
+            send(*client_fd, message_to_print, pos, 0); 
+        }
+#endif
 
     esp_err_t err = nvs_flash_init();   
     ESP_ERROR_CHECK( err );
@@ -112,17 +171,34 @@ void advanced_mag_calibration (void *pvParameters)
     }
     
     printf("Сохраняем данные в NVS ... ");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "\r\nСохраняем данные в NVS ...\r\n", sizeof("\r\nСохраняем данные в NVS ...\r\n"), 0);   
+#endif
     err = nvs_commit(NVS_handle);
-    if (err == ESP_OK) printf("Данные сохранены\n");
-        else printf("Ошибка сохранения данных!\n");
+    if (err == ESP_OK) 
+    {
+      printf("Данные сохранены\n");
+#ifdef TELNET_CONF_MODE
+      send(*client_fd, "Данные сохранены\r\n", sizeof("Данные сохранены\r\n"), 0);   
+#endif
+    }
+        else 
+        {
+          printf("Ошибка сохранения данных!\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Ошибка сохранения данных!\r\n", sizeof("Ошибка сохранения данных!\r\n"), 0);   
+#endif
+        }
     nvs_close(NVS_handle);
     printf("Для перезапуска нажмите ESC\r\n");
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, "Для перезапуска нажмите ESC (придется переподключиться к WiFi)\r\n", sizeof("\r\nДля перезапуска нажмите ESC (придется переподключиться к WiFi)\r\n"), 0);   
+#endif
 
     free(A_1);
     free(B);
 
     vTaskDelete(NULL);
-
 }
 
 

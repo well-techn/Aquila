@@ -5,16 +5,16 @@
 
 #define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
-#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
+//#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
 #define USING_MS5611
 #define BATTERY_COMPENSATION
-#define USING_MAVLINK_TELEMETRY
+//#define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI
-#define ADVANCED_ACCEL_CALIBRATION
 //#define MEMORY_CONSUMPTION_MESUREMENT
+#define TELNET_CONF_MODE
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3

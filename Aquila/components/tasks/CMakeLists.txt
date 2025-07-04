@@ -17,6 +17,7 @@ idf_component_register(SRCS
 "./init.c"
 "./main_flying_cycle.c"
 "./configuration_mode.c"
+"./configuration_mode_telnet.c"
 
 "${PROJECT_DIR}/components/general_components/AES_crypto.c"
 "${PROJECT_DIR}/components/general_components/filters.c"
@@ -46,7 +47,7 @@ idf_component_register(SRCS
 
 "${PROJECT_DIR}/components/service_tasks/engines_test.c"
 "${PROJECT_DIR}/components/service_tasks/reading_logs_from_external_flash.c"
-"${PROJECT_DIR}/components/service_tasks/imu_calibration.c"
+"${PROJECT_DIR}/components/service_tasks/gyro_calibration.c"
 "${PROJECT_DIR}/components/service_tasks/advanced_acc_calibration.c"
 "${PROJECT_DIR}/components/service_tasks/advanced_mag_calibration.c"
 
@@ -67,4 +68,4 @@ INCLUDE_DIRS
 "${IDF_PATH}/components/esp_partition/include/"
 "${IDF_PATH}/components/nvs_flash/include/"
 "${IDF_PATH}/components/esp_driver_usb_serial_jtag/include/driver/"
-REQUIRES mbedtls)
+REQUIRES esp_wifi mbedtls)

@@ -35,13 +35,13 @@
 #include "MCP23017_monitoring_and_control.h"
 #include "PCA9685_control.h"
 #include "writing_logs_to_flash.h"
-#include "reading_logs_from_external_flash.h"
 #include "blinking_flight_lights.h"
 #include "performance_monitor.h"
 #include "INA219_read_and_process_data.h"
 #include "send_telemetry_via_mavlink.h"
 #include "main_flying_cycle.h"
 #include "configuration_mode.h"
+#include "configuration_mode_telnet.h"
 
 const char *TAG_INIT = "INIT";
 const char *TAG_FLY = "FLY";
@@ -273,6 +273,11 @@ void init(void * pvParameters)
   esp_log_level_set(TAG_MAV,ESP_LOG_INFO);
   esp_log_level_set(TAG_MS5611,ESP_LOG_INFO);  
 
+  #ifdef TELNET_CONF_MODE
+  esp_log_level_set("wifi",ESP_LOG_WARN);
+  esp_log_level_set("wifi_init",ESP_LOG_WARN);
+  #endif
+
   
 
   printf("\n");
@@ -331,7 +336,13 @@ void init(void * pvParameters)
   if (!(MCP23017_get_inputs_state() & 0b00000001))        //если стоит DI0 - заходим в меню настойки (запускаем отдельную задачу settings)
   {
     ESP_LOGE(TAG_INIT,"Установлена перемычка DI0, входим в режим конфигурирования.....");
+#ifdef TELNET_CONF_MODE
+    ESP_LOGW(TAG_INIT,"Запускаем режим конфигурирования по WiFi через Telnet");    
+    xTaskCreate(configuration_mode_telnet, "configuration_mode_telnet", 4096, NULL, 10, NULL);
+#else
+    ESP_LOGW(TAG_INIT,"Запускаем режим конфигурирования по USB-UART");     
     xTaskCreate(configuration_mode, "configuration_mode", 4096, NULL, 10, NULL);
+#endif
     vTaskSuspend(NULL); //останавливаем init
   }
 

@@ -1453,7 +1453,6 @@ uint8_t calculation_B_and_Ainv_with_exclusion(float array[][3], double *A_1, dou
     B[1] = -B[1]; // y-axis combined bias
     B[2] = -B[2]; // z-axis combined bias
 
-    // for(i = 0; i < 3; i++)
     printf("\r\nКоректировочные значения сдвигов (bias):\r\n");
     printf("%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
 

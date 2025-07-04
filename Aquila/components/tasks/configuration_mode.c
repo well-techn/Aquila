@@ -7,7 +7,7 @@
 #include "usb_serial_jtag.h"
 #include "reading_logs_from_external_flash.h"
 #include "engines_test.h"
-#include "imu_calibration.h"
+#include "gyro_calibration.h"
 #include "advanced_acc_calibration.h"
 #include "advanced_mag_calibration.h"
 
@@ -36,9 +36,9 @@ void configuration_mode(void *arg)
 uint8_t len = 0;
 
 printf("\n***** Устройство в режиме конфигурации *****\n\n");
-printf("Выберете пункт меню\n");
+printf("Выберите пункт меню\n");
 printf("1 -> скачивание логов\n");
-printf("2 -> калибровка IMU\n");
+printf("2 -> калибровка гироскопов\n");
 printf("3 -> тестирование двигателей\n");
 printf("4 -> калибровка ESC (пока не готово)\n");
 printf("5 -> продвинутая калибровка акселерометра (по magnetto)\n");
@@ -59,8 +59,8 @@ printf("ESC -> перезапуск\n\n");
                     break;
                 
                 case '2':
-                    printf("2 - Запускаем простую калибровку IMU (по уровню)\n\n");
-                    xTaskCreate(imu_calibration,"imu_calibration",4096,NULL,0,NULL);   
+                    printf("2 - Запускаем простую калибровку гироскопов\n\n");
+                    xTaskCreate(gyro_calibration,"gyro_calibration",4096,NULL,0,NULL);   
                     break;
                 
                 case '3':

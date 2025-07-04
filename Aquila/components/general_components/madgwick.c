@@ -145,8 +145,8 @@ void MadgwickAHRSupdate(float gx, float gy, float gz, float ax, float ay, float 
                 _2q1 = 2.0 * q1;
                 _2q2 = 2.0 * q2;
                 _2q3 = 2.0 * q3;
-                _2q0q2 = 2.0 * q0 * q2;
-                _2q2q3 = 2.0 * q2 * q3;
+                //_2q0q2 = 2.0 * q0 * q2;
+                //_2q2q3 = 2.0 * q2 * q3;
                 q0q0 = q0 * q0;
                 q0q1 = q0 * q1;
                 q0q2 = q0 * q2;

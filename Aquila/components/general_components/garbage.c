@@ -149,7 +149,7 @@ static void NVS_read_write_test(void * pvParameters)
 zzz
 
 enum {
-            IMU_calibration,
+            gyro_calibration,
             IMU_coeff_calculation,
             MAG_calibration,
             MAG_coeff_calculation,
@@ -157,7 +157,7 @@ enum {
 };
 int state;
 
-state = IMU_calibration;
+state = gyro_calibration;
 
 minimize all  ctrl+K, ctrl+0
 Shift+Atl+F auto format

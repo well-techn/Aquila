@@ -18,6 +18,7 @@ idf_component_register(SRCS
 "timing.c"
 "pid.c"
 "advanced_math.c"
+#"${PROJECT_DIR}/components/tasks/configuration_mode_telnet.c"
 
 
 INCLUDE_DIRS 
@@ -26,4 +27,6 @@ INCLUDE_DIRS
 "${PROJECT_DIR}/components/wt_libs/include/"
 "${IDF_PATH}/components/esp_driver_spi/include/driver/"
 "${IDF_PATH}/components/esp_driver_i2c/include/driver/"
-REQUIRES mbedtls)
+"${IDF_PATH}/components/nvs_flash/include/"
+"${IDF_PATH}/components/esp_partition/include/"
+REQUIRES esp_wifi mbedtls)

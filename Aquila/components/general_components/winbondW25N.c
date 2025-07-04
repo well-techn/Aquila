@@ -11,6 +11,11 @@
 #include <rom/ets_sys.h>
 #include "wt_alldef.h"
 #include "esp_random.h"
+#ifdef TELNET_CONF_MODE
+  #include "lwip/err.h"
+  #include "lwip/sys.h"
+  #include <lwip/sockets.h>
+#endif
 
 extern spi_device_handle_t W25N01;
 extern char *TAG_W25N;
@@ -165,62 +170,6 @@ void W25N_erase_all_new(void)
     }
   }
   ESP_LOGI(TAG_W25N,"Полная очистка успешно завершена, было стерто %d страниц (%d блоков)\n", page_address, page_address/64);     //компенсируем крайний инкремент
-}
-
-void W25N_read_and_print_all(void) 
-{
-  uint16_t page_address = 0;
-  uint16_t column_address = 0;
-  uint8_t i = 0;
-  uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)];
-  uint8_t empty_timestamp_flag = 0;
-  struct logging_data_set* p_to_set_to_log;
-//печатаем строку заголовков
-  printf("time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode|e1|e2|e3|e4|flags|rssi|*\n");
-
-  while ((page_address < 65535)&&(empty_timestamp_flag == 0))             //65365 страниц на микросхеме памяти
-  {
-    W25N_page_data_read(page_address);                                    //копируем содержимое страницы в буфер микросхемы
-    column_address = 0;
-
-    while ((column_address < (2048 - sizeof(struct logging_data_set)))&&(empty_timestamp_flag == 0)) //пока в буфере помещается целый пакет данных
-    {
-      W25N_read(column_address, receiving_logs_buffer, sizeof(struct logging_data_set));  //считываем первый пакет из буфера
-     
-     p_to_set_to_log = (struct logging_data_set*)receiving_logs_buffer;
-     
-     if (p_to_set_to_log->timestamp == 4294967295) empty_timestamp_flag = 1;      //в такое число считывается таймстэмп если ячейкм не запроганы (все FF) 
-     if (!empty_timestamp_flag)
-     {
-      printf("%lu|", p_to_set_to_log->timestamp);
-      for (i=0;i<3;i++) printf("%d|", p_to_set_to_log->accel[i]);
-      for (i=0;i<3;i++) printf("%d|", p_to_set_to_log->gyro[i]);
-      for (i=0;i<4;i++) printf("%f|", p_to_set_to_log->q[i]);
-      for (i=0;i<3;i++) printf("%0.2f|", p_to_set_to_log->angles[i]);
-      printf("%d|", p_to_set_to_log->lidar_altitude_cm);
-      //printf("%d|", p_to_set_to_log->lidar_strength);
-      printf("%d|", p_to_set_to_log->baro_altitude_cm);
-      printf("%d|", p_to_set_to_log->kalman_altitude_cm);
-      printf("%d|", p_to_set_to_log->kalman_velocity_cm);
-      printf("%d|", p_to_set_to_log->altitude_setpoint_cm);
-      printf("%d|", p_to_set_to_log->voltage_mv);
-      printf("%d|", p_to_set_to_log->current_ca);
-      printf("%0.2f|", p_to_set_to_log->throttle_command);
-      printf("%0.2f|", p_to_set_to_log->pitch_command);
-      printf("%0.2f|", p_to_set_to_log->roll_command);
-      printf("%0.2f|", p_to_set_to_log->yaw_command);
-      printf("%d|", p_to_set_to_log->mode_command);
-      for (i=0;i<4;i++) printf("%ld|", p_to_set_to_log->engines[i]);
-      printf("%d|", p_to_set_to_log->flags);
-      printf("%d|", p_to_set_to_log->rssi_level);
-      printf("*\n");                                    //конец строки
-
-      column_address+= sizeof(struct logging_data_set);           //переход на следующий пакет в буфере микросхемы
-     } 
-    }
-  page_address++;                                       //переход к считыванию следующей страницы памяти
-  }
-  ESP_LOGI(TAG_W25N,"Считывание логов из внешней flash-памяти завершено, перезапустите систему");
 }
 
 esp_err_t winbond_read_write_test(void)

@@ -716,45 +716,9 @@ void NVS_reading_calibration_values(void)
 
   // Начинаем считывание сохраненных переменных
   //коэффициенты простой калибровки
-  ESP_LOGI(TAG_NVS,"Считываем данные калибровки IMU из NVS ... ");
+  ESP_LOGI(TAG_NVS,"Считываем данные калибровки гироскопов из NVS ... ");
   
-  err = nvs_get_i16(NVS_handle, "accel_1_off_0", &accel_1_offset[0]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"accel_1_offset[0] = %d", accel_1_offset[0]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"accel_1_offset[0] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "accel_1_off_1", &accel_1_offset[1]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"accel_1_offset[1] = %d", accel_1_offset[1]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"accel_1_offset[1] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "accel_1_off_2", &accel_1_offset[2]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"accel_1_offset[2] = %d", accel_1_offset[2]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"accel_1_offset[2] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "gyro_1_off_0", &gyro_1_offset[0]); 
+   err = nvs_get_i16(NVS_handle, "gyro_1_off_0", &gyro_1_offset[0]); 
   switch (err) {
       case ESP_OK:
           ESP_LOGD(TAG_NVS,"gyro_1_offset[0] = %d", gyro_1_offset[0]);
@@ -785,42 +749,6 @@ void NVS_reading_calibration_values(void)
           break;
       case ESP_ERR_NVS_NOT_FOUND:
           ESP_LOGW(TAG_NVS,"gyro_1_offset[2] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "accel_2_off_0", &accel_2_offset[0]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"accel_2_offset[0] = %d", accel_2_offset[0]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"accel_2_offset[0] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "accel_2_off_1", &accel_2_offset[1]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"accel_2_offset[1] = %d", accel_2_offset[1]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"accel_2_offset[1] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "accel_2_off_2", &accel_2_offset[2]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"accel_2_offset[2] = %d", accel_2_offset[2]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"accel_2_offset[2] не определен!");
           break;
       default :
           ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
@@ -862,6 +790,7 @@ void NVS_reading_calibration_values(void)
           ESP_LOGE(TAG_NVS,"Ошибка считывания (%s)!\n", esp_err_to_name(err));
   }
   
+//коэффициенты калибровки по магнетто для акселерометров
   err = nvs_get_u64(NVS_handle, "accel_1_bias[0]", &temp); 
   p_double = (double*) &temp;
   accel_1_bias[0] = *p_double;
@@ -885,8 +814,6 @@ void NVS_reading_calibration_values(void)
   err = nvs_get_u64(NVS_handle, "accel_2_bias[2]", &temp); 
   p_double = (double*) &temp;
   accel_2_bias[2] = *p_double;
-
-
 
   err = nvs_get_u64(NVS_handle, "accel_1_A_i[00]", &temp); 
   p_double = (double*) &temp;
@@ -973,15 +900,23 @@ void NVS_reading_calibration_values(void)
 
  NVS_reading_calibration_values();
     
-  if ((gyro_1_offset[0]  || gyro_1_offset[1] || gyro_1_offset[2] || accel_1_offset[0] || accel_1_offset[1] || accel_1_offset[2]) == 0)
+  if ((gyro_1_offset[0]  || gyro_1_offset[1] || gyro_1_offset[2]) == 0)
   {
-    ESP_LOGE(TAG_FLY,"IMUs не откалиброваны, запуститесь в сервисном режиме и проведите калибровку IMU\n");
+    ESP_LOGE(TAG_FLY,"Гироскопы не откалиброваны, запуститесь в сервисном режиме и проведите калибровку гироскопов\n");
     uint16_t error_code = 10;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
   }
 
-vTaskDelay(100/portTICK_PERIOD_MS);       //without these delay assertion fails
+  if ((accel_1_bias[0] || accel_1_bias[1] || accel_1_bias[1] || accel_2_bias[0] || accel_2_bias[1] || accel_2_bias[1]) == 0)
+  {
+    ESP_LOGE(TAG_FLY,"Акселерометры не откалиброваны, запуститесь в сервисном режиме и проведите калибровку акселерометров\n");
+    uint16_t error_code = 10;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
+  }
+//без этой задержки assertion не проходит, хз почему
+vTaskDelay(100/portTICK_PERIOD_MS);       
 
 ESP_LOGI(TAG_FLY,"Создаем и запускаем таймер контроля зависания IMU#1.....");
 Create_and_start_IMU_1_suspension_Timer();
@@ -1077,36 +1012,27 @@ while(1)
       gyro_raw_2[1] = (sensor_data_2[10] << 8) | sensor_data_2[11];          //Y
       gyro_raw_2[2] = (sensor_data_2[12] << 8) | sensor_data_2[13];          //Z
       
-#ifdef ADVANCED_ACCEL_CALIBRATION
 //применяем к акселерометру калибровку по методу Magnetto при помощи вычисленных калибровочных коэффициентов bias и матрицы A_inv в сервисном режиме
 //убираем bias      
       for (i=0;i<3;i++) accel_1_wo_hb[i] = (float)accel_raw_1[i] - (float)accel_1_bias[i];
-
 //умножаем матрицу A_inv на показания      
       accel_1_converted[0] = (float)accel_1_A_inv[0][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[0][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[0][2]*accel_1_wo_hb[2];
       accel_1_converted[1] = (float)accel_1_A_inv[1][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[1][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[1][2]*accel_1_wo_hb[2];
       accel_1_converted[2] = (float)accel_1_A_inv[2][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[2][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[2][2]*accel_1_wo_hb[2];
-      
+//то же самое делаем с показаниями второго акселерометра      
       for (i=0;i<3;i++) accel_2_wo_hb[i] = accel_raw_2[i] - accel_2_bias[i];
       
       accel_2_converted[0] = accel_2_A_inv[0][0]*accel_2_wo_hb[0] + accel_2_A_inv[0][1]*accel_2_wo_hb[1] + accel_2_A_inv[0][2]*accel_2_wo_hb[2];
       accel_2_converted[1] = accel_2_A_inv[1][0]*accel_2_wo_hb[0] + accel_2_A_inv[1][1]*accel_2_wo_hb[1] + accel_2_A_inv[1][2]*accel_2_wo_hb[2];
       accel_2_converted[2] = accel_2_A_inv[2][0]*accel_2_wo_hb[0] + accel_2_A_inv[2][1]*accel_2_wo_hb[1] + accel_2_A_inv[2][2]*accel_2_wo_hb[2];
-      
+//переводим показания акселерометра в G      
       for (i=0;i<3;i++) 
           {
-            accel_1_converted[i] = accel_1_converted[i] / 8192.0;         // переводим в G    8192
-            accel_2_converted[i] = accel_2_converted[i] / 8192.0;         // переводим в G    8192
+            accel_1_converted[i] = accel_1_converted[i] / 8192.0;        
+            accel_2_converted[i] = accel_2_converted[i] / 8192.0;        
           }
-#else
-//в противном случае используем обычные коэффициенты
-      for (i=0;i<3;i++) 
-          {
-            accel_1_converted[i] = ((float)accel_raw_1[i] - (float)accel_1_offset[i]) / 8192.0;         // переводим в G    8192
-            accel_2_converted[i] = ((float)accel_raw_2[i] - (float)accel_2_offset[i]) / 8192.0;         // переводим в G    8192
-          }
-#endif
-//гироскопы калибруем только стандартным способом          
+
+//гироскопы калибруем только стандартным способом, вычитая оффсет           
       for (i=0;i<3;i++) 
           {
             gyro_1_converted[i]  = (((float)gyro_raw_1[i] - (float)gyro_1_offset[i]) / 131.0) * ((float)M_PI / 180.0);   //в rads

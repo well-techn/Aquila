@@ -59,7 +59,6 @@ void W25N_block_erase(uint16_t page_address);
 void W25N_erase_all(void);
 void W25N_erase_all_new(void);
 uint8_t W25N_read_STATUS_register(void);
-void W25N_read_and_print_all(void);
 
 
 
