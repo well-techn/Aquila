@@ -18,7 +18,7 @@ idf_component_register(SRCS
 "timing.c"
 "pid.c"
 "advanced_math.c"
-#"${PROJECT_DIR}/components/tasks/configuration_mode_telnet.c"
+"px4flow.c"
 
 
 INCLUDE_DIRS 

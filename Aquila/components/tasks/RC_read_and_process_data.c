@@ -69,14 +69,16 @@ void RC_read_and_process_data(void * pvParameters)
   float rc_yaw_old = 0;
   float raw_rc_throttle_old = 0;
 
-  uint8_t set_allowed = 0;
+  uint8_t lidar_alt_hold_set_allowed = 0;
+  uint8_t baro_alt_hold_set_allowed = 0;
 
   uint16_t command_for_PCA9685;
   uint16_t mode_old = 0;
   uint8_t LED_status = 0;
   uint8_t start_flag_old = 0;
 
-  remote_control_data.altitude_hold_flag = 0;
+  remote_control_data.lidar_altitude_hold_flag = 0;
+  remote_control_data.baro_altitude_hold_flag = 0;
   
   ESP_LOGI(TAG_RC,"Настраиваем UART для пульта управления.....");
   remote_control_uart_config();
@@ -191,12 +193,28 @@ void RC_read_and_process_data(void * pvParameters)
 
 //если ручка газа в нижнем положении и включен тумблер "старт двигателей" установить флаг engines_start_flag        
               if ((remote_control_data.received_throttle < 8400) && (remote_control_data.mode & 0x0001)) remote_control_data.engines_start_flag = 1;
-//если тумблер "старт двигателей" выключен - обнуляем бит engines_start_flag при любом положении ручки газа                
-              if (!(remote_control_data.mode & 0x01)) {remote_control_data.engines_start_flag = 0; remote_control_data.altitude_hold_flag = 0; set_allowed = 0;}
-//если  тумблер включен "удержание высоты" при запущенных двигателях - устанавливаем флаг altitude_hold_flag 
-              if ((remote_control_data.mode & 0x02) && (set_allowed == 1) && (remote_control_data.engines_start_flag)) remote_control_data.altitude_hold_flag = 1;
+//если тумблер "старт двигателей" выключен - обнуляем бит engines_start_flag (при любом положении ручки газа)                
+              if (!(remote_control_data.mode & 0x01)) 
+              { 
+                remote_control_data.engines_start_flag = 0; 
+                remote_control_data.lidar_altitude_hold_flag = 0; 
+                remote_control_data.baro_altitude_hold_flag = 0;
+                lidar_alt_hold_set_allowed = 0;
+                baro_alt_hold_set_allowed = 0;
+              }
+#ifdef USING_TFMINIS_I2C              
+//переменные ***_alt_hold_set_allowed нужны для того, чтобы избежать ситуации, когда мы полетали в ударжании, выключили engines_start_bit оставив включенными тумблера режимов удержания выооты и потом опять включили engines_start - в этом случае режим удержания не включится, пока не выключим тумблер удержания и опять не включим
+//если  тумблер "удержание высоты по лидару" включен при запущенных двигателях - устанавливаем флаг lidar_altitude_hold_flag 
+              if ((remote_control_data.mode & 0x02) && (lidar_alt_hold_set_allowed == 1) && (remote_control_data.engines_start_flag)) remote_control_data.lidar_altitude_hold_flag = 1;
 //в противном случае обнуляем этот флаг              
-              if (!(remote_control_data.mode & 0x02)) {remote_control_data.altitude_hold_flag = 0; set_allowed = 1;}
+              if (!(remote_control_data.mode & 0x02)) {remote_control_data.lidar_altitude_hold_flag = 0; lidar_alt_hold_set_allowed = 1;}
+#endif
+#ifdef USING_MS5611  
+//если  тумблер "удержание высоты по барометру" включен при запущенных двигателях - устанавливаем флаг lidar_altitude_hold_flag 
+              if ((remote_control_data.mode & 0x04) && (baro_alt_hold_set_allowed == 1) && (remote_control_data.engines_start_flag)) remote_control_data.baro_altitude_hold_flag = 1;
+//в противном случае обнуляем этот флаг              
+              if (!(remote_control_data.mode & 0x04)) {remote_control_data.baro_altitude_hold_flag = 0; baro_alt_hold_set_allowed = 1;}
+#endif
 //при изменении положения тумблера 4 отправить в очередь задачи управления PCA9685 команду на изменение сигнала
               if ((remote_control_data.mode & 0x08) ^ (mode_old & 0x08))  {
                 if (remote_control_data.mode & 0x08) command_for_PCA9685 = 0x0103;

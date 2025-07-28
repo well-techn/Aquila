@@ -24,8 +24,8 @@ void MS5611_read_and_process_data(void * pvParameters)
   double MS5611_P = 0;
 
   uint8_t first_reads_counter = 0;
-  double MS_5611_ground_pressure = 0;;
-  float altitude_baro_cm_filter_pool[5] = {0,0,0,0,0};
+  double MS_5611_ground_pressure = 0;
+  float altitude_baro_cm_filter_pool[20] = {0};
   float altitude_baro_cm = 0;
 
   ESP_LOGI(TAG_MS5611,"Считывание PROM MS5611.....");
@@ -102,7 +102,8 @@ void MS5611_read_and_process_data(void * pvParameters)
             {
               altitude_baro_cm = (MS_5611_ground_pressure - MS5611_P) * 8.33;       //1mBar*100 = 8.3см Относительная высота = разность давлений * 8.3см
               if (altitude_baro_cm < 0) altitude_baro_cm = 0;
-              altitude_baro_cm = avg_filter_1d(altitude_baro_cm_filter_pool, altitude_baro_cm, 5);
+              altitude_baro_cm = avg_filter_1d(altitude_baro_cm_filter_pool, altitude_baro_cm, 20);
+              //printf("%d, ", (uint16_t)altitude_baro_cm);
               xQueueSend(MS5611_to_main_queue, &altitude_baro_cm, NULL); 
             }                         
     } 

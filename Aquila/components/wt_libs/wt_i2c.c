@@ -9,6 +9,7 @@
 #include "MS5611.h"
 #include "inttypes.h"
 #include "TfminiS.h"
+#include "px4flow.h"
 
 i2c_master_bus_handle_t i2c_internal_bus_handle;
 i2c_master_bus_handle_t i2c_external_bus_handle;
@@ -20,6 +21,7 @@ i2c_master_dev_handle_t IST8310_dev_handle;
 i2c_master_dev_handle_t FL3195_dev_handle;
 i2c_master_dev_handle_t MS5611_dev_handle;
 i2c_master_dev_handle_t TFSMINI_dev_handle;
+i2c_master_dev_handle_t PX4FLOW_dev_handle;
 
 //инициализация i2c
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
@@ -60,10 +62,17 @@ void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
     .scl_speed_hz = I2C_TFMINIS_FREQ_HZ,
     };
 
+    i2c_device_config_t PX4FLOW_dev_config = {
+    .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+    .device_address = PX4FLOW_I2C_ADDRESS,
+    .scl_speed_hz = I2C_PX4FLOW_FREQ_HZ,
+    };
+
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &PCA9685_dev_config, &PCA9685_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &MCP23017_dev_config, &MCP23017_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &INA219_dev_config, &INA219_dev_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &TFSMINI_dev_config, &TFSMINI_dev_handle));
+    ESP_ERROR_CHECK(i2c_master_bus_add_device(i2c_internal_bus_handle, &PX4FLOW_dev_config, &PX4FLOW_dev_handle));
 }
 
 void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port)
@@ -203,8 +212,8 @@ esp_err_t checking_address_at_the_bus(i2c_master_bus_handle_t bus_handle, uint8_
 {
     esp_err_t ret = ESP_FAIL;
     ret = i2c_master_probe(bus_handle, device_address, -1);
-    if (ret == ESP_OK) printf ("device with address 0x%02x is discovered\n", device_address);
-    else printf ("device with address 0x%02x is not discovered\n", device_address);
+    //if (ret == ESP_OK) printf ("device with address 0x%02x is discovered\n", device_address);
+    //else printf ("device with address 0x%02x is not discovered\n", device_address);
 
     return ret;
 }

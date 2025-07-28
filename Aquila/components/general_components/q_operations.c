@@ -155,6 +155,26 @@ void calculate_desired_quat_from_3_angles(float pitch, float roll, float yaw, fl
 }
 
 
+void Convert_Q_to_degrees(float q0, float q1, float q2, float q3, float* pitch, float* roll, float* yaw)
+{
+    float a12,a22,a31,a32,a33 = 0;
+
+    a12 =   2.0f * (q1 * q2 + q0 * q3);
+    a22 =   q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3;
+    a31 =   2.0f * (q0 * q1 + q2 * q3);
+    a32 =   2.0f * (q1 * q3 - q0 * q2);
+    a33 =   q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
+
+    *pitch = -asin(a32) * 57.29577951;  // 180/пи
+
+    *roll = atan2(a31, a33) * 57.29577951;
+    //if (*roll > 90) *roll -= 360.0;     
+
+    *yaw = -atan2(a12, a22) * 57.29577951;
+    *yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если магнетометр не используем - без разницы, вреда не наносит
+}
+
+
 
 
 

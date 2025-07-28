@@ -99,10 +99,10 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   if (gpio_intr_status_1 & (1ULL << A2))   //сигнал от кнопки аварийной остановки на Holybro M9N, выключаем двигатели
   {
     ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN ,0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN ,0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN ,0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN, 0);   //аварийно останавливаем двигатели
+    gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN, 0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN, 0);
+    gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN, 0);
     gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
   }  
   
@@ -114,7 +114,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     gptimer_get_raw_count(IMU_2_suspension_timer,&IMU_2_timer_value);
   } 
   
-  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN))   //сигнал от IMU1 
+  if (gpio_intr_status_1 & (1ULL << MPU6000_2_INTERRUPT_PIN))   //сигнал от IMU2 
   {
     imu_2_interrupt_flag = 1;
     gptimer_get_raw_count(IMU_1_suspension_timer,&IMU_1_timer_value);
@@ -129,14 +129,14 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 14, eSetValueWithOverwrite, NULL,  &xHigherPriorityTaskWoken);    //14 - код что все ок
   }
 
- else if (IMU_2_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //IMU2 не выдал сигнал
+ else if (IMU_2_timer_value >= IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //IMU2 не выдал сигнал
   {
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
     xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 15, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);     //15 - код что 2ой завис
   }
 
-  else if ( IMU_1_timer_value > IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //IMU1 не выдал сигнал
+  else if ( IMU_1_timer_value >= IMU_SUSPENSION_TIMER_DELAY_MS * 1000)  //IMU1 не выдал сигнал
   {
     imu_1_interrupt_flag = 0;
     imu_2_interrupt_flag = 0;
@@ -151,10 +151,10 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
 static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    
 { 
   ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN ,0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN ,0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN ,0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN ,0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN, 0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN, 0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN, 0);
+  gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN, 0);
   gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
 }
 
@@ -256,7 +256,6 @@ static void create_and_start_general_suspension_timer()
 
 /*Задача основного полетного цикла. Единственная задача на ядре 1. 
   - Активируется по прерыванию о готовности данных от IMU.
-  - при необходимости калибрует и записывает в NVS калибровочные коэффициенты 
   - Считывает данные от IMU, обрабатывает, вычисляет Маджвиком (с учетом магнетометра или без) углы наклона
   - получает из очереди команды от пульта
   - на основе данных по текущим углам и команд от пульта вычисляет необходимые воздействия на двигатели посредством двухконтурного PID
@@ -273,11 +272,20 @@ void main_flying_cycle(void * pvParameters)
   extern float q3;
   
   uint32_t IMU_interrupt_status = 0;
-  uint8_t test_for_all_0 = 0;
-  uint8_t test_for_all_1 = 0xFF;
-  
+
   uint8_t sensor_data_1[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
   uint8_t sensor_data_2[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+
+  uint8_t sensor_data_1_old[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+  uint8_t sensor_data_2_old[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
+
+  uint8_t test_for_equal_prev = 0;
+  uint8_t test_for_all_equal = 0;
+  uint8_t counter_for_all_equal_IMU1 = 0;
+  uint8_t counter_for_all_equal_IMU2 = 0;
+  uint8_t IMU_1_data_fail = 0;
+  uint8_t IMU_2_data_fail = 0;
+
 
   int16_t accel_raw_1[3] = {0,0,0}; 
   int16_t gyro_raw_1[3] = {0,0,0}; 
@@ -288,8 +296,6 @@ void main_flying_cycle(void * pvParameters)
   uint64_t timer_value = 0;
   uint16_t i = 0;
  
-  int16_t accel_1_offset[3] = {0,0,0};
-  int16_t accel_2_offset[3] = {0,0,0};
   int16_t gyro_1_offset[3] = {0,0,0};
   int16_t gyro_2_offset[3] = {0,0,0};
 
@@ -427,7 +433,8 @@ void main_flying_cycle(void * pvParameters)
   struct data_from_rc_to_main_struct rc_fresh_data;
     rc_fresh_data.mode = 0;
     rc_fresh_data.engines_start_flag = 0;
-    rc_fresh_data.altitude_hold_flag = 0;
+    rc_fresh_data.lidar_altitude_hold_flag = 0;
+    rc_fresh_data.baro_altitude_hold_flag = 0;
   struct data_from_main_to_rc_struct data_to_send_to_rc;
   uint32_t remote_control_lost_comm_counter = 0;
 
@@ -440,24 +447,35 @@ void main_flying_cycle(void * pvParameters)
 #endif 
 
 //переменные по режиму удержания высоты
-  bool altitude_hold_mode_enabled = 0;
+  bool lidar_altitude_hold_mode_enabled = 0;
+  bool baro_altitude_hold_mode_enabled = 0;
   float altitude_setpoint = 0;
   float alt_hold_initial_throttle = 0;
-  float alt_error_change_filter_pool[7] = {0};//ALT_PID_DIF_FILTER_LENGTH
   uint8_t new_lidar_data_arrived_flag = 0;
+  uint8_t new_baro_data_arrived_flag = 0;
   float pid_altitude = 0;
 
-  PIDController_t alt_hold_pid;
-    alt_hold_pid.kp = 8.0;  //10       //  раб значения 10, 290, 0.4, 10-290-0.2 seems better,9-290-0.2 seems better
-    alt_hold_pid.kd = 290.0; //290      //
-    alt_hold_pid.ki = 0.2;  //0.4       //
-    alt_hold_pid.prev_error = 0;
-    alt_hold_pid.integral_error = 0;
-    alt_hold_pid.integral_limit = 250;
-    alt_hold_pid.pid_limit = 500;
-    alt_hold_pid.throttle_limit = 0;
-    alt_hold_pid.print_results = 0;
-
+  PIDController_t lidar_alt_hold_pid;
+    lidar_alt_hold_pid.kp = 8.0;  //10       //  раб значения 10, 290, 0.4, 10-290-0.2 seems better,9-290-0.2 seems better
+    lidar_alt_hold_pid.kd = 290.0; //290      //
+    lidar_alt_hold_pid.ki = 0.2;  //0.4       //
+    lidar_alt_hold_pid.prev_error = 0;
+    lidar_alt_hold_pid.integral_error = 0;
+    lidar_alt_hold_pid.integral_limit = 250;
+    lidar_alt_hold_pid.pid_limit = 500;
+    lidar_alt_hold_pid.throttle_limit = 0;
+    lidar_alt_hold_pid.print_results = 0;
+  
+  PIDController_t baro_alt_hold_pid;
+    baro_alt_hold_pid.kp = 8.0;  //10       //  раб значения 10, 290, 0.4, 10-290-0.2 seems better,9-290-0.2 seems better
+    baro_alt_hold_pid.kd = 290.0; //290      //
+    baro_alt_hold_pid.ki = 0.2;  //0.4       //
+    baro_alt_hold_pid.prev_error = 0;
+    baro_alt_hold_pid.integral_error = 0;
+    baro_alt_hold_pid.integral_limit = 250;
+    baro_alt_hold_pid.pid_limit = 500;
+    baro_alt_hold_pid.throttle_limit = 0;
+    baro_alt_hold_pid.print_results = 0;
 
 #ifdef USING_TFMINIS_I2C 
     struct data_from_lidar_to_main_struct lidar_fresh_data;
@@ -470,19 +488,17 @@ void main_flying_cycle(void * pvParameters)
   float INA219_fresh_data[4];
   float voltage_correction_coeff = 1.0;
   
-#ifdef USING_W25N 
   //переменные для логирования
   uint64_t start_time = 0;
   uint8_t flags_byte = 0;
   struct logging_data_set set_to_log;
   struct logging_data_set* p_to_log_structure = &set_to_log;
-#endif
 
 
 #ifdef USING_MAVLINK_TELEMETRY
     mavlink_data_set_t main_to_mavlink_data;
-    main_to_mavlink_data.latitude = 321857245;     //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
-    main_to_mavlink_data.longtitude = 441857249;
+    main_to_mavlink_data.latitude = 111111111;     //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
+    main_to_mavlink_data.longtitude = 222222222;
     mavlink_data_set_t* p_to_mavlink_data = &main_to_mavlink_data;
 #endif
 
@@ -494,8 +510,8 @@ uint64_t temp;
 double* p_double;
 
 KalmanFilter2d_t Kalm_vert;
-  Kalm_vert.dt = 0.001;                    // интервал времени
-  Kalm_vert.sigma2_accel = ACCEL_SIGMA2;             // дисперсия акселерометра, постоянная величина как характеристика акселя
+  Kalm_vert.dt = 0.001;                             // интервал времени
+  Kalm_vert.sigma2_accel = ACCEL_SIGMA2;            // дисперсия акселерометра, постоянная величина как характеристика акселя
   Kalm_vert.sigma2_baro = BARO_SIGMA2;              // дисперсия барометра, постоянная величина как характеристика барометра
 
   Kalm_vert.P[0][0] = 1;
@@ -527,26 +543,7 @@ KalmanFilter2d_t Kalm_vert;
   float q_angle = 0;
   float q_axis[4];
 */
-  void Convert_Q_to_degrees(void) {
-    
-    float a12,a22,a31,a32,a33 = 0;
-
-    a12 =   2.0f * (q1 * q2 + q0 * q3);
-    a22 =   q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3;
-    a31 =   2.0f * (q0 * q1 + q2 * q3);
-    a32 =   2.0f * (q1 * q3 - q0 * q2);
-    a33 =   q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
-    
-    pitch = -asin(a32) * 57.29577951;
-    
-    roll = atan2(a31, a33) * 57.29577951;
-    if (roll > 90) roll -= 360.0;
-    
-    yaw = -atan2(a12, a22) * 57.29577951;
-    yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если магнетометр не используем - без разницы, вреда не наносит
-
-  }
-
+  
   void calculate_pids_2(void) {
 
 //наружний pitch по углу   
@@ -665,8 +662,10 @@ void prepare_logs(void) {
   
   if (rc_fresh_data.engines_start_flag) flags_byte |= 0b00000001;                                 //bit0 - engine start flag
    else flags_byte &= 0b11111110;
-  if (altitude_hold_mode_enabled) flags_byte |= 0b00000010;                                 //bit1 - altitude hold flag
+  if (lidar_altitude_hold_mode_enabled) flags_byte |= 0b00000010;                                 //bit1 - lidar altitude hold flag
   else flags_byte &= 0b11111101;
+  if (baro_altitude_hold_mode_enabled) flags_byte |= 0b00000100;                                 //bit2 - baro altitude hold flag
+  else flags_byte &= 0b11111011;
   if (remote_control_lost_comm_counter == RC_NO_COMM_DELAY_MAIN_CYCLES) flags_byte |= 0b10000010; //bit8 - comm lost flag
    else flags_byte &= 0b01111111;
   set_to_log.flags = flags_byte;
@@ -688,7 +687,7 @@ void prepare_mavlink_data(void) {
   main_to_mavlink_data.voltage_mv = (uint16_t)(INA219_fresh_data[0] * 1000);
   main_to_mavlink_data.current_ca = (uint16_t)(INA219_fresh_data[1] * 100);
 #ifdef USING_TFMINIS_I2C 
-  main_to_mavlink_data.altitude_cm = (uint16_t)lidar_altitude_corrected;
+  main_to_mavlink_data.altitude_cm = (uint16_t)Kalm_vert.h;
 #endif
   main_to_mavlink_data.rssi_level = rc_fresh_data.rssi_level;
   main_to_mavlink_data.armed_status = rc_fresh_data.engines_start_flag;
@@ -897,10 +896,9 @@ void NVS_reading_calibration_values(void)
 
  
 //считываем из флеш калибровочные коэффициенты IMU и проверяем что они записаны
-
  NVS_reading_calibration_values();
     
-  if ((gyro_1_offset[0]  || gyro_1_offset[1] || gyro_1_offset[2]) == 0)
+  if ((gyro_1_offset[0] || gyro_1_offset[1] || gyro_1_offset[2]) == 0)
   {
     ESP_LOGE(TAG_FLY,"Гироскопы не откалиброваны, запуститесь в сервисном режиме и проведите калибровку гироскопов\n");
     uint16_t error_code = 10;
@@ -908,7 +906,7 @@ void NVS_reading_calibration_values(void)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
   }
 
-  if ((accel_1_bias[0] || accel_1_bias[1] || accel_1_bias[1] || accel_2_bias[0] || accel_2_bias[1] || accel_2_bias[1]) == 0)
+  if ((accel_1_bias[0] || accel_1_bias[1] || accel_1_bias[2] || accel_2_bias[0] || accel_2_bias[1] || accel_2_bias[2]) == 0)
   {
     ESP_LOGE(TAG_FLY,"Акселерометры не откалиброваны, запуститесь в сервисном режиме и проведите калибровку акселерометров\n");
     uint16_t error_code = 10;
@@ -962,39 +960,70 @@ while(1)
       {
         SPI_read_bytes(MPU6000_1, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_1, 14);
         for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i];
+        flags_byte |= 0b00001000;                                 //прописываем во флаги что имело место зависание IMU2
+        ESP_LOGE(TAG_FLY, "IMU2 timing_Error");
       }
 
       else if (IMU_interrupt_status == 16) //1st failed
       {
         SPI_read_bytes(MPU6000_2, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_2, 14);
         for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i];
+        flags_byte |= 0b00010000;                                 //прописываем во флаги что имело место зависание IMU1
+        ESP_LOGE(TAG_FLY, "IMU1 timing_Error");
       } 
       
       else ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0); //motors emergency stop
+    
+//проверяем данные с IMU1 на предмет равенства всех элементов или равенства текущего пакета предыдущему с инкрементом счетчика одинаковых пакетов
+      test_for_equal_prev = arrays_are_equal (sensor_data_1, sensor_data_1_old, 14);
+      test_for_all_equal = all_array_elements_are_equal(sensor_data_1, 14);
+        
+      if (test_for_equal_prev == 1) counter_for_all_equal_IMU1++;
+      else counter_for_all_equal_IMU1 = 0;
+      
+      if ((counter_for_all_equal_IMU1 > 10) || (test_for_all_equal == 1)) IMU_1_data_fail = 1;
+      else IMU_1_data_fail = 0;
 
-//проверяем данные с IMU1 на предмет если они вдруг все 0 или все 1
-      test_for_all_0 = 0;
-      test_for_all_1 = 0xFF;
-      for (i=0;i<14;i++) 
+//проверяем данные с IMU2 на предмет равенства всех элементов или равенства текущего пакета предыдущему с инкрементом счетчика одинаковых пакетов
+      test_for_equal_prev = arrays_are_equal (sensor_data_2, sensor_data_2_old, 14);
+      test_for_all_equal = all_array_elements_are_equal(sensor_data_2, 14);
+        
+      if (test_for_equal_prev == 1) counter_for_all_equal_IMU2++;
+      else counter_for_all_equal_IMU2 = 0;
+      
+      if ((counter_for_all_equal_IMU2 > 10) || (test_for_all_equal == 1)) IMU_2_data_fail = 1;
+      else IMU_2_data_fail = 0;
+
+
+//осуществляем корректирующие действия
+//если оба не прошли проверку то фиксируем это во флагах и выключаем моторы
+      if (IMU_1_data_fail && IMU_2_data_fail)  
       {
-        test_for_all_0 = test_for_all_0 | sensor_data_1[i];  
-        test_for_all_1 = test_for_all_1 & sensor_data_1[i];
+        ESP_LOGE(TAG_FLY,"Ошибка обоих");
+        ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0); //motors emergency stop
+        flags_byte |= 0b01100000;                                 //прописываем во флаги ошибка проверки по обоим IMU
+        uint8_t error_code = 4;
+        xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+        while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
       }
-      if ((test_for_all_0 == 0) || (test_for_all_1 == 0xFF)) //если да - заменяем данными со второго IMU
+      else if (IMU_1_data_fail) 
       {
-        for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i]; 
+        for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i];
+        flags_byte |= 0b00100000;                                 //прописываем во флаги ошибка проверки по 1му IMU
+        gpio_set_level(LED_BLUE,0);
       }
-//проверяем данные с IMU2 на предмет если они вдруг все 0 или все 1
-      test_for_all_0 = 0;
-      test_for_all_1 = 0xFF;
-      for (i=0;i<14;i++) 
+
+      else if (IMU_2_data_fail) 
       {
-        test_for_all_0 = test_for_all_0 | sensor_data_2[i]; 
-        test_for_all_1 = test_for_all_1 & sensor_data_2[i];
+        for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i];
+        flags_byte |= 0b01000000;                                 //прописываем во флаги ошибка проверки по 2му IMU
+        gpio_set_level(LED_GREEN,0);
       }
-      if ((test_for_all_0 == 0) || (test_for_all_1 == 0xFF)) //если да - заменяем данными со второго IMU
+//сохраняем текущие данные в переменные для хранения старых даных
+      for (i = 0;i<14;i++)
       {
-        for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i]; 
+        sensor_data_1_old[i] = sensor_data_1[i];
+        sensor_data_2_old[i] = sensor_data_2[i];
       }
 
 //формируем "сырые" показания акселерометров и гироскопов
@@ -1055,7 +1084,7 @@ while(1)
 if ((large_counter % PID_LOOPS_RATIO) == 0) {
 
         for (i=0;i<madgwick_cycles;i++) {
-//считываем время прошедшее с прошлого цифка расчета 
+//считываем время прошедшее с прошлого цикла расчета 
           ESP_ERROR_CHECK(gptimer_get_raw_count(GP_timer, &timer_value));
           ESP_ERROR_CHECK(gptimer_set_raw_count(GP_timer, 0));
 //если используем модуль с компасом и GPS запускаем фильтр Маджвика с учетом данных от магнетометра, используя в качестве входных параметров усредненные накопленные за предыдущие циклы 
@@ -1088,9 +1117,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
                                 timer_value);
     
 #endif
-        }
-//если не используем модуль с компасом и GPS - запускаем маджвика без учета данных от магнетометра используя в качестве входных параметров усредненные накопленные за предыдущие циклы 
-//показания гироскопов и акселерометров          
+        }       
         
 //очищаем накопленные данные от гироскопов и акселерометров         
         for (i=0;i<3;i++)
@@ -1102,7 +1129,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
           gyro_2_converted_accumulated[i] = 0;
         }
 //выполняем преобразование из кватерниона в углы Эйлера   
-        Convert_Q_to_degrees();
+        Convert_Q_to_degrees(q0, q1, q2, q3, &pitch, &roll, &yaw);
       }
 
 //производим запрос данных от INA219 (раз в X циклов, то есть (1000/X) в секунду) 
@@ -1141,10 +1168,10 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
 #endif
 
 //далее место где удобно что-то выводить, печатать 
-//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"fil are %0.2f, %0.2f, %0.2f, %0.2f", engine_filtered[0],engine_filtered[1],engine_filtered[2],engine_filtered[3]);
+//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.4f, %0.4f, %0.4f, %0.4f\n", q0, q1, q2, q3);
 //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"new are %0.2f, %0.2f, %0.2f, %0.2f", engine_filtered_new[0],engine_filtered_new[1],engine_filtered_new[2],engine_filtered_new[3]);        
 //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f", pitch, roll, yaw);
-//if ((large_counter % 1000) == 0) printf("%0.1f\n", lidar_fresh_data.altitude); // баро высота в cm
+//if ((large_counter % 200) == 0) printf("%0.4f\n", altitude_setpoint/100.0); // баро высота в cm
 
 //получаем свежие данные из очереди от пульта управления. Если данные успешно получены - информируем задачу моргания полетными огнями что моргаем в штатном режиме (режим "1")
     
@@ -1164,7 +1191,8 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
             rc_fresh_data.received_pitch = 0;
             rc_fresh_data.received_roll = 0;
             rc_fresh_data.received_yaw = 0;
-            rc_fresh_data.altitude_hold_flag = 0;     //выходим из режима удержания высоты если был включен
+            rc_fresh_data.lidar_altitude_hold_flag = 0;     //выходим из режима удержания высоты по лидару если был включен
+            rc_fresh_data.baro_altitude_hold_flag = 0;     //выходим из режима удержания высоты по барометру если был включен
           }
 //и оповещаем задачу моргания полетными огнями моргать в аварийном режиме (режим "0")
           xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
@@ -1183,7 +1211,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
         {
           new_lidar_data_arrived_flag = 1;
           ESP_LOGD(TAG_FLY,"высота %0.3f", lidar_fresh_data.altitude); // высота в cm
-          if (lidar_fresh_data.altitude < 900) lidar_altitude_corrected = lidar_fresh_data.altitude * cos(pitch * 0.017453292) * cos(roll * 0.017453292);// M_PI/180
+          if (lidar_fresh_data.altitude < 1200) lidar_altitude_corrected = lidar_fresh_data.altitude * cos(pitch * 0.017453292) * cos(roll * 0.017453292);// M_PI/180
         }
 #endif
 
@@ -1196,9 +1224,10 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
         {
           if (large_counter > 8000)   
           {
+            new_baro_data_arrived_flag = 1;
             Kalman_2d_update(baro_altitude_cm, &Kalm_vert);
             if (Kalm_vert.h < 0) Kalm_vert.h = 0;
-            //printf("%0.2f, %0.2f\n", baro_altitude_cm / 100.0, Kalm_vert.h); // баро высота в cm
+            //printf("%d, %d\n", (uint16_t)Kalm_vert.h, (uint16_t)lidar_altitude_corrected);
             //printf("%0.2f, %0.2f\n", accel_z_ave_rotated_filtered, Kalm_vert.v); // баро высота в cm
           }
         }
@@ -1215,43 +1244,83 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
         if (rc_fresh_data.engines_start_flag)
         {
           throttle = rc_fresh_data.received_throttle; //если двигатели запущены устанавливаем уровень газа в соответствие с полученным от пульта
-                 
-#ifdef USING_TFMINIS_I2C 
-        if ((rc_fresh_data.altitude_hold_flag) && (lidar_fresh_data.altitude < 900)) 
+//если используем лидар то начинаем танцы с бубном чтобы можно было использовать режим удержания высоты, замещая уровень газа от пульта автоматическим                
+        if (rc_fresh_data.lidar_altitude_hold_flag || rc_fresh_data.baro_altitude_hold_flag)
           {
-            if (altitude_hold_mode_enabled == 0)                                      //если только включили режим, первый раз в цикл вошли
-            {
-              altitude_hold_mode_enabled = 1;
-              altitude_setpoint = lidar_altitude_corrected;                          //запоминаем высоту                          
-              alt_hold_initial_throttle = rc_fresh_data.received_throttle;            //запоминаем уровень газа (должен быть около висения)
-            }
-            if (new_lidar_data_arrived_flag)                                          //если есть свежие данные от лидара            
-            {                                                                         //то считаем уровень газа             
-              new_lidar_data_arrived_flag = 0;
-//если газ вверху то увеличиваем установку высоты, если внизу - уменьшаем с с линейной зависимостью от положения ручки газа  
-              if (rc_fresh_data.raw_throttle > 2648) altitude_setpoint += 0.000556 * rc_fresh_data.raw_throttle - 1.5289; 
-              if (rc_fresh_data.raw_throttle < 1448) altitude_setpoint += 0.000556 * rc_fresh_data.raw_throttle - 0.75;
+#ifdef USING_MS5611
+//если находимся в режиме удержания высоты по барометру            
+              if (rc_fresh_data.baro_altitude_hold_flag)
+              {
+//если только включили режим, первый раз в цикл вошли
+                if (baro_altitude_hold_mode_enabled == 0)                                      
+                {
+//зафиксировали что режим включен
+                  baro_altitude_hold_mode_enabled = 1;
+//запоминаем высоту 
+                  altitude_setpoint = Kalm_vert.h;
+//запоминаем уровень газа (должен быть около висения в момент когда активируем режим удержания) 
+                  alt_hold_initial_throttle = rc_fresh_data.received_throttle; 
+                }
+//если есть свежие данные от барометра при включенном режиме работы по барометру то считаем уровень газа
+                if (new_baro_data_arrived_flag)                                                     
+                {                                                                            
+                  new_baro_data_arrived_flag = 0;
+                  pid_altitude = PID_Compute(&baro_alt_hold_pid, altitude_setpoint, Kalm_vert.h, 0);
+                }
+              }
+#endif 
+
+#ifdef USING_TFMINIS_I2C                 
+//если находимся в режиме удержания высоты по лидару           
+              if (rc_fresh_data.lidar_altitude_hold_flag)
+              {
+//если только включили режим, первый раз в цикл вошли
+                if (lidar_altitude_hold_mode_enabled == 0)                                      
+                {
+//зафиксировали что режим включен
+                  lidar_altitude_hold_mode_enabled = 1;
+//запоминаем высоту 
+                  altitude_setpoint = lidar_altitude_corrected;
+//запоминаем уровень газа (должен быть около висения в момент когда активируем режим удержания) 
+                  alt_hold_initial_throttle = rc_fresh_data.received_throttle; 
+                }
+//если есть свежие данные от лидара при включенном режиме работы по лидару то считаем уровень газа
+                if (new_lidar_data_arrived_flag)                                                     
+                {                                                                            
+                  new_lidar_data_arrived_flag = 0;
+                  pid_altitude = PID_Compute(&lidar_alt_hold_pid, altitude_setpoint, lidar_altitude_corrected, 0);
+                }
+              }
+#endif   
+//корректируем установку высоты (в эту точку попадаем каждый цикл 1мс) без привязки к приходу новых данных от датчиков
+//если газ вверху то увеличиваем установку высоты, если внизу - уменьшаем с с линейной зависимостью от положения ручки газа
+//коэффициенты выбраны исходя из того, что макс скорость изменения высоты = 50см/сек, то есть 0,05см за 1мс
+              if (rc_fresh_data.raw_throttle > 2648) altitude_setpoint += 0.0000345 * rc_fresh_data.raw_throttle - 0.091; 
+              if (rc_fresh_data.raw_throttle < 1448) altitude_setpoint += 0.0000345 * rc_fresh_data.raw_throttle - 0.05;
 //задаем пределы установки высоты (цифры в сантиметрах)
-              if (altitude_setpoint >= 800) altitude_setpoint = 800;
+              if (altitude_setpoint >= 2000) altitude_setpoint = 2000;
               if (altitude_setpoint <= 5) altitude_setpoint = 5;
 
-              pid_altitude = PID_Compute(&alt_hold_pid, altitude_setpoint, lidar_altitude_corrected, 0);
+//заменяем значение throttle от пульта вычисленным при помощи регулятора
+            throttle = alt_hold_initial_throttle + pid_altitude;             
             }
-            throttle = alt_hold_initial_throttle + pid_altitude;    //заменяем значение throttle от пульта вычисленным при помощи регулятора
-          }
+  
+//если режим удержания высоты выключаем (или он постоянно выключен) то обнуляем интегральные составляющие ПИД регуляторов и флаги, чтобы они не выстрелили при следующем запуске
         else 
           {
-            altitude_hold_mode_enabled = 0; 
-            alt_hold_pid.prev_error = 0;
-            alt_hold_pid.integral_error = 0;
+            lidar_altitude_hold_mode_enabled = 0; 
+            lidar_alt_hold_pid.prev_error = 0;
+            lidar_alt_hold_pid.integral_error = 0;
+            baro_altitude_hold_mode_enabled = 0;
+            baro_alt_hold_pid.prev_error = 0;
+            baro_alt_hold_pid.integral_error = 0;
             altitude_setpoint = 0;
           }
-#endif  
 
 //на основании всех полученных выше данных считаем двухконтурным ПИД-регулятором управляющие воздействия на двигатели по углам
         calculate_pids_2();
         }
-//если от пульта команда что двигатели выключены - сбрасываем интегральные составляющие ПИД
+//если от пульта команда что двигатели выключены - сбрасываем интегральные составляющие ПИД, глушим моторы и выключаем режимы удержания
         else 
         {
           yaw_setpoint = yaw;
@@ -1261,7 +1330,8 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
           pitch_pid_rate.prev_error = roll_pid_rate.prev_error = yaw_pid_rate.prev_error = 0;
           integral_yaw_error_angle = error_yaw_angle_old = 0;
           engine[0] = engine[1] = engine[2] = engine[3] = ENGINE_PWM_MIN_DUTY;
-          altitude_hold_mode_enabled = 0;
+          lidar_altitude_hold_mode_enabled = 0;
+          baro_altitude_hold_mode_enabled = 0;
         }
 //фильтруем вычисленные ПИД регулятором данные        
         ESC_input_data_filter();

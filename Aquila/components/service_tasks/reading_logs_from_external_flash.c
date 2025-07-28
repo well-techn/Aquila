@@ -76,8 +76,7 @@ void reading_logs_from_external_flash(void *pvParameters)
           next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->roll_command);
           next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->yaw_command);
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->mode_command);
-          for (i = 0; i < 4; i++)
-            next += sprintf(message_to_print + next, "%ld|", p_to_set_to_log->engines[i]);
+          for (i = 0; i < 4; i++) next += sprintf(message_to_print + next, "%ld|", p_to_set_to_log->engines[i]);
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->flags);
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->rssi_level);
           next += sprintf(message_to_print + next, "*\r\n"); // конец строки

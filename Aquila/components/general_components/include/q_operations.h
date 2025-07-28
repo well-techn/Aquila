@@ -10,5 +10,6 @@ void quat_from_angle_and_axis(float angle, float* axis, float* q);
 void angle_and_axis_from_quat(float* q, float* angle, float* axis);
 void calculate_desired_quat_from_angles_and_yaw_rate(float pitch, float roll, float yaw_rate_degrees, float time, float* q_desired);
 void calculate_desired_quat_from_3_angles(float pitch, float roll, float yaw, float* q_desired);
+void Convert_Q_to_degrees(float q0, float q1, float q2, float q3, float* pitch, float* roll, float* yaw);
 
 #endif

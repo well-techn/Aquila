@@ -42,6 +42,7 @@
 #include "main_flying_cycle.h"
 #include "configuration_mode.h"
 #include "configuration_mode_telnet.h"
+#include "px4flow.h"
 
 const char *TAG_INIT = "INIT";
 const char *TAG_FLY = "FLY";
@@ -59,6 +60,7 @@ const char *TAG_IST8310 = "IST8310";
 const char *TAG_FL3195 = "RGB_LED";
 const char *TAG_MS5611 = "MS5611";
 const char *TAG_MAV = "MAV";
+const char *TAG_PX4FLOW = "PX4FLOW";
 
 
 //spi handles
@@ -299,8 +301,29 @@ void init(void * pvParameters)
   SPI_init();
   ESP_LOGI(TAG_INIT,"Оба SPI настроены\n");
 
-  ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
+#ifdef USING_PX4FLOW
+  px4flow_i2c_frame_t px4flow_frame;
+  px4flow_i2c_integral_frame_t px4flow_int_frame;
+  ESP_LOGI(TAG_PX4FLOW,"Проверка связи с PX4FLOW.....");
+  if (px4flow_communication_check() != ESP_OK) {
+    error_code = 3;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
 
+  while(1)
+  {
+    px4flow_read_frame(&px4flow_frame);
+    printf("REG: count %d, qual %d\n", px4flow_frame.frame_count, px4flow_frame.quality);
+    vTaskDelay(100/portTICK_PERIOD_MS);
+
+    px4flow_read_integral_frame(&px4flow_int_frame);
+    printf("INT: gyro temp %d, qual %d\n\n", px4flow_int_frame.gyro_temperature, px4flow_int_frame.quality);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+  }
+#endif
+
+  ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
   if (MCP23017_communication_check() != ESP_OK) {
     error_code = 3;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);

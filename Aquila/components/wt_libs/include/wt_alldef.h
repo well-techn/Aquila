@@ -3,18 +3,19 @@
 
 #include <inttypes.h>
 
-#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
 //#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
 //#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
 //#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
-#define USING_MS5611
+//#define USING_MS5611
 #define BATTERY_COMPENSATION
 //#define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI
 //#define MEMORY_CONSUMPTION_MESUREMENT
 #define TELNET_CONF_MODE
+//#define USING_PX4FLOW
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -43,6 +44,7 @@
 #define I2C_MCP23017_FREQ_HZ              (400000)
 #define I2C_INA219_FREQ_HZ                (400000)
 #define I2C_TFMINIS_FREQ_HZ               (400000)
+#define I2C_PX4FLOW_FREQ_HZ               (100000)
 #define I2C_INT_MASTER_TX_BUF_DISABLE     (0)                       //параметры для инициализации интерфейса                           
 #define I2C_INT_MASTER_RX_BUF_DISABLE     (0)                                           
 #define ACK_CHECK_EN                      (0x01)                       
@@ -90,7 +92,8 @@ struct data_from_rc_to_main_struct {
     uint8_t trim_pitch;                                                       //значение trim по pitch 
     uint8_t trim_roll;                                                        //значение trim по roll
     uint8_t engines_start_flag;                                               //флаг запуска двигателей
-    uint8_t altitude_hold_flag;                                               //флаг удержания высоты
+    uint8_t lidar_altitude_hold_flag;                                         //флаг удержания высоты по лидару
+    uint8_t baro_altitude_hold_flag;                                          //флаг удержания высоты по барометру
     int8_t rssi_level;
   };
 
@@ -236,7 +239,7 @@ struct logging_data_set {
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
 #define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
 #define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по метолу magnetto 
-#define NUMBER_OF_ACC_INPUTS                    (50)                           //кол-во векторов для расчета калибровки акселерометра по метолу magnetto 
+#define NUMBER_OF_ACC_INPUTS                    (50)                            //кол-во векторов для расчета калибровки акселерометра по метолу magnetto 
 
 //GPIO
 #define A0                                            (4)
@@ -281,8 +284,26 @@ struct logging_data_set {
 #define BATTERY_CAPACITY                              (2200) //мА*ч
 #define VERT_ACC_FILTER_F_CUT                         (8.0)  
 
-#define ACCEL_SIGMA2                                  (5)//10
-#define BARO_SIGMA2                                   (1)
+//параметры для фильтра Калмана по высоте
+#define ACCEL_SIGMA2                                  (1000)//10
+#define BARO_SIGMA2                                   (20)
+#define VERT_ALT_FILTER_F_CUT                         (4.0)
+
+//структура, хранящее текущее состояние системы
+typedef struct system_state {                             
+  float acc_local[3];
+  float gyro_local[3];
+  float q[4];
+  float acc_ned[3];
+  float velocity_ned[3];
+  float position_ned[3];
+  float pitch;
+  float roll;
+  float yaw;
+  float lidar_h_cm;
+  float baro_h_cm;
+  float altitude;
+} system_state_t;
 
 
 #endif

@@ -24,7 +24,7 @@ void writing_logs_to_flash(void * pvParameters)
       //for (int i = 0; i<sizeof(struct logging_data_set);i++) printf("%d",buffer[i]);
       W25N_random_program_data_load(column_address, (uint8_t*)buffer, sizeof(struct logging_data_set));   //загружаем пакет данных в буфер начиная с column_address
       column_address = column_address + sizeof(struct logging_data_set);                        //увеличиваем colunm_address на размер пакета данных 
-      if (column_address >= (2048-sizeof(struct logging_data_set)))   //проверяем что в буфер (на эту страницу) еще что-то влезет [79 байт за 1мс, 25 пакетов на странице, 79*25 = 1975]
+      if (column_address >= (2048-sizeof(struct logging_data_set)))   //проверяем что в буфер (на эту страницу) еще что-то влезет
       {                             //если буфер заполнен - записываем страницу и инкрементируем адрес страницы
         column_address = 0;
         W25N_program_execute(page_address);       //65536 pages, итого на 26 минут макс

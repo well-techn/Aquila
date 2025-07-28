@@ -28,6 +28,7 @@
 #define BUFFER_SIZE 128
 
 static const char *TAG = "WiFi";
+extern TaskHandle_t task_handle_init;
 
 const char *welcome_messages[] =
     {
@@ -40,7 +41,7 @@ const char *welcome_messages[] =
         "4 -> калибровка ESC (пока не готово)\r\n",
         "5 -> продвинутая калибровка акселерометра (по magnetto)\r\n",
         "6 -> продвинутая калибровка магнетометра (по magnetto)\r\n",
-        "7 -> продолжить загрузку в обычном режиме\r\n",
+        "7 -> продолжить загрузку в обычном режиме (не использовать)\r\n",
         "ESC -> перезапуск\r\n\n",
         NULL};
 
@@ -49,6 +50,7 @@ char r_2[] = "2 - Запускаем простую калибровку гир�
 char r_3[] = "3 - Запускаем тестирование двигателей через 10 секунд, убедитесь в безопасности операции. ESC для прерывания\r\n";
 char r_5[] = "5 - Запускаем продвинутую калибровку акселерометра (по magnetto)\r\n";
 char r_6[] = "6 - Запускаем продвинутую калибровку магнетометра (по magnetto)\r\n";
+char r_7[] = "7 - Выключаем WiFi и продолжаем обычную загрузку\r\n";
 char n_1[] = "Неизвестное меню, повторите ввод\r\n";
 char esc[] = "ESC - перезапускаемся\n\n";
 
@@ -188,8 +190,17 @@ void configuration_mode_telnet(void *arg)
                     send(client_fd, r_6, sizeof(r_6), 0);
                     xTaskCreate(advanced_acc_calibration,"advanced_mag_calibration",16384,(void *)&client_fd,0,NULL);    
                     break;
+                 
+                case '7':
+                    send(client_fd, r_7, sizeof(r_7), 0);
+                    ESP_ERROR_CHECK(esp_wifi_stop());
+                    ESP_ERROR_CHECK(esp_wifi_deinit());
+                    //ESP_ERROR_CHECK(esp_netif_deinit());
+                    vTaskDelete(NULL);
+                    vTaskResume(task_handle_init);
+                    break;
 
-                case 0x1B:
+                case 0x1B:  //ESC
                     send(client_fd, esc, sizeof(esc), 0);
                     vTaskDelay(200/portTICK_PERIOD_MS);
                     esp_restart();

@@ -31,5 +31,7 @@ void Kalman_2d_predict(float acceleration, KalmanFilter2d_t* this);
 void Kalman_2d_update(float baro_height, KalmanFilter2d_t* this);
 void Butterworth_init(float f_sampling, float f_cut, Butterworth_t* this);
 float Butterworth_filter(float input, Butterworth_t* state); 
+uint8_t arrays_are_equal (uint8_t* array_1, uint8_t* array_2, uint8_t length);
+uint8_t all_array_elements_are_equal(uint8_t* array, uint8_t length);
 
 #endif
