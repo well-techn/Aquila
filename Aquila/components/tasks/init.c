@@ -43,6 +43,8 @@
 #include "configuration_mode.h"
 #include "configuration_mode_telnet.h"
 #include "px4flow.h"
+#include "px4flow_read_and_process_data.h"
+#include "emergency_mode.h"
 
 const char *TAG_INIT = "INIT";
 const char *TAG_FLY = "FLY";
@@ -62,7 +64,6 @@ const char *TAG_MS5611 = "MS5611";
 const char *TAG_MAV = "MAV";
 const char *TAG_PX4FLOW = "PX4FLOW";
 
-
 //spi handles
 extern spi_device_handle_t W25N01;
 extern spi_device_handle_t MPU6000_1;
@@ -75,16 +76,10 @@ extern i2c_master_dev_handle_t IST8310_dev_handle;
 extern i2c_master_dev_handle_t TFSMINI_dev_handle;
 
 //семафоры
+SemaphoreHandle_t semaphore_for_i2c_internal;
 SemaphoreHandle_t semaphore_for_i2c_external;
 static StaticSemaphore_t semaphore_for_i2c_external_buffer;
-SemaphoreHandle_t semaphore_for_i2c_internal;
 static StaticSemaphore_t semaphore_for_i2c_internal_buffer;
-
-//таймеры
- gptimer_handle_t GP_timer;
- gptimer_handle_t general_suspension_timer;
- gptimer_handle_t IMU_1_suspension_timer;
- gptimer_handle_t IMU_2_suspension_timer;
 
 //очереди
 QueueHandle_t gps_queue_for_events = NULL; //очередь для передачи событий от UART с подключенным GPS (pattern detection) в задачу обработки данных GPS
@@ -102,6 +97,7 @@ QueueHandle_t INA219_to_main_queue = NULL; //очередь для переда�
 QueueHandle_t mav_queue_for_events = NULL; //очередь для обработки событий для UART Mavlink
 QueueHandle_t main_to_mavlink_queue = NULL; //очередь для передачи данных из main в mavlink
 QueueHandle_t MS5611_to_main_queue = NULL; //очередь для передачи данных из задачи считывания MS5611 в main
+QueueHandle_t px4flow_to_main_queue = NULL;//очередь для передачи данных из задачи считывания px4flow в main
 
 //параметры выделения памяти для статического размещения задач
 StaticTask_t MCP23017_monitoring_and_control_TCB_buffer;
@@ -146,6 +142,12 @@ StackType_t mavlink_telemetry_stack[MAVLINK_TELEMETRY_STACK_SIZE];
 StaticTask_t MS5611_read_and_process_data_TCB_buffer;
 StackType_t MS5611_read_and_process_data_stack[MS5611_READ_AND_PROCESS_DATA_STACK_SIZE];
 
+StaticTask_t px4flow_read_and_process_data_TCB_buffer;
+StackType_t px4flow_read_and_process_data_stack[PX4FLOW_READ_AND_PROCESS_DATA_STACK_SIZE];
+
+StaticTask_t emergency_mode_TCB_buffer;
+StackType_t emergency_mode_stack[EMERGENCY_MODE_STACK_SIZE];
+
 //задачи
 TaskHandle_t task_handle_blinking_flight_lights;
 TaskHandle_t task_handle_main_flying_cycle;
@@ -160,6 +162,8 @@ TaskHandle_t task_handle_writing_logs_to_flash;
 TaskHandle_t task_handle_mavlink_telemetry;
 TaskHandle_t task_handle_lidar_read_and_process_data;
 TaskHandle_t task_handle_MS5611_read_and_process_data;
+TaskHandle_t task_handle_px4flow_read_and_process_data;
+TaskHandle_t task_handle_emergency_mode;
 
 static void configure_IOs()
 {
@@ -237,19 +241,6 @@ static void configuring_channel_for_PWM(uint8_t channel, uint8_t pin)   // по�
   ESP_ERROR_CHECK(ledc_channel_config(&engine_pwm_channel));
 }
 
-//создание таймера, отсчитывающего временые промежутки для фильтра Маджвика
-static void Create_and_start_GP_Timer()                    
-{
-  gptimer_config_t timer_config = {
-      .clk_src = GPTIMER_CLK_SRC_DEFAULT,
-      .direction = GPTIMER_COUNT_UP,
-      .resolution_hz = 10 * 1000 * 1000, // 10MHz, 1 tick = 0,1us
-  };
-  ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &GP_timer));
-  ESP_ERROR_CHECK(gptimer_enable(GP_timer));
-  ESP_ERROR_CHECK(gptimer_start(GP_timer));
-}
-
 //непосредственно задача первичной инициализации.
 //Проверяет связь со всеми компонентами, производит их настройку. При необходимости калибрует ESC, запускает задачу считывания логов. 
 //если все прошло гладко - создает основные рабочие задачи. Если где-то ошибка - запускается задача аварийного моргания светодиодами для визуальной индикации ошибки.
@@ -267,13 +258,13 @@ void init(void * pvParameters)
   esp_log_level_set(TAG_W25N,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_MPU6000,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_PCA9685,ESP_LOG_INFO);  //WARN ERROR
-  esp_log_level_set(TAG_MCP23017,ESP_LOG_INFO);  //WARN ERROR
+  esp_log_level_set(TAG_MCP23017,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_LIDAR,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FL3195,ESP_LOG_WARN); 
   esp_log_level_set(TAG_MAV,ESP_LOG_INFO);
-  esp_log_level_set(TAG_MS5611,ESP_LOG_INFO);  
+  esp_log_level_set(TAG_MS5611,ESP_LOG_INFO);
 
   #ifdef TELNET_CONF_MODE
   esp_log_level_set("wifi",ESP_LOG_WARN);
@@ -284,7 +275,7 @@ void init(void * pvParameters)
 
   printf("\n");
   ESP_LOGI(TAG_INIT,"Старт системы\n");
-
+  
   ESP_LOGI(TAG_INIT,"Конфигурирование пинов входов - выходов.....");
   configure_IOs();
   ESP_LOGI(TAG_INIT,"Входы - выходы настроены\n");
@@ -300,28 +291,6 @@ void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Настраиваем оба SPI.....");
   SPI_init();
   ESP_LOGI(TAG_INIT,"Оба SPI настроены\n");
-
-#ifdef USING_PX4FLOW
-  px4flow_i2c_frame_t px4flow_frame;
-  px4flow_i2c_integral_frame_t px4flow_int_frame;
-  ESP_LOGI(TAG_PX4FLOW,"Проверка связи с PX4FLOW.....");
-  if (px4flow_communication_check() != ESP_OK) {
-    error_code = 3;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-
-  while(1)
-  {
-    px4flow_read_frame(&px4flow_frame);
-    printf("REG: count %d, qual %d\n", px4flow_frame.frame_count, px4flow_frame.quality);
-    vTaskDelay(100/portTICK_PERIOD_MS);
-
-    px4flow_read_integral_frame(&px4flow_int_frame);
-    printf("INT: gyro temp %d, qual %d\n\n", px4flow_int_frame.gyro_temperature, px4flow_int_frame.quality);
-    vTaskDelay(1000/portTICK_PERIOD_MS);
-  }
-#endif
 
   ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
   if (MCP23017_communication_check() != ESP_OK) {
@@ -440,33 +409,33 @@ void init(void * pvParameters)
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
-#ifdef USING_FL3195
-  ESP_LOGI(TAG_INIT,"Проверка связи с FL3195.....");
-  if (FL3195_communication_check() != ESP_OK) {
-    error_code = 9;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-
-  ESP_LOGI(TAG_INIT,"Настройка FL3195.....");
-  if (FL3195_configuration() != ESP_OK) {
-    error_code = 10;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-#endif
-
 #ifdef USING_MS5611
   ESP_LOGI(TAG_MS5611,"Проверка связи с MS5611.....");
   if (MS5611_communication_check() != ESP_OK) {
-    error_code = 3;
+    error_code = 9;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_MS5611,"Сброс MS5611.....");
   if (MS5611_I2C_reset() != ESP_OK) {
-    error_code = 3;
+    error_code = 10;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+#endif
+
+#ifdef USING_FL3195
+  ESP_LOGI(TAG_INIT,"Проверка связи с FL3195.....");
+  if (FL3195_communication_check() != ESP_OK) {
+    error_code = 11;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  ESP_LOGI(TAG_INIT,"Настройка FL3195.....");
+  if (FL3195_configuration() != ESP_OK) {
+    error_code = 12;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -476,59 +445,54 @@ void init(void * pvParameters)
 #ifdef USING_MAGNETOMETER
   ESP_LOGI(TAG_INIT,"Проверка связи с IST8310.....");
   if (IST8310_communication_check() != ESP_OK) {
-    error_code = 11;
+    error_code = 13;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Настройка IST8310.....");
     if (IST8310_configuration() != ESP_OK) {
-    error_code = 12;
+    error_code = 14;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
   ESP_LOGI(TAG_INIT,"Производим тест IST8310.....");
   if (IST8310_selftest() != ESP_OK) {
-    error_code = 13;
+    error_code = 15;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 #endif
 
-#ifdef USING_TFMINIS_I2C
-ESP_LOGI(TAG_INIT,"Проверка связи с Tfmini-S (по i2c).....");
-if (tfminis_communication_check() != ESP_OK) {
-  error_code = 9;
-  xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-  while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-}
-#endif
-/*
-  ESP_LOGI(TAG_INIT,"Настраиваем оба SPI.....");
-  SPI_init();
-  ESP_LOGI(TAG_INIT,"Оба SPI настроены\n");
-*/
   ESP_LOGI(TAG_INIT,"Проверка связи с MPU#1.....");
   if (MPU6000_communication_check(MPU6000_1) != ESP_OK) {
-    error_code = 14;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}  }
-  
-  ESP_LOGI(TAG_INIT,"Проверка связи с MPU#2.....");
-  if (MPU6000_communication_check(MPU6000_2) != ESP_OK) {
     error_code = 16;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-/*  
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}  }
+/*
   ESP_LOGI(TAG_INIT,"Performing self-test of MPU#1.....");
   if (MPU6000_self_test(MPU6000_1) != ESP_OK) {
     error_code = 4;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   } 
+*/
+  ESP_LOGI(TAG_INIT,"Настройка MPU#1.....");
+  if (MPU6000_init(MPU6000_1) != ESP_OK) {
+    error_code = 17;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+  
+  ESP_LOGI(TAG_INIT,"Проверка связи с MPU#2.....");
+  if (MPU6000_communication_check(MPU6000_2) != ESP_OK) {
+    error_code = 18;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
 
+  /*  
   ESP_LOGI(TAG_INIT,"Performing self-test of MPU#2.....");
   if (MPU6000_self_test(MPU6000_2) != ESP_OK) {
     error_code = 5;
@@ -536,16 +500,9 @@ if (tfminis_communication_check() != ESP_OK) {
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   } 
 */
-  ESP_LOGI(TAG_INIT,"Настройка MPU#1.....");
-  if (MPU6000_init(MPU6000_1) != ESP_OK) {
-    error_code = 15;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-
   ESP_LOGI(TAG_INIT,"Настройка MPU#2.....");
   if (MPU6000_init(MPU6000_2) != ESP_OK) {
-    error_code = 17;
+    error_code = 19;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -560,7 +517,7 @@ if (tfminis_communication_check() != ESP_OK) {
   
   ESP_LOGI(TAG_INIT,"Считываем JEDEC ID.....");
   if (W25N_read_JEDEC_ID() != ESP_OK) {
-    error_code = 18;
+    error_code = 20;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
@@ -570,7 +527,39 @@ if (tfminis_communication_check() != ESP_OK) {
   W25N_write_status_register(W25N_CONFIG_REG_SR2, 0b00011000); //оставляем ECC включенным и Buffer Read Mode (постепенное считывание)
 
   ESP_LOGI(TAG_INIT,"Удаляем данные с W25N.....");
-  W25N_erase_all_new();
+  W25N_erase_all();
+//помещено сюда потому что не успевает загружаться
+#ifdef USING_TFMINIS_I2C
+vTaskDelay(100/portTICK_PERIOD_MS);
+ESP_LOGI(TAG_INIT,"Проверка связи с Tfmini-S (по i2c).....");
+if (tfminis_communication_check() != ESP_OK) {
+  error_code = 21;
+  xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+  while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+}
+#endif
+
+#ifdef USING_PX4FLOW
+  ESP_LOGI(TAG_INIT,"Проверка связи с PX4FLOW.....");
+  vTaskDelay(5000/portTICK_PERIOD_MS);
+  if (px4flow_communication_check() != ESP_OK) {
+    error_code = 22;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+/*
+  while(1)
+  {
+    px4flow_read_frame(&px4flow_frame);
+    px4flow_read_integral_frame(&px4flow_int_frame);
+    
+    printf("%d, %d, %d\n", px4flow_frame.pixel_flow_x_sum, px4flow_frame.pixel_flow_y_sum, px4flow_frame.frame_count);
+    printf("%d, %d, %d, %ld\n\n", px4flow_int_frame.pixel_flow_x_integral, px4flow_int_frame.pixel_flow_y_integral, px4flow_int_frame.frame_count_since_last_readout, px4flow_int_frame.integration_timespan);
+    
+    vTaskDelay(100/portTICK_PERIOD_MS);
+  }
+*/  
+#endif
   
   W25N01_queue = xQueueCreate(5, sizeof(struct logging_data_set *));
   if (W25N01_queue == NULL) {
@@ -629,7 +618,7 @@ if (tfminis_communication_check() != ESP_OK) {
   xSemaphoreGive(semaphore_for_i2c_internal);   //The semaphore is created in the 'empty' state, meaning the semaphore must first be given
 
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от пульта управления в main_flying_cycle.....");
-  remote_control_to_main_queue = xQueueCreate(10, sizeof(struct data_from_rc_to_main_struct));
+  remote_control_to_main_queue = xQueueCreate(10, sizeof(data_from_rc_to_main_struct));
   if (remote_control_to_main_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи данных от пульта управления в main_flying_cycle не создана\n");
     error_code = 1;
@@ -649,7 +638,7 @@ if (tfminis_communication_check() != ESP_OK) {
     else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от GPS в main_flying_cycle успешно создана.....\n");
      
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи телеметрии из main_flying_cycle на пульт управления");
-  main_to_rc_queue = xQueueCreate(1, sizeof(struct data_from_main_to_rc_struct));     //size 1 because use xQueueOverwrite
+  main_to_rc_queue = xQueueCreate(1, sizeof(data_from_main_to_rc_struct));     //size 1 because use xQueueOverwrite
   if (main_to_rc_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи телеметрии из main_flying_cycle на пульт управления не создана\n");
     error_code = 1;
@@ -660,7 +649,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_TFMINIS_I2C 
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от лидара в main_flying_cycle.....");
-  lidar_to_main_queue = xQueueCreate(10, sizeof(struct data_from_lidar_to_main_struct));
+  lidar_to_main_queue = xQueueCreate(10, sizeof(data_from_lidar_to_main_struct));
   if ( lidar_to_main_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи данных от лидара в main_flying_cycle не создана\n");
     error_code = 1;
@@ -704,9 +693,17 @@ if (tfminis_communication_check() != ESP_OK) {
     else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от MS5611 в main_flying_cycle успешно создана\n"); 
 #endif
 
-  ESP_LOGI(TAG_INIT,"Создаем и запускаем GP timer.....");
-  Create_and_start_GP_Timer ();
-  ESP_LOGI(TAG_INIT,"GP timer создан и запущен\n");
+#ifdef USING_PX4FLOW
+  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от PX4Flow в main_flying_cycle.....");
+  px4flow_to_main_queue = xQueueCreate(5, sizeof(data_from_px4flow_to_main_struct_t));
+  if (px4flow_to_main_queue == NULL) {
+    ESP_LOGE(TAG_INIT,"Очередь для передачи данных от PX4Flow в main_flying_cycle не создана\n");
+    error_code = 1;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от PX4Flow в main_flying_cycle успешно создана\n"); 
+#endif
 
 //*************************************************** НАЧИНАЕМ СОЗДАВАТЬ ЗАДАЧИ ****************************************************************************************************** */
 
@@ -774,7 +771,7 @@ if (tfminis_communication_check() != ESP_OK) {
   }
 
   vTaskDelay(50/portTICK_PERIOD_MS);
-
+/*
   ESP_LOGI(TAG_INIT,"Создаем задачу для отправки телеметрии на пульт управления.....");
   task_handle_send_data_to_RC = xTaskCreateStaticPinnedToCore(send_data_to_RC,"send_data_to_RC",SEND_DATA_TO_RC_STACK_SIZE ,NULL,SEND_DATA_TO_RC_PRIORITY,send_data_to_RC_stack,&send_data_to_RC_TCB_buffer,0);
   if (task_handle_send_data_to_RC != NULL)
@@ -785,7 +782,7 @@ if (tfminis_communication_check() != ESP_OK) {
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-
+*/
 #ifdef USING_PERFORMANCE_MESUREMENT
   ESP_LOGI(TAG_INIT,"Создаем задачу контроля загруженности процессора.....");
   task_handle_performace_measurement = xTaskCreateStaticPinnedToCore(performance_monitor,"performance_monitor",8192 ,NULL,PERFORMANCE_MEASUREMENT_PRIORITY,performance_measurement_stack, &performance_measurement_TCB_buffer,0);
@@ -826,22 +823,35 @@ if (tfminis_communication_check() != ESP_OK) {
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
+  
+  vTaskDelay(50/portTICK_PERIOD_MS);
 
-  ESP_LOGI(TAG_INIT,"Создаем задачу моргания полетными огнями (blinking_flight_lights).....");
-  task_handle_blinking_flight_lights = xTaskCreateStaticPinnedToCore(blinking_flight_lights,"blinking_flight_lights",BLINKING_FLIGHT_LIGHTS_STACK_SIZE,NULL,BLINKING_FLIGHT_LIGHTS_PRIORITY,blinking_flight_lights_stack, &blinking_flight_lights_TCB_buffer,0);
-  if ( task_handle_blinking_flight_lights != NULL)
-    ESP_LOGI(TAG_INIT,"Задача моргания полетными огнями успешно создана на ядре 0\n");
-  else {
-    ESP_LOGE(TAG_INIT,"Задача моргания полетными огнями не создана\n");
-    error_code = 2;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
-
-  gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
-  gpio_set_level(RED_FLIGHT_LIGHTS, 1);  
-
-  vTaskDelay(50/portTICK_PERIOD_MS); 
+#ifdef PREFLIGHT_POWER_CHECKUP
+//проверяем напряжение аккумулятора и ток потребления системы
+  ESP_LOGI(TAG_INIT,"Проверяем напряжение аккумулятора и тока потребления системы.....");
+  xTaskNotifyGive(task_handle_INA219_read_and_process_data);
+  float INA219_fresh_data_init[4];
+  if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data_init, portMAX_DELAY))
+    {
+      if ((INA219_fresh_data_init[0] < 9.0) || (INA219_fresh_data_init[0] > 13.0)) 
+      {
+        ESP_LOGE(TAG_INIT,"Ошибка напряжение аккумулятора, текущее напряжение %0.2fВ", INA219_fresh_data_init[0]);
+        uint16_t error_code = 24;
+        xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+        while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
+      }
+      
+      if ((INA219_fresh_data_init[1] < 0.1) || (INA219_fresh_data_init[1] > 1)) 
+      {
+        ESP_LOGE(TAG_INIT,"Ошибка тока потребления, ток %0.2fА", INA219_fresh_data_init[1]);
+        uint16_t error_code = 24;
+        xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+        while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
+      }
+      
+      ESP_LOGI(TAG_INIT,"Проверка напряжения АКБ и тока потребления пройдена, напряжение %0.2fВ, ток %0.2fА\n", INA219_fresh_data_init[0],INA219_fresh_data_init[1]);
+    }
+#endif
 
 #ifdef USING_W25N
   ESP_LOGI(TAG_INIT,"Создаем задачу записи логов во внешнюю flash-память (writing_logs_to_flash).....");
@@ -873,6 +883,34 @@ if (tfminis_communication_check() != ESP_OK) {
   vTaskDelay(50/portTICK_PERIOD_MS);
 #endif
 
+#ifdef USING_PX4FLOW
+  ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных от PX4Flow (px4flow_read_and_process_data).....");
+  task_handle_px4flow_read_and_process_data = xTaskCreateStaticPinnedToCore(px4flow_read_and_process_data,"px4flow_read_and_process_data",PX4FLOW_READ_AND_PROCESS_DATA_STACK_SIZE ,NULL,PX4FLOW_READ_AND_PROCESS_DATA_PRIORITY,px4flow_read_and_process_data_stack,&px4flow_read_and_process_data_TCB_buffer,0);
+  if (task_handle_px4flow_read_and_process_data != NULL)  
+    ESP_LOGI(TAG_INIT,"Задача для получения данных от PX4Flow успешно создана на ядре 0\n");
+  else {
+    ESP_LOGE(TAG_INIT,"Задача для получения данных от PX4Flow не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  vTaskDelay(50/portTICK_PERIOD_MS);
+#endif
+
+  ESP_LOGI(TAG_INIT,"Создаем задачу аварийного режима(emergency_mode).....");
+  task_handle_emergency_mode = xTaskCreateStaticPinnedToCore(emergency_mode,"emergency_mode",EMERGENCY_MODE_STACK_SIZE ,NULL,EMERGENCY_MODE_PRIORITY,emergency_mode_stack,&emergency_mode_TCB_buffer,0);
+  if (task_handle_emergency_mode != NULL)  
+    ESP_LOGI(TAG_INIT,"Задача для аварийного режима успешно создана на ядре 0\n");
+  else {
+    ESP_LOGE(TAG_INIT,"Задача для аварийного режима не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  vTaskDelay(50/portTICK_PERIOD_MS);
+
   ESP_LOGI(TAG_INIT,"Создаем задачу основного полетного цикла (Main_flying_cycle)..... ");
   task_handle_main_flying_cycle = xTaskCreateStaticPinnedToCore(main_flying_cycle, "Main_flying_cycle", MAIN_FLYING_CYCLE_STACK_SIZE, NULL, MAIN_FLYING_CYCLE_PRIORITY, main_flying_cycle_stack,&main_flying_cycle_TCB_buffer,1);
   if (task_handle_main_flying_cycle != NULL)
@@ -884,11 +922,25 @@ if (tfminis_communication_check() != ESP_OK) {
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
+  ESP_LOGI(TAG_INIT,"Создаем задачу моргания полетными огнями (blinking_flight_lights).....");
+  task_handle_blinking_flight_lights = xTaskCreateStaticPinnedToCore(blinking_flight_lights,"blinking_flight_lights",BLINKING_FLIGHT_LIGHTS_STACK_SIZE,NULL,BLINKING_FLIGHT_LIGHTS_PRIORITY,blinking_flight_lights_stack, &blinking_flight_lights_TCB_buffer,0);
+  if ( task_handle_blinking_flight_lights != NULL)
+    ESP_LOGI(TAG_INIT,"Задача моргания полетными огнями успешно создана на ядре 0\n");
+  else {
+    ESP_LOGE(TAG_INIT,"Задача моргания полетными огнями не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
+  gpio_set_level(RED_FLIGHT_LIGHTS, 1);  
+
+  vTaskDelay(50/portTICK_PERIOD_MS); 
+
   #ifdef USING_MAVLINK_TELEMETRY
-//задержка пока загрузится minim_OSD
-  vTaskDelay(3000/portTICK_PERIOD_MS);
   ESP_LOGI(TAG_INIT,"Создаем задачу отправки телеметрии по mavink (send_telemetry_via_mavlink).....");
-  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_mavlink,"send_telemetry_via_mavlink",MAVLINK_TELEMETRY_STACK_SIZE,NULL,MAVLINK_TELEMETRY_PRIORITY,mavlink_telemetry_stack, &mavlink_telemetry_TCB_buffer,0);
+  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_mavlink,"send_telemetry_via_mavlink", MAVLINK_TELEMETRY_STACK_SIZE,NULL,MAVLINK_TELEMETRY_PRIORITY,mavlink_telemetry_stack, &mavlink_telemetry_TCB_buffer,0);
   if (task_handle_mavlink_telemetry != NULL) 
     {
       ESP_LOGI(TAG_INIT,"Задача отправки телеметрии по mavink успешно создана на ядре 0\n");

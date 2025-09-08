@@ -3,19 +3,20 @@
 
 #include <inttypes.h>
 
-//#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
-//#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
+#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
-//#define USING_MS5611
+#define USING_MS5611
 #define BATTERY_COMPENSATION
-//#define USING_MAVLINK_TELEMETRY
+#define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI
 //#define MEMORY_CONSUMPTION_MESUREMENT
 #define TELNET_CONF_MODE
 //#define USING_PX4FLOW
+#define PREFLIGHT_POWER_CHECKUP
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -67,7 +68,7 @@
 #define REMOTE_CONTROL_UART                           (2)                     //номер порта
 #define RC_UART_BAUD_RATE                             (57600)                 //скорость порта для канала связи с пультом 
 #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC            (13)                    //длина пакета данных, отправляемого пультом на дрон
-#define NUMBER_OF_BYTES_TO_SEND_TO_RC                 (15)                    //длина пакета данных, отправляемого дроном на пульт
+#define NUMBER_OF_BYTES_TO_SEND_TO_RC                 (15)                    //длина пакета данных, отправляемого дроном на пульт    4
 #define RC_RX_UART_BUFF_SIZE                          (256)                   //размер буфера (256 это минимальное значение)
 #define RC_TX_UART_BUFF_SIZE                          (256)
 #define RC_UART_TX_PIN                                (2)                     //GPIO для TX 
@@ -76,13 +77,13 @@
 #define RC_UART_CTS_PIN                               (UART_PIN_NO_CHANGE)
 #define RC_UART_PATTERN_DETECTION_QUEUE_SIZE          (10)                    //длина очереди для алгоритма детектирования пэттерна (можно и меньше, с запасом)
 #define RC_MESSAGE_HEADER                             (0x4E)                  //заголовочный байт отправляемых пакетов, используется для кросс-проверки целостности данных
-#define RC_NO_COMM_DELAY_MAIN_CYCLES                  (3000)                  //если в полете дроном не будет получен новый пакет от пульта в течение этого кол-ва циклов - считаем что связь с пультом утеряна и переходим в "автономный режим"
+#define RC_NO_COMM_DELAY_MAIN_CYCLES                  (2000)                  //если в полете дроном не будет получен новый пакет от пульта в течение этого кол-ва циклов - считаем что связь с пультом утеряна и переходим в "автономный режим"
 #define RC_NO_COMM_THROTTLE_HOVER_VALUE               (9500)                  //значение уровня "газа" в автономном режиме            
 
 //структура для передачи данных от задачи обработки данных пульта в main_flying_cycle.
 //данные, полученные от пульта, обрабатываются в соответствующей задаче (RC_read_and_process_data), собираются в эту структуру
 // и отправляются через очередь в main_flying_cycle
-struct data_from_rc_to_main_struct {                                          
+typedef struct {                                          
     float raw_throttle;
     float received_throttle;                                                  //значение газа
     float received_pitch;                                                     //значение pitch
@@ -95,17 +96,17 @@ struct data_from_rc_to_main_struct {
     uint8_t lidar_altitude_hold_flag;                                         //флаг удержания высоты по лидару
     uint8_t baro_altitude_hold_flag;                                          //флаг удержания высоты по барометру
     int8_t rssi_level;
-  };
+  } data_from_rc_to_main_struct;
 
 //структура для передачи данных от main_flying_cycle в задачу отправки телеметрии на пульт.
 //стрктура наполняется данными в main_flying_cycle и отправляется через очередь в задачу отправки телеметрии на пульт (send_data_to_RC)
-struct data_from_main_to_rc_struct {                                          
+typedef struct {                                          
     float pitch;                                                              //текущее значение pitch
     float roll;                                                               //текущее значение roll
     float yaw;                                                                //текущее значение yaw
     uint16_t power_voltage_value;                                             //текущее значение напряжения питания
     uint16_t altitude;                                                        //текущее значение высоты
-  };
+  } data_from_main_to_rc_struct;
 
 #define RC_FILTER_COEFF                         (0.85)                        //коэффициент фильтрации данных с ручки газа remote_control_data.received_throttle = remote_control_data.received_throttle * RC_FILTER_COEFF + rc_throttle_old * (1 - RC_FILTER_COEFF);
 
@@ -121,23 +122,23 @@ struct data_from_main_to_rc_struct {
 #define GPS_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)                          //длина очереди для обнаружения пэттернов
 //структура для передачи данных от задачи обработки GPS в main_flying_cycle
 //заполняется значениями в задаче обработки данных от GPS (gps_read_and_process_data) и отправляется через очередь в main_flying_cycle
-struct data_from_gps_to_main_struct {                             
+typedef struct data_from_gps_to_main_struct {                             
     uint32_t latitude_d;
     uint32_t longtitude_d;
     uint8_t status;
-  };
+  } data_from_gps_to_main_struct_t;
 
 #ifdef USING_TFMINIS_I2C 
-#define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR    (50)  
+  #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR    (50)  
 
 //структура для передачи данных от задачи обработки данных лидара в main_flying_cycle.
 //Заполняется данными в задаче обработке данных лидара (lidar_read_and_process_data) и отправляется через очередь в main_flying_cycle
-  struct data_from_lidar_to_main_struct {                             
+  typedef struct  {                             
       float altitude;                                                   //высота в см
       float vertical_velocity;
       uint16_t strength;                                                //качество сигнала                                                         
       uint8_t valid;                                                    //данные по высоте корректны или могут быть не корректны
-    };
+    } data_from_lidar_to_main_struct;
   #define LIDAR_RATE_HZ                              (25)                       //частота поступления данных с лидара
   #define ALT_PID_DIF_FILTER_LENGTH                  (7)
 #endif
@@ -155,7 +156,7 @@ struct data_from_gps_to_main_struct {
   #define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)                        //длина очереди для обнаружения пэттернов
 
 //Переменные, передаваемые в задачу Mavlink
-typedef struct mavlink_data_set {                             
+typedef struct {                             
   uint32_t latitude;
   uint32_t longtitude;
   float angles[3]; //pitch, roll,yaw
@@ -166,7 +167,20 @@ typedef struct mavlink_data_set {
   uint8_t gps_status;
   uint8_t armed_status;                                                  
 } mavlink_data_set_t;
+#endif
 
+#ifdef USING_PX4FLOW
+  #define NUMBER_OF_BYTES_TO_RECEIVE_FROM_PX4   (50)
+  typedef struct {                             
+    float flow_x_meters;
+    float flow_y_meters;
+    float flow_vx;
+    float flow_vy; 
+    float optical_x;
+    float optical_y;
+    uint8_t quality;                                                       
+  } data_from_px4flow_to_main_struct_t;
+  #define PX4FLOW_F_PIXELS                                (666.667)
 #endif
 
 //GPIO и параметры для модуля ШИМ (LEDC) для управления моторами
@@ -213,9 +227,12 @@ struct logging_data_set {
   uint16_t lidar_altitude_cm;
   //uint16_t lidar_strength;
   uint16_t baro_altitude_cm;
-  uint16_t kalman_altitude_cm;
+  int16_t kalman_altitude_cm;
   int16_t kalman_velocity_cm;
   uint16_t altitude_setpoint_cm;
+  int16_t px4flow_position_x_cm;
+  int16_t px4flow_position_y_cm;
+  uint8_t px4flow_quality;
   uint16_t voltage_mv;
   uint16_t current_ca;    //сантиамперы, чтобы влезло в 2 байта
   float throttle_command;
@@ -235,11 +252,11 @@ struct logging_data_set {
 //если цикл виснет - через это время сработает прерывание и аварийно выключит моторы
 #define SUSPENSION_TIMER_DELAY_SEC              (1)
 //если в течение столько мс не приходит прерывание от IMU считаем его зависшим                             
-#define IMU_SUSPENSION_TIMER_DELAY_MS           (2)                             
+#define IMU_SUSPENSION_TIMER_DELAY_MS           (3)                             
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
 #define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
-#define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по метолу magnetto 
-#define NUMBER_OF_ACC_INPUTS                    (50)                            //кол-во векторов для расчета калибровки акселерометра по метолу magnetto 
+#define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по методу magnetto 
+#define NUMBER_OF_ACC_INPUTS                    (100)                            //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
 
 //GPIO
 #define A0                                            (4)
@@ -263,6 +280,8 @@ struct logging_data_set {
 #define PERFORMANCE_MEASUREMENT_STACK_SIZE            (8192)
 #define MAVLINK_TELEMETRY_STACK_SIZE                  (4096)
 #define MS5611_READ_AND_PROCESS_DATA_STACK_SIZE       (4096)
+#define PX4FLOW_READ_AND_PROCESS_DATA_STACK_SIZE      (4096)
+#define EMERGENCY_MODE_STACK_SIZE                     (4096)
 
 //приоритеты задач
 #define MCP23017_MONITORING_AND_CONTROL_PRIORITY      (1)
@@ -280,12 +299,14 @@ struct logging_data_set {
 #define PERFORMANCE_MEASUREMENT_PRIORITY              (2)
 #define MAVLINK_TELEMETRY_PRIORITY                    (0)
 #define MS5611_READ_AND_PROCESS_DATA_PRIORITY         (2)
+#define PX4FLOW_READ_AND_PROCESS_DATA_PRIORITY        (4)
+#define EMERGENCY_MODE_PRIORITY                       (1)
 
 #define BATTERY_CAPACITY                              (2200) //мА*ч
 #define VERT_ACC_FILTER_F_CUT                         (8.0)  
 
 //параметры для фильтра Калмана по высоте
-#define ACCEL_SIGMA2                                  (1000)//10
+#define ACCEL_SIGMA2                                  (100)//10
 #define BARO_SIGMA2                                   (20)
 #define VERT_ALT_FILTER_F_CUT                         (4.0)
 
@@ -293,6 +314,7 @@ struct logging_data_set {
 typedef struct system_state {                             
   float acc_local[3];
   float gyro_local[3];
+  float velocity_local[3];
   float q[4];
   float acc_ned[3];
   float velocity_ned[3];
@@ -304,6 +326,13 @@ typedef struct system_state {
   float baro_h_cm;
   float altitude;
 } system_state_t;
+
+//структура, которую собирает задача emergency_mode, чтобы отправить по радио на низкой скорости
+typedef struct  {                             
+      uint32_t latitude;
+      uint32_t longtitude;
+      uint8_t voltage_dv;       //вольты * 10                                                                                                                                         //данные по высоте корректны или могут быть не корректны
+    } __attribute__((packed)) data_from_emergency_beacon_to_radio_t;
 
 
 #endif

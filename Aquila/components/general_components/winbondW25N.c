@@ -126,24 +126,6 @@ void W25N_block_erase(uint16_t page_address) {
 
 void W25N_erase_all(void) 
 {
-  uint8_t buf[2];
-  uint16_t page_address = 0;
-
-  while (page_address < 65471) 
-  {
-    W25N_write_enable();
-    buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
-    buf[1] = (uint8_t) page_address;  //LSB
-    SPI_write_bytes (W25N01, 8, W25N_BLOCK_ERASE, 0, 0, 8, buf, 2);
-    vTaskDelay(10/portTICK_PERIOD_MS); //tBE = 2..10ms
-    if (W25N_read_STATUS_register() & 0b00000100) ESP_LOGE(TAG_W25N,"Ошибка стирания на странице %d\n",page_address); //проверяем флаг Erase_fail
-    page_address+=64;
-  }
-  ESP_LOGI(TAG_W25N,"Полная очистка успешно завершена"); 
-}
-
-void W25N_erase_all_new(void) 
-{
   uint8_t buf[4];
   uint16_t page_address = 0;
   uint8_t empty_block_flag = 0;

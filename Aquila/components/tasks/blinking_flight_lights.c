@@ -16,7 +16,7 @@ void blinking_flight_lights(void * pvParameters)
   {
     xTaskNotifyWait(0,0,&blinking_mode,NULL);
   
-    if (blinking_mode == 0)                 //аварийный режим (1 зеленый 1 красный)
+    if (blinking_mode == 0)                 //аварийный режим (вместе 10Гц)
     {
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
       gpio_set_level(RED_FLIGHT_LIGHTS, 1);
@@ -24,7 +24,7 @@ void blinking_flight_lights(void * pvParameters)
       
       gpio_set_level(GREEN_FLIGHT_LIGHTS, 0);
       gpio_set_level(RED_FLIGHT_LIGHTS, 0);
-      vTaskDelay(250/portTICK_PERIOD_MS);
+      vTaskDelay(100/portTICK_PERIOD_MS);
     }
 
     if (blinking_mode == 1)               //штатный режим (2 зеленых 1 красный)

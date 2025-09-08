@@ -8,7 +8,7 @@
 #define MAVLINK_V1_MESSAGE_HEADER 0xFE
 
 //структура общей части всех пакетов
-typedef struct __mavlink_message_header {                      //The maximum packet length is 263 bytes for full payload.
+typedef struct {                      //The maximum packet length is 263 bytes for full payload.
     uint8_t magic;   ///< protocol magic marker
     uint8_t len;     ///< Length of payload
     uint8_t seq;     ///< Sequence of packet
@@ -22,7 +22,7 @@ typedef struct __mavlink_message_header {                      //The maximum pac
 #define MAVLINK_MSG_ID_HEARTBEAT_LEN 9
 #define MAVLINK_MSG_ID_HEARTBEAT_CRC 50
 
-typedef struct __mavlink_heartbeat_t {
+typedef struct {
     mavlink_header_t header;
     uint32_t custom_mode; /*<  A bitfield for use for autopilot-specific flags*/
     uint8_t type; 
@@ -38,7 +38,7 @@ typedef struct __mavlink_heartbeat_t {
 #define MAVLINK_MSG_ID_SYS_STATUS_LEN 31
 #define MAVLINK_MSG_ID_SYS_STATUS_CRC 124
 
-typedef struct __mavlink_sys_status_t {
+typedef struct {
      mavlink_header_t header; 
      uint32_t onboard_control_sensors_present; 
      uint32_t onboard_control_sensors_enabled; 
@@ -61,7 +61,7 @@ typedef struct __mavlink_sys_status_t {
 #define MAVLINK_MSG_ID_RADIO_STATUS_LEN 9
 #define MAVLINK_MSG_ID_RADIO_STATUS_CRC 185
 
-typedef struct __mavlink_radio_status_t {
+typedef struct {
     mavlink_header_t header;
     uint16_t rxerrors; /*<  Count of radio packet receive errors (since boot).*/
     uint16_t fixed; /*<  Count of error corrected radio packets (since boot).*/
@@ -78,7 +78,7 @@ typedef struct __mavlink_radio_status_t {
 #define MAVLINK_MSG_ID_ATTITUDE_LEN 28
 #define MAVLINK_MSG_ID_ATTITUDE_CRC 39
 
-typedef struct __mavlink_attitude_t {
+typedef struct {
     mavlink_header_t header;
     uint32_t time_boot_ms; /*< [ms] Timestamp (time since system boot).*/
     float roll; /*< [rad] Roll angle (-pi..+pi)*/
@@ -95,7 +95,7 @@ typedef struct __mavlink_attitude_t {
 #define MAVLINK_MSG_ID_BATTERY_STATUS_LEN 36
 #define MAVLINK_MSG_ID_BATTERY_STATUS_CRC 154
 
-typedef struct __mavlink_battery_status_t {
+typedef struct {
     mavlink_header_t header;
     int32_t current_consumed; /*< [mAh] Consumed charge, -1: autopilot does not provide consumption estimate*/
     int32_t energy_consumed; /*< [hJ] Consumed energy, -1: autopilot does not provide energy consumption estimate*/
@@ -114,7 +114,7 @@ typedef struct __mavlink_battery_status_t {
 #define MAVLINK_MSG_ID_GLOBAL_POSITION_INT_LEN 28
 #define MAVLINK_MSG_ID_GLOBAL_POSITION_INT_CRC 10
 
-typedef struct __mavlink_global_position_int_t {
+typedef struct {
     mavlink_header_t header;
     uint32_t time_boot_ms; /*< [ms] Timestamp (time since system boot).*/
     int32_t lat; /*< [degE7] Latitude, expressed*/
@@ -133,7 +133,7 @@ typedef struct __mavlink_global_position_int_t {
 #define MAVLINK_MSG_ID_GPS_RAW_INT_LEN 30
 #define MAVLINK_MSG_ID_GPS_RAW_INT_CRC 24
 
-typedef struct __mavlink_gps_raw_int_t {
+typedef struct {
     mavlink_header_t header;
     uint64_t time_usec; /*< [us] Timestamp (UNIX Epoch time or time since system boot). The receiving end can infer timestamp format (since 1.1.1970 or since system boot) by checking for the magnitude of the number.*/
     int32_t lat; /*< [degE7] Latitude (WGS84, EGM96 ellipsoid)*/
@@ -154,7 +154,7 @@ typedef struct __mavlink_gps_raw_int_t {
 #define MAVLINK_MSG_ID_RC_CHANNELS_RAW_LEN 22
 #define MAVLINK_MSG_ID_RC_CHANNELS_RAW_CRC 244
 
-typedef struct __mavlink_rc_channels_raw_t {
+typedef struct {
     mavlink_header_t header;
     uint32_t time_boot_ms; /*< [ms] Timestamp (time since system boot).*/
     uint16_t chan1_raw; /*< [us] RC channel 1 value.*/
@@ -176,7 +176,7 @@ typedef struct __mavlink_rc_channels_raw_t {
 #define MAVLINK_MSG_ID_VFR_HUD_LEN 20
 #define MAVLINK_MSG_ID_VFR_HUD_CRC 20
 
-typedef struct __mavlink_vfr_hud_t {
+typedef struct {
     mavlink_header_t header;
     float airspeed; /*< Current airspeed in m/s*/
     float groundspeed; /*< Current ground speed in m/s*/

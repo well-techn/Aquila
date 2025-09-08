@@ -71,6 +71,8 @@ void Kalman_2d_predict(float acceleration, KalmanFilter2d_t* this)
     //вспомогательная переменная "время в квадрате" для уменьшения операций умножения
     float t2 = this->dt * this->dt;
     
+    //printf("%f\n",this->h);
+
     //прогноз (обычные уравнения)
     this->h = this->h + this->v * this->dt + 0.5f * acceleration * t2;
 	this->v = this->v + acceleration * this->dt;

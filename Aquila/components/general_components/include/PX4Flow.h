@@ -17,14 +17,24 @@
 //адрес для чтения "интегрального" регистра
 #define PX4FLOW_READ_INTEGRAL_FRAME_ADDRESS 0x16
 
+//фокусное расстояние в пикселях 
+//focal_length_px = (global_data.param[PARAM_FOCAL_LENGTH_MM]) / (4.0f * 6.0f) * 1000.0f; //original focal lenght: 12mm pixelsize: 6um, binning 4 enabled
+
+//разница между кадрами в пикселях 64 пикселя макс
+
+//коррекция по гироскопу 
+/* calc pixel of gyro 
+	float y_rate_pixel = y_rate * (get_time_between_images() / 1000000.0f) * focal_length_px;
+	float comp_x = histflowx + y_rate_pixel;
+*/
 
 typedef struct px4flow_i2c_frame
 {
-    uint16_t frame_count;// counts created I2C frames
-    int16_t pixel_flow_x_sum;// accumulated x flow in pixels*10 since last I2C frame
-    int16_t pixel_flow_y_sum;// accumulated y flow in pixels*10 since last I2C frame
-    int16_t flow_comp_m_x;// x velocity*1000 in meters / timestep
-    int16_t flow_comp_m_y;// y velocity*1000 in meters / timestep
+    uint16_t frame_count;// counts created I2C frames                                   постоянно инкрементирующееся значение
+    int16_t pixel_flow_x_sum;// accumulated x flow in pixels*10 since last I2C frame    суммарное перемещение в пикселях
+    int16_t pixel_flow_y_sum;// accumulated y flow in pixels*10 since last I2C frame    суммарное перемещение в пикселях
+    int16_t flow_comp_m_x;// x velocity*1000 in meters / timestep                       скорость в м/с
+    int16_t flow_comp_m_y;// y velocity*1000 in meters / timestep                       скорость в м/с
     int16_t quality;// Optical flow quality / confidence 0: bad, 255: maximum quality
     int16_t gyro_x_rate; //gyro x rate
     int16_t gyro_y_rate; //gyro y rate
@@ -37,7 +47,7 @@ typedef struct px4flow_i2c_frame
 typedef struct px4flow_i2c_integral_frame
 {
     uint16_t frame_count_since_last_readout;//number of flow measurements since last I2C readout [#frames]
-    int16_t pixel_flow_x_integral;//accumulated flow in radians*10000 around x axis since last I2C readout [rad*10000]
+    int16_t pixel_flow_x_integral;//accumulated flow in radians*10000 around x axis since last I2C readout [rad*10000]      accumulated_flow_x += pixel_flow_y  / focal_length_px * 1.0f;
     int16_t pixel_flow_y_integral;//accumulated flow in radians*10000 around y axis since last I2C readout [rad*10000]
     int16_t gyro_x_rate_integral;//accumulated gyro x rates in radians*10000 since last I2C readout [rad*10000] 
     int16_t gyro_y_rate_integral;//accumulated gyro y rates in radians*10000 since last I2C readout [rad*10000] 

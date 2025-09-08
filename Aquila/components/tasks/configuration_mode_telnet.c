@@ -188,7 +188,7 @@ void configuration_mode_telnet(void *arg)
 
                 case '6':
                     send(client_fd, r_6, sizeof(r_6), 0);
-                    xTaskCreate(advanced_acc_calibration,"advanced_mag_calibration",16384,(void *)&client_fd,0,NULL);    
+                    xTaskCreate(advanced_mag_calibration,"advanced_mag_calibration",16384,(void *)&client_fd,0,NULL);    
                     break;
                  
                 case '7':

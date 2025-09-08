@@ -30,21 +30,21 @@ void MCP23017_monitoring_and_control(void * pvParameters)
     {
       ESP_LOGI(TAG_MCP23017,"Received request %02x",MCP23017_external_request); 
 
-      if (MCP23017_external_request == 0b10000000) {                //command to read inputs
+      if (MCP23017_external_request == 0b10000000) {                //команда считать состояние входов
         xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY);
         MCP23017_inputs_state = MCP23017_get_inputs_state();
         xSemaphoreGive(semaphore_for_i2c_internal); 
         ESP_LOGI(TAG_MCP23017,"Current input state is %02x",MCP23017_inputs_state);  
       }
       
-      if (MCP23017_external_request & 0b01000000) {                 //if bit6 is set that means 2 lower bit represents output to be set
+      if (MCP23017_external_request & 0b01000000) {                 //если bit6 установлен значит младщие 2 бита содержат номер выхода для установки в 1
         xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY);
         MCP23017_set_output(&MCP23017_current_outputs_state, MCP23017_external_request & 0b00001111);
         xSemaphoreGive(semaphore_for_i2c_internal);
         ESP_LOGI(TAG_MCP23017,"Got request to set output %d, output is set",MCP23017_external_request & 0b00001111);  
       }
 
-      if (MCP23017_external_request & 0b00100000) {                 //if bit5 is set that means 2 lower bit represents output to be cleared
+      if (MCP23017_external_request & 0b00100000) {                 //если bit4 установлен значит младщие 2 бита содержат номер выхода для установки в 0
         xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY);
         MCP23017_clear_output(&MCP23017_current_outputs_state, MCP23017_external_request & 0b00001111);
         xSemaphoreGive(semaphore_for_i2c_internal);

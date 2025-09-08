@@ -53,7 +53,10 @@ void gps_read_and_process_data(void * pvParameters)
   uart_event_t gps_uart_event;  
   char latitude = 0;
   char longtitude = 0;
-  struct data_from_gps_to_main_struct gps_data;
+  data_from_gps_to_main_struct_t gps_data;
+    gps_data.latitude_d = 111111111;          //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
+    gps_data.longtitude_d = 222222222;
+
   uint8_t gps_status_old = 5;
 
   ESP_LOGI(TAG_GPS,"Настраиваем GPS UART.....");
@@ -167,13 +170,13 @@ if (gps_data.status != gps_status_old )
 
             case UART_FIFO_OVF:
               ESP_LOGW(TAG_GPS, "hw fifo overflow");
-              uart_flush_input(REMOTE_CONTROL_UART);
+              uart_flush_input(GPS_UART);
               xQueueReset(gps_queue_for_events);
               break;
 
             case UART_BUFFER_FULL:
               ESP_LOGW(TAG_GPS, "ring buffer full");
-              uart_flush_input(REMOTE_CONTROL_UART);
+              uart_flush_input(GPS_UART);
               xQueueReset(gps_queue_for_events);
               break;
         

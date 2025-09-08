@@ -34,7 +34,7 @@ void lidar_read_and_process_data(void * pvParameters)
   uint16_t raw_height = 0;
   //uint16_t raw_height_old = 0;
   uint16_t raw_strength = 0;
-  struct data_from_lidar_to_main_struct lidar_data;
+  data_from_lidar_to_main_struct lidar_data;
   //float initial_height = 0;
   float median_filter_pool[MEDIAN_FILTER_LENGTH];
   float avg_filter_pool[AVG_FILTER_LENGTH];

@@ -17,7 +17,7 @@ extern QueueHandle_t main_to_rc_queue;
 
 void send_data_to_RC(void * pvParameters)
 {
-  struct data_from_main_to_rc_struct data_to_send_to_rc;
+  data_from_main_to_rc_struct data_to_send_to_rc;
   uint8_t outcoming_message_buffer_remote[NUMBER_OF_BYTES_TO_SEND_TO_RC];
   uint8_t LED_status = 0;
 
@@ -27,6 +27,7 @@ void send_data_to_RC(void * pvParameters)
     {
       if (xQueueReceive(main_to_rc_queue, &data_to_send_to_rc, (TickType_t)portMAX_DELAY)) 
       {
+        
         outcoming_message_buffer_remote[0] = RC_MESSAGE_HEADER;
         outcoming_message_buffer_remote[1] = 0; //reserved
         outcoming_message_buffer_remote[2] = 0; //reserved
@@ -42,10 +43,16 @@ void send_data_to_RC(void * pvParameters)
         outcoming_message_buffer_remote[12] = (data_to_send_to_rc.altitude & 0xFF00) >> 8; 
         outcoming_message_buffer_remote[13] = data_to_send_to_rc.altitude & 0x00FF; 
         outcoming_message_buffer_remote[14] = dallas_crc8(outcoming_message_buffer_remote, (NUMBER_OF_BYTES_TO_SEND_TO_RC - 1));
-        
+/*        
+        outcoming_message_buffer_remote[0] = RC_MESSAGE_HEADER;
+        outcoming_message_buffer_remote[1] = (uint8_t)data_to_send_to_rc.power_voltage_value;                 //сантивольты
+        outcoming_message_buffer_remote[2] = (uint8_t)data_to_send_to_rc.altitude;                            //метры
+        outcoming_message_buffer_remote[3] = dallas_crc8(outcoming_message_buffer_remote, (NUMBER_OF_BYTES_TO_SEND_TO_RC - 1));
+        printf("%x, %x, %x, %x\n",outcoming_message_buffer_remote[0],outcoming_message_buffer_remote[1],outcoming_message_buffer_remote[2],outcoming_message_buffer_remote[3]);
+*/
         uart_write_bytes(REMOTE_CONTROL_UART, outcoming_message_buffer_remote, NUMBER_OF_BYTES_TO_SEND_TO_RC);
-        if (LED_status) {gpio_set_level(LED_BLUE, 0); LED_status=0;}
-              else {gpio_set_level(LED_BLUE, 1);LED_status=1;}
+                if (LED_status) {gpio_set_level(LED_BLUE, 0); LED_status=0;}
+                      else {gpio_set_level(LED_BLUE, 1);LED_status=1;}
       }                       
     } 
   }

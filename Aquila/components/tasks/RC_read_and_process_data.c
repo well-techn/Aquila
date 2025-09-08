@@ -56,12 +56,12 @@ void RC_read_and_process_data(void * pvParameters)
   uart_event_t remote_control_uart_event;
   uint8_t incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2];
   uint16_t received_throttle = 0;
-  uint16_t received_pitch = 2000;                       //neutral position
+  uint16_t received_pitch = 2000;                       //среднее положение
   uint16_t received_roll = 2000;
   uint16_t received_yaw = 2000;
   short trim_roll = -1;
   short trim_pitch = 2;
-  struct data_from_rc_to_main_struct remote_control_data;
+  data_from_rc_to_main_struct remote_control_data;
   
   float rc_throttle_old = 0;
   float rc_pitch_old = 0;
@@ -237,12 +237,14 @@ void RC_read_and_process_data(void * pvParameters)
               mode_old = remote_control_data.mode;
               start_flag_old = remote_control_data.engines_start_flag;
 //каждый 3й раз пробуждаем задачу отправки телеметрии на пульт
+/*
               remote_packets_counter++;
               if (remote_packets_counter == 3)
               {
                 remote_packets_counter = 0;
                 xTaskNotifyGive(task_handle_send_data_to_RC);        
-              }  
+              }
+*/  
             }
             else 
             { 

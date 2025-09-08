@@ -57,7 +57,6 @@ void W25N_write_status_register(uint8_t status_register_address, uint8_t reg_val
 esp_err_t winbond_read_write_test(void);
 void W25N_block_erase(uint16_t page_address);
 void W25N_erase_all(void);
-void W25N_erase_all_new(void);
 uint8_t W25N_read_STATUS_register(void);
 
 

@@ -27,7 +27,7 @@ void reading_logs_from_external_flash(void *pvParameters)
   // сюда содержимое пакета печатается через sprintf (длина с запасом)
   char message_to_print[200];
   uint16_t next = 0;
-  char header[] = "time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode|e1|e2|e3|e4|flags|rssi|EOL\r\n";
+  char header[] = "time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|optical_X|optical_Y|optical_quality|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode_c|e1|e2|e3|e4|flags|rssi|EOL\r\n";
   char end_message[] = "Считывание логов из внешней flash-памяти завершено, перезапустите систему\r\n";
 
   while (1)
@@ -69,6 +69,11 @@ void reading_logs_from_external_flash(void *pvParameters)
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->kalman_altitude_cm);
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->kalman_velocity_cm);
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->altitude_setpoint_cm);
+          
+          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->px4flow_position_x_cm);
+          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->px4flow_position_y_cm);
+          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->px4flow_quality);
+
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->voltage_mv);
           next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->current_ca);
           next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->throttle_command);

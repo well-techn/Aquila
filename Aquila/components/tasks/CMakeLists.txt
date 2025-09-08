@@ -16,8 +16,10 @@ idf_component_register(SRCS
 "./send_telemetry_via_mavlink.c"
 "./init.c"
 "./main_flying_cycle.c"
+"./px4flow_read_and_process_data.c"
 "./configuration_mode.c"
 "./configuration_mode_telnet.c"
+"./emergency_mode.c"
 
 "${PROJECT_DIR}/components/general_components/AES_crypto.c"
 "${PROJECT_DIR}/components/general_components/filters.c"
