@@ -52,4 +52,14 @@ void calculation_mean_and_sigma_of_vector_array(float array[][3], double *mean, 
 void calculation_B_and_Ainv(float array[][3], double *A_1, double *B, double *mean, double *sigma, uint16_t number_of_elements);
 uint8_t calculation_B_and_Ainv_with_exclusion(float array[][3], double *A_1, double *B, double vector_norm, double rej_threshold, uint16_t number_of_elements);
 
+float sin_approx(float x);
+float cos_approx(float x);
+float atan2_approx(float y, float x);
+float acos_approx(float x);
+float asin_approx(float x);
+
+
+
+
+
 #endif

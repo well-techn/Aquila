@@ -141,7 +141,7 @@ void advanced_acc_calibration(void *pvParameters)
 #endif
     calculation_B_and_Ainv_with_exclusion(input_data_1, A_1, B, 8192, 0, NUMBER_OF_ACC_INPUTS);
 #ifdef TELNET_CONF_MODE
-        send(*client_fd, "\r\nКоректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКоректировочные значения сдвигов (bias):\r\n"), 0);
+        send(*client_fd, "\r\nКорректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКорректировочные значения сдвигов (bias):\r\n"), 0);
         pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
         send(*client_fd, message_to_print, pos, 0);
         
@@ -189,7 +189,7 @@ void advanced_acc_calibration(void *pvParameters)
     calculation_B_and_Ainv_with_exclusion(input_data_2, A_1, B, 8192, 0, NUMBER_OF_ACC_INPUTS);
 
     #ifdef TELNET_CONF_MODE
-        send(*client_fd, "\r\nКоректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКоректировочные значения сдвигов (bias):\r\n"), 0);
+        send(*client_fd, "\r\nКорректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКорректировочные значения сдвигов (bias):\r\n"), 0);
         pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
         send(*client_fd, message_to_print, pos, 0);
         

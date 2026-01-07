@@ -45,6 +45,7 @@
 #include "px4flow.h"
 #include "px4flow_read_and_process_data.h"
 #include "emergency_mode.h"
+#include "sending_something_over_wifi.h"
 
 const char *TAG_INIT = "INIT";
 const char *TAG_FLY = "FLY";
@@ -86,6 +87,7 @@ QueueHandle_t gps_queue_for_events = NULL; //очередь для переда�
 QueueHandle_t gps_to_main_queue = NULL; //очередь для передачи обработанных GPS данных в main_flying_cycle
 QueueHandle_t remote_control_queue_for_events = NULL; //очередь для передачи событий от UART пульта управления (pattern detection) в задачу обработки данных пульта
 QueueHandle_t remote_control_to_main_queue = NULL; //очередь для передачи обработанных данных от пульта в main_flying_cycle
+QueueHandle_t remote_control_to_main_pid_queue; //очередь для передачи ПИД-коэффциентов от пульта в main_flying_cycle
 QueueHandle_t lidar_queue_for_events = NULL; //очередь для передачи событий от UART с подключенным лидаром (pattern detection) в задачу обработки данных от лидара
 QueueHandle_t lidar_to_main_queue = NULL; //очередь для передачи обработанных данных от лидара в main_flying_cycle
 QueueHandle_t MCP23017_queue = NULL; //очередь принимающая команды на считывания состояния или управления MCP23017
@@ -148,6 +150,9 @@ StackType_t px4flow_read_and_process_data_stack[PX4FLOW_READ_AND_PROCESS_DATA_ST
 StaticTask_t emergency_mode_TCB_buffer;
 StackType_t emergency_mode_stack[EMERGENCY_MODE_STACK_SIZE];
 
+StaticTask_t sending_something_over_wifi_TCB_buffer;
+StackType_t sending_something_over_wifi_stack[SENDING_SOMETHING_OVER_WIFI_STACK_SIZE];
+
 //задачи
 TaskHandle_t task_handle_blinking_flight_lights;
 TaskHandle_t task_handle_main_flying_cycle;
@@ -164,6 +169,7 @@ TaskHandle_t task_handle_lidar_read_and_process_data;
 TaskHandle_t task_handle_MS5611_read_and_process_data;
 TaskHandle_t task_handle_px4flow_read_and_process_data;
 TaskHandle_t task_handle_emergency_mode;
+TaskHandle_t task_handle_sending_something_over_wifi;
 
 static void configure_IOs()
 {
@@ -625,7 +631,17 @@ if (tfminis_communication_check() != ESP_OK) {
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
-    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от пульта управления в main_flying_cycle успешно создана\n"); 
+    else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от пульта управления в main_flying_cycle успешно создана\n");
+    
+  ESP_LOGI(TAG_INIT,"Создаем очередь для передачи ПИД-коэффициентов от пульта управления в main_flying_cycle.....");
+  remote_control_to_main_pid_queue = xQueueCreate(10, sizeof(pid_coeff_data_from_rc_to_main_struct));
+  if (remote_control_to_main_pid_queue == NULL) {
+    ESP_LOGE(TAG_INIT,"Очередь для передачи ПИД-коэффициентов  от пульта управления в main_flying_cycle не создана\n");
+    error_code = 1;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+    else ESP_LOGI(TAG_INIT,"Очередь для передачи ПИД-коэффициентов от пульта управления в main_flying_cycle успешно создана\n");
 
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от GPS в main_flying_cycle");
   gps_to_main_queue = xQueueCreate(10, sizeof(struct data_from_gps_to_main_struct));
@@ -828,14 +844,14 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef PREFLIGHT_POWER_CHECKUP
 //проверяем напряжение аккумулятора и ток потребления системы
-  ESP_LOGI(TAG_INIT,"Проверяем напряжение аккумулятора и тока потребления системы.....");
+  ESP_LOGI(TAG_INIT,"Проверяем напряжение аккумулятора и ток потребления системы.....");
   xTaskNotifyGive(task_handle_INA219_read_and_process_data);
   float INA219_fresh_data_init[4];
   if (xQueueReceive(INA219_to_main_queue, &INA219_fresh_data_init, portMAX_DELAY))
     {
       if ((INA219_fresh_data_init[0] < 9.0) || (INA219_fresh_data_init[0] > 13.0)) 
       {
-        ESP_LOGE(TAG_INIT,"Ошибка напряжение аккумулятора, текущее напряжение %0.2fВ", INA219_fresh_data_init[0]);
+        ESP_LOGE(TAG_INIT,"Ошибка напряжения аккумулятора, текущее напряжение %0.2fВ", INA219_fresh_data_init[0]);
         uint16_t error_code = 24;
         xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
         while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
@@ -947,6 +963,21 @@ if (tfminis_communication_check() != ESP_OK) {
     }
   else {
     ESP_LOGE(TAG_INIT,"Задача отправки телеметрии по mavink не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }       
+#endif
+
+#ifdef WIFI_INFLIGHT_TEST
+  ESP_LOGI(TAG_INIT,"Создаем задачу отправки данных по WiFi (sending_something_over_wifi).....");
+  task_handle_sending_something_over_wifi = xTaskCreateStaticPinnedToCore(sending_something_over_wifi,"sending_something_over_wifi", SENDING_SOMETHING_OVER_WIFI_STACK_SIZE,NULL,SENDING_SOMETHING_OVER_WIFI_PRIORITY,sending_something_over_wifi_stack, &sending_something_over_wifi_TCB_buffer,0);
+  if (task_handle_sending_something_over_wifi != NULL) 
+    {
+      ESP_LOGI(TAG_INIT,"Задача отправки данных по WiFi успешно создана на ядре 0\n");
+    }
+  else {
+    ESP_LOGE(TAG_INIT,"Задача отправки данных по WiFi не создана\n");
     error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 

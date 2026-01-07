@@ -20,6 +20,7 @@ idf_component_register(SRCS
 "./configuration_mode.c"
 "./configuration_mode_telnet.c"
 "./emergency_mode.c"
+"./sending_something_over_wifi.c"
 
 "${PROJECT_DIR}/components/general_components/AES_crypto.c"
 "${PROJECT_DIR}/components/general_components/filters.c"
@@ -53,8 +54,7 @@ idf_component_register(SRCS
 "${PROJECT_DIR}/components/service_tasks/gyro_calibration.c"
 "${PROJECT_DIR}/components/service_tasks/advanced_acc_calibration.c"
 "${PROJECT_DIR}/components/service_tasks/advanced_mag_calibration.c"
-
-
+"${PROJECT_DIR}/components/service_tasks/printing_calibration_coefficients.c"
 
 INCLUDE_DIRS
 "./include" 

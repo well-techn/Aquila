@@ -107,12 +107,11 @@ void Kalman_2d_update(float baro_height, KalmanFilter2d_t* this)
 }
 
 void Butterworth_init(float f_sampling, float f_cut, Butterworth_t* this) 
-{
-    
+{   
     float omega = 2.0 * M_PI * f_cut / f_sampling; // Нормированная частота
     float theta = omega / 2.0;
-    float sn = sin(theta);
-    float cs = cos(theta);
+    float sn = sinf(theta);
+    float cs = cosf(theta);
     float alpha = sn / (2.0 * sqrt(2.0)); // Для порядка 2
 
     // Коэффициенты передаточной функции

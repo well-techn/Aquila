@@ -1,6 +1,7 @@
 #include "wt_alldef.h"
 #include "math.h"
 #include "stdio.h"
+#include "advanced_math.h"
 
 void quaternion_conjugation(float* q, float* result)
 {
@@ -56,17 +57,17 @@ void quaternion_difference(float* q_current, float* q_desired, float* q_diff)
 void quat_from_angle_and_axis(float angle, float* axis, float* q)
 {
     q[0] = cos((angle/2) * M_PI / 180.0);
-    q[1] = axis[0] * sin((angle/2) * M_PI / 180.0);
-    q[2] = axis[1] * sin((angle/2) * M_PI / 180.0);
-    q[3] = axis[2] * sin((angle/2) * M_PI / 180.0);
+    q[1] = axis[0] * sinf((angle/2) * M_PI / 180.0);
+    q[2] = axis[1] * sinf((angle/2) * M_PI / 180.0);
+    q[3] = axis[2] * sinf((angle/2) * M_PI / 180.0);
 }
 
 void angle_and_axis_from_quat(float* q, float* angle, float* axis)
 {
     *angle = 2 * acos(q[0]) * 180 / M_PI;
-    axis[1] = q[1] / sin((*angle/2) * M_PI / 180.0);
-    axis[2] = q[2] / sin((*angle/2) * M_PI / 180.0);
-    axis[3] = q[3] / sin((*angle/2) * M_PI / 180.0);
+    axis[1] = q[1] / sinf((*angle/2) * M_PI / 180.0);
+    axis[2] = q[2] / sinf((*angle/2) * M_PI / 180.0);
+    axis[3] = q[3] / sinf((*angle/2) * M_PI / 180.0);
 }
 
 void calculate_desired_quat_from_angles_and_yaw_rate(float pitch, float roll, float yaw_rate_degrees, float time, float* q_desired)
@@ -138,7 +139,6 @@ void calculate_desired_quat_from_3_angles(float pitch, float roll, float yaw, fl
     //for (int i = 0; i<4;i++) printf("%0.3f ", q_yaw[i]);
     //printf("\n");
     
-    
     quaternions_multiplication(q_pitch, q_roll, q_temp);
     //printf("First multiplication: ");
     //for (int i = 0; i<4;i++) printf("%f ", q_temp[i]);
@@ -171,6 +171,25 @@ void Convert_Q_to_degrees(float q0, float q1, float q2, float q3, float* pitch, 
     //if (*roll > 90) *roll -= 360.0;     
 
     *yaw = -atan2(a12, a22) * 57.29577951;
+    *yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если магнетометр не используем - без разницы, вреда не наносит
+}
+
+void Convert_Q_to_degrees_fast(float q0, float q1, float q2, float q3, float* pitch, float* roll, float* yaw)
+{
+    float a12,a22,a31,a32,a33 = 0;
+
+    a12 =   2.0f * (q1 * q2 + q0 * q3);
+    a22 =   q0 * q0 + q1 * q1 - q2 * q2 - q3 * q3;
+    a31 =   2.0f * (q0 * q1 + q2 * q3);
+    a32 =   2.0f * (q1 * q3 - q0 * q2);
+    a33 =   q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
+
+    *pitch = -asin_approx(a32) * 57.29577951;  // 180/пи
+
+    *roll = atan2_approx(a31, a33) * 57.29577951;
+    //if (*roll > 90) *roll -= 360.0;     
+
+    *yaw = -atan2_approx(a12, a22) * 57.29577951;
     *yaw -= 9.4; // компенсация наклонения при использовании магнетометра. Если магнетометр не используем - без разницы, вреда не наносит
 }
 

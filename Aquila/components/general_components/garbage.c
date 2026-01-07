@@ -342,7 +342,82 @@ void configure_pin_for_interrupt (void)
 */
 
 
+/*
 
+if (large_counter == 10000) 
+        {
+            gpio_config_t INT_1 = {
+            .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_ENABLE,
+            .intr_type = GPIO_INTR_DISABLE
+            }; 
+
+            ESP_ERROR_CHECK(gpio_config(&INT_1));
+        }
+
+        if (large_counter == 15000) 
+        {
+
+          gpio_config_t INT_1 = {
+            .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_ENABLE,
+            .intr_type = GPIO_INTR_POSEDGE
+            }; 
+
+            ESP_ERROR_CHECK(gpio_config(&INT_1));
+
+            gpio_config_t INT_2 = {
+            .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_ENABLE,
+            .intr_type = GPIO_INTR_DISABLE
+            }; 
+
+            ESP_ERROR_CHECK(gpio_config(&INT_2));
+        }
+
+        if (large_counter == 20000) 
+        {
+            gpio_config_t INT_2 = {
+            .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_ENABLE,
+            .intr_type = GPIO_INTR_POSEDGE
+            }; 
+
+            ESP_ERROR_CHECK(gpio_config(&INT_2));
+        }
+
+                if (large_counter == 25000) 
+        {
+            gpio_config_t INT_1 = {
+            .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_ENABLE,
+            .intr_type = GPIO_INTR_DISABLE
+            }; 
+
+            ESP_ERROR_CHECK(gpio_config(&INT_1));
+          
+          
+          gpio_config_t INT_2 = {
+            .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
+            .mode = GPIO_MODE_INPUT,
+            .pull_up_en = GPIO_PULLUP_DISABLE,
+            .pull_down_en = GPIO_PULLDOWN_ENABLE,
+            .intr_type = GPIO_INTR_DISABLE
+            }; 
+
+            ESP_ERROR_CHECK(gpio_config(&INT_2));
+        }
+ */
 
 
 

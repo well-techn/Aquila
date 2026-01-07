@@ -18,24 +18,124 @@ void reading_logs_from_external_flash(void *pvParameters)
   uint16_t page_address = 0;
   uint16_t column_address = 0;
   uint8_t i = 0;
-  // сюда считывается содержимое 1го пакета из flash-памяти
-  uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)];
+  uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)]; // сюда считывается содержимое 1го пакета из flash-памяти
   uint8_t empty_timestamp_flag = 0;
   struct logging_data_set *p_to_set_to_log;
 
   int16_t *client_fd = pvParameters;
-  // сюда содержимое пакета печатается через sprintf (длина с запасом)
-  char message_to_print[200];
+  char message_to_print[300]; // сюда содержимое пакета печатается через snprintf (длина с запасом)
   uint16_t next = 0;
-  char header[] = "time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|optical_X|optical_Y|optical_quality|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode_c|e1|e2|e3|e4|flags|rssi|EOL\r\n";
+  //char header[] = "time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode_c|e1|e2|e3|e4|flags|rssi|EOL\r\n";
   char end_message[] = "Считывание логов из внешней flash-памяти завершено, перезапустите систему\r\n";
+  char header_new[300];
+
+//формируем строку заголовка исходя из того, что включено в логи
+  next += snprintf(header_new, sizeof(header_new), "time_us|");
+#ifdef LOGGING_ACCEL_1 
+  next += snprintf(header_new + next, sizeof(header_new), "ax_raw_1|");
+  next += snprintf(header_new + next, sizeof(header_new), "ay_raw_1|");
+  next += snprintf(header_new + next, sizeof(header_new), "az_raw_1|");
+#endif
+
+#ifdef LOGGING_ACCEL_2 
+  next += snprintf(header_new + next, sizeof(header_new), "ax_raw_2|");
+  next += snprintf(header_new + next, sizeof(header_new), "ay_raw_2|");
+  next += snprintf(header_new + next, sizeof(header_new), "az_raw_3|");
+#endif
+
+#ifdef LOGGING_GYRO_1
+  next += snprintf(header_new + next, sizeof(header_new), "gx_raw_1|");
+  next += snprintf(header_new + next, sizeof(header_new), "gy_raw_1|");
+  next += snprintf(header_new + next, sizeof(header_new), "gz_raw_1|");
+#endif
+
+#ifdef LOGGING_GYRO_2 
+  next += snprintf(header_new + next, sizeof(header_new), "gx_raw_2|");
+  next += snprintf(header_new + next, sizeof(header_new), "gy_raw_2|");
+  next += snprintf(header_new + next, sizeof(header_new), "gz_raw_3|");
+#endif
+
+#ifdef LOGGING_AVG_ACCEL
+  next += snprintf(header_new + next, sizeof(header_new), "ax_avg|");
+  next += snprintf(header_new + next, sizeof(header_new), "ay_avg|");
+  next += snprintf(header_new + next, sizeof(header_new), "az_avg|");
+#endif
+
+#ifdef LOGGING_AVG_GYRO
+  next += snprintf(header_new + next, sizeof(header_new), "gx_avg|");
+  next += snprintf(header_new + next, sizeof(header_new), "gy_avg|");
+  next += snprintf(header_new + next, sizeof(header_new), "gz_avg|");
+#endif
+
+#ifdef LOGGING_QUATERNION 
+  next += snprintf(header_new + next, sizeof(header_new), "q0|q1|q2|q3|");
+#endif
+
+#ifdef LOGGING_ANGLES 
+  next += snprintf(header_new + next, sizeof(header_new), "pitch|roll|yaw|");
+#endif
+
+#ifdef LOGGING_LIDAR_PID
+  next += snprintf(header_new + next, sizeof(header_new), "error|P|I|D|");
+#endif
+
+#ifdef LOGGING_LIDAR_ALTITUDE_CM
+  next += snprintf(header_new + next, sizeof(header_new), "lid_h|");
+#endif
+
+#ifdef LOGGING_BARO_ALTITUDE_CM
+  next += snprintf(header_new + next, sizeof(header_new), "baro_h|");
+#endif
+
+#ifdef LOGGING_KALMAN_ALTITUDE_CM
+  next += snprintf(header_new + next, sizeof(header_new), "Kalman_h|");
+#endif
+
+#ifdef LOGGING_KALMAN_VELOCITY_CM
+  next += snprintf(header_new + next, sizeof(header_new), "Kalman_v|");
+#endif
+
+#ifdef LOGGING_ALTITUDE_SETPOINT_CM
+  next += snprintf(header_new + next, sizeof(header_new), "alt_set|");
+#endif
+
+#ifdef LOGGING_VOLTAGE_mV
+  next += snprintf(header_new + next, sizeof(header_new), "V_mV|");
+#endif
+
+#ifdef LOGGING_CURRENT_cA
+  next += snprintf(header_new + next, sizeof(header_new), "I_cA|");
+#endif
+
+#ifdef LOGGING_RC_COMMANDS
+  next += snprintf(header_new + next, sizeof(header_new), "thr_c|pitch_c|roll_c|yaw_c|mode_c|");
+#endif
+
+#ifdef LOGGING_ENGINES
+  next += snprintf(header_new + next, sizeof(header_new), "e1|e2|e3|e4|");
+#endif
+
+#ifdef LOGGING_ENGINES_FILTERED
+  next += snprintf(header_new + next, sizeof(header_new), "e1_f|e2_f|e3_f|e4_f|");
+#endif
+
+#ifdef LOGGING_FLAGS
+  next += snprintf(header_new + next, sizeof(header_new), "flags|");
+#endif
+
+#ifdef LOGGING_RSSI_LEVEL
+  next += snprintf(header_new + next, sizeof(header_new), "RSSI|");
+#endif
+
+  next += snprintf(header_new + next, sizeof(header_new), "EOL\r\n");
+  next = 0;
 
   while (1)
   {
     // печатаем строку заголовков
-    printf("%s", header);
+    printf("%s", header_new);
 #ifdef TELNET_CONF_MODE
-    send(*client_fd, header, strlen(header), 0);
+    send(*client_fd, header_new, strlen(header_new), 0);
 #endif
 
     while ((page_address < 65535) && (empty_timestamp_flag == 0)) // 65365 страниц на микросхеме памяти
@@ -51,40 +151,99 @@ void reading_logs_from_external_flash(void *pvParameters)
 
         if (p_to_set_to_log->timestamp == 4294967295)
           empty_timestamp_flag = 1; // в такое число считывается таймстэмп если ячейкм не запроганы (все FF)
-// в случае если не достигли конца записанных в микруху данных начинаем переводить числа в печатный вид при помощи sprintf
+// в случае если не достигли конца записанных в микруху данных начинаем переводить числа в печатный вид при помощи snprintf
         if (!empty_timestamp_flag)
         {
-          next += sprintf(message_to_print, "%lu|", p_to_set_to_log->timestamp);
-          for (i = 0; i < 3; i++)
-            next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->accel[i]);
-          for (i = 0; i < 3; i++)
-            next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->gyro[i]);
-          for (i = 0; i < 4; i++)
-            next += sprintf(message_to_print + next, "%f|", p_to_set_to_log->q[i]);
-          for (i = 0; i < 3; i++)
-            next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->angles[i]);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->lidar_altitude_cm);
-          // next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->lidar_strength);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->baro_altitude_cm);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->kalman_altitude_cm);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->kalman_velocity_cm);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->altitude_setpoint_cm);
-          
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->px4flow_position_x_cm);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->px4flow_position_y_cm);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->px4flow_quality);
+          next += snprintf(message_to_print, sizeof(message_to_print), "%lu|", p_to_set_to_log->timestamp);
+#ifdef LOGGING_ACCEL_1
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_1[i]);
+#endif
 
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->voltage_mv);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->current_ca);
-          next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->throttle_command);
-          next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->pitch_command);
-          next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->roll_command);
-          next += sprintf(message_to_print + next, "%0.2f|", p_to_set_to_log->yaw_command);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->mode_command);
-          for (i = 0; i < 4; i++) next += sprintf(message_to_print + next, "%ld|", p_to_set_to_log->engines[i]);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->flags);
-          next += sprintf(message_to_print + next, "%d|", p_to_set_to_log->rssi_level);
-          next += sprintf(message_to_print + next, "*\r\n"); // конец строки
+#ifdef LOGGING_ACCEL_2
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_2[i]);
+#endif
+
+#ifdef LOGGING_GYRO_1
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->gyro_1[i]);
+#endif
+
+#ifdef LOGGING_GYRO_2
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->gyro_2[i]);
+#endif
+
+#ifdef LOGGING_AVG_ACCEL
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_avg[i]);
+#endif
+
+#ifdef LOGGING_AVG_GYRO
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->gyro_avg[i]);
+#endif
+          
+#ifdef LOGGING_QUATERNION
+          for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%f|", p_to_set_to_log->q[i]);
+#endif
+          
+#ifdef LOGGING_ANGLES
+          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->angles[i]);
+#endif
+
+#ifdef LOGGING_LIDAR_PID
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|%0.2f|%0.2f|%0.2f|",p_to_set_to_log->error, p_to_set_to_log->P_component, p_to_set_to_log->I_component, p_to_set_to_log->D_component);
+#endif
+
+
+#ifdef LOGGING_LIDAR_ALTITUDE_CM
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->lidar_altitude_cm);
+#endif
+
+#ifdef LOGGING_BARO_ALTITUDE_CM
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->baro_altitude_cm);
+#endif
+
+#ifdef LOGGING_KALMAN_ALTITUDE_CM
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->kalman_altitude_cm);
+#endif
+
+#ifdef LOGGING_KALMAN_VELOCITY_CM
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->kalman_velocity_cm);
+#endif
+
+#ifdef LOGGING_ALTITUDE_SETPOINT_CM
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->altitude_setpoint_cm);
+#endif          
+
+#ifdef LOGGING_VOLTAGE_mV
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->voltage_mv);
+#endif
+
+#ifdef LOGGING_CURRENT_cA
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->current_ca);
+#endif
+
+#ifdef LOGGING_RC_COMMANDS
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->throttle_command);
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->pitch_command);
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->roll_command);
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->yaw_command);
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->mode_command);
+#endif
+
+#ifdef LOGGING_ENGINES
+          for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%ld|", p_to_set_to_log->engines[i]);
+#endif
+
+#ifdef LOGGING_ENGINES_FILTERED
+          for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%ld|", p_to_set_to_log->engines_filtered[i]);
+#endif
+
+#ifdef LOGGING_FLAGS
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->flags);
+#endif
+
+#ifdef LOGGING_RSSI_LEVEL
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->rssi_level);
+#endif
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "*\r\n"); // конец строки
 
 // Печаем или отправляем сформированную строку в telnet
 #ifdef TELNET_CONF_MODE

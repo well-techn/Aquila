@@ -28,7 +28,7 @@ void send_data_to_RC(void * pvParameters)
       if (xQueueReceive(main_to_rc_queue, &data_to_send_to_rc, (TickType_t)portMAX_DELAY)) 
       {
         
-        outcoming_message_buffer_remote[0] = RC_MESSAGE_HEADER;
+        outcoming_message_buffer_remote[0] = RC_CONTROL_MESSAGE_HEADER;
         outcoming_message_buffer_remote[1] = 0; //reserved
         outcoming_message_buffer_remote[2] = 0; //reserved
         outcoming_message_buffer_remote[3] = 0; //reserved

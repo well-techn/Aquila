@@ -5,6 +5,7 @@ idf_component_register(SRCS
 "./gyro_calibration.c"
 "./advanced_acc_calibration.c"
 "./advanced_mag_calibration.c"
+"./printing_calibration_coefficients.c"
 
 INCLUDE_DIRS
 "./include" 

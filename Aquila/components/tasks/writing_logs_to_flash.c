@@ -27,7 +27,7 @@ void writing_logs_to_flash(void * pvParameters)
       if (column_address >= (2048-sizeof(struct logging_data_set)))   //проверяем что в буфер (на эту страницу) еще что-то влезет
       {                             //если буфер заполнен - записываем страницу и инкрементируем адрес страницы
         column_address = 0;
-        W25N_program_execute(page_address);       //65536 pages, итого на 26 минут макс
+        W25N_program_execute(page_address);       //65536 страниц 
         page_address++;
       }
     if (page_address == 65535)                    //если страницы закончились

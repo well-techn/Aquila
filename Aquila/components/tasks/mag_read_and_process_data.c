@@ -29,7 +29,9 @@ void mag_read_and_process_data (void * pvParameters)
   float magn_data_axis_corrected[3]= {0,0,0};
   double mag_hard_bias[3] = {0,0,0};   //calibration values with Magneto 1.2
   
-  double mag_A_inv[3][3];   //calibration values with Magneto 1.2
+  double mag_A_inv[3][3] = {{0,  0,  0},    
+                            {0,  0,  0},
+                            {0,  0,  0}};   //calibration values with Magneto 1.2
 
   float magn_wo_hb[3] = {0,0,0};
   float magn_data_calibrated[3] = {0,0,0};

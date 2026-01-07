@@ -42,6 +42,48 @@ void blinking_flight_lights(void * pvParameters)
       vTaskDelay(50/portTICK_PERIOD_MS);
       gpio_set_level(RED_FLIGHT_LIGHTS, 0);
       vTaskDelay(750/portTICK_PERIOD_MS);
-    } 
+    }
+    
+    if (blinking_mode == 2)               //питание ниже 10,5В (4 зеленых 4 красных)
+    {  
+      for (uint8_t i = 0; i<4; i++)
+      {
+        gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
+        vTaskDelay(50/portTICK_PERIOD_MS);
+        gpio_set_level(GREEN_FLIGHT_LIGHTS, 0);
+        vTaskDelay(100/portTICK_PERIOD_MS);
+      }  
+      vTaskDelay(500/portTICK_PERIOD_MS);
+
+      for (uint8_t i = 0; i<4; i++)
+      {
+        gpio_set_level(RED_FLIGHT_LIGHTS, 1);
+        vTaskDelay(50/portTICK_PERIOD_MS);
+        gpio_set_level(RED_FLIGHT_LIGHTS, 0);
+        vTaskDelay(50/portTICK_PERIOD_MS);
+      }
+      vTaskDelay(250/portTICK_PERIOD_MS);
+    }
+
+    if (blinking_mode == 3)               //питание ниже 9,5В (4 зеленых 6 красных)
+    { 
+      for (uint8_t i = 0; i<6; i++)
+      {
+        gpio_set_level(GREEN_FLIGHT_LIGHTS, 1);
+        vTaskDelay(50/portTICK_PERIOD_MS);
+        gpio_set_level(GREEN_FLIGHT_LIGHTS, 0);
+        vTaskDelay(100/portTICK_PERIOD_MS);
+      }  
+      vTaskDelay(500/portTICK_PERIOD_MS);
+
+      for (uint8_t i = 0; i<6; i++)
+      {
+        gpio_set_level(RED_FLIGHT_LIGHTS, 1);
+        vTaskDelay(50/portTICK_PERIOD_MS);
+        gpio_set_level(RED_FLIGHT_LIGHTS, 0);
+        vTaskDelay(50/portTICK_PERIOD_MS);
+      }
+      vTaskDelay(250/portTICK_PERIOD_MS);
+    }
   }
 }

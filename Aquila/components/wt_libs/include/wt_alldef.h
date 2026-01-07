@@ -3,7 +3,9 @@
 
 #include <inttypes.h>
 
-#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во флеш
+#define FW_VERSION          "2025-12"
+
+#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во внешнюю флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
 #define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
 #define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
@@ -17,6 +19,40 @@
 #define TELNET_CONF_MODE
 //#define USING_PX4FLOW
 #define PREFLIGHT_POWER_CHECKUP
+//#define WIFI_INFLIGHT_TEST
+
+//набор дефайнов, определяющий какие данные будут записываться в "черный ящик" внешней флеш-памяти
+#ifdef USING_W25N
+  //#define LOGGING_ACCEL_1
+  //#define LOGGING_ACCEL_2
+ // #define LOGGING_GYRO_1
+  //#define LOGGING_GYRO_2
+  //#define LOGGING_AVG_ACCEL
+  //#define LOGGING_AVG_GYRO
+  //#define LOGGING_QUATERNION
+  //#define LOGGING_ANGLES
+
+  
+
+  #ifdef USING_TFMINIS_I2C
+    #define LOGGING_LIDAR_PID
+    #define LOGGING_LIDAR_ALTITUDE_CM
+  #endif
+  #ifdef USING_MS5611 
+    //#define LOGGING_BARO_ALTITUDE_CM
+    //#define LOGGING_KALMAN_ALTITUDE_CM
+    //#define LOGGING_KALMAN_VELOCITY
+    //#define LOGGING_BARO_PID
+  #endif
+  #define LOGGING_ALTITUDE_SETPOINT_CM
+  #define LOGGING_VOLTAGE_mV
+  //#define LOGGING_CURRENT_cA
+  //#define LOGGING_RC_COMMANDS
+  #define LOGGING_ENGINES
+  #define LOGGING_ENGINES_FILTERED
+  #define LOGGING_FLAGS
+  //#define LOGGING_RSSI_LEVEL
+#endif
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -67,7 +103,8 @@
 //GPIO и параметры UART для канала связи с пультом
 #define REMOTE_CONTROL_UART                           (2)                     //номер порта
 #define RC_UART_BAUD_RATE                             (57600)                 //скорость порта для канала связи с пультом 
-#define NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC            (13)                    //длина пакета данных, отправляемого пультом на дрон
+#define NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC    (13)                    //длина пакета данных управления, отправляемого пультом на дрон
+#define NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC        (8)                     //длина пакета данных с ПИД коэффициентами, отправляемого пультом на дрон
 #define NUMBER_OF_BYTES_TO_SEND_TO_RC                 (15)                    //длина пакета данных, отправляемого дроном на пульт    4
 #define RC_RX_UART_BUFF_SIZE                          (256)                   //размер буфера (256 это минимальное значение)
 #define RC_TX_UART_BUFF_SIZE                          (256)
@@ -76,7 +113,8 @@
 #define RC_UART_RTS_PIN                               (UART_PIN_NO_CHANGE)
 #define RC_UART_CTS_PIN                               (UART_PIN_NO_CHANGE)
 #define RC_UART_PATTERN_DETECTION_QUEUE_SIZE          (10)                    //длина очереди для алгоритма детектирования пэттерна (можно и меньше, с запасом)
-#define RC_MESSAGE_HEADER                             (0x4E)                  //заголовочный байт отправляемых пакетов, используется для кросс-проверки целостности данных
+#define RC_CONTROL_MESSAGE_HEADER                     (0x4E)                  //заголовочный байт отправляемых пультом пакетов, содержащих данные для управления, используется для кросс-проверки целостности данных
+#define RC_PID_COEFF_MESSAGE_HEADER                   (0x5E)                  //заголовочный байт отправляемых пультом пакетов, содержащих ПИД коэффициенты, используется для кросс-проверки целостности данных
 #define RC_NO_COMM_DELAY_MAIN_CYCLES                  (2000)                  //если в полете дроном не будет получен новый пакет от пульта в течение этого кол-ва циклов - считаем что связь с пультом утеряна и переходим в "автономный режим"
 #define RC_NO_COMM_THROTTLE_HOVER_VALUE               (9500)                  //значение уровня "газа" в автономном режиме            
 
@@ -90,13 +128,22 @@ typedef struct {
     float received_roll;                                                      //значение roll
     float received_yaw;                                                       //значение yaw
     uint16_t mode;                                                            //режим (два байта с состояниями тумблеров)
-    uint8_t trim_pitch;                                                       //значение trim по pitch 
-    uint8_t trim_roll;                                                        //значение trim по roll
+    int8_t trim_pitch;                                                        //значение trim по pitch 
+    int8_t trim_roll;                                                         //значение trim по roll
     uint8_t engines_start_flag;                                               //флаг запуска двигателей
     uint8_t lidar_altitude_hold_flag;                                         //флаг удержания высоты по лидару
     uint8_t baro_altitude_hold_flag;                                          //флаг удержания высоты по барометру
     int8_t rssi_level;
   } data_from_rc_to_main_struct;
+
+//структура для передачи ПИД-коэффициентов, полученных от пульта, от задачи обработки данных пульта в main_flying_cycle.
+//данные, полученные от пульта, обрабатываются в соответствующей задаче (RC_read_and_process_data), собираются в эту структуру
+// и отправляются через очередь в main_flying_cycle
+typedef struct {
+    uint16_t kp_alt_hold_coeff;
+    uint16_t ki_alt_hold_coeff;  
+    uint16_t kd_alt_hold_coeff;                                           
+  } pid_coeff_data_from_rc_to_main_struct;
 
 //структура для передачи данных от main_flying_cycle в задачу отправки телеметрии на пульт.
 //стрктура наполняется данными в main_flying_cycle и отправляется через очередь в задачу отправки телеметрии на пульт (send_data_to_RC)
@@ -217,33 +264,106 @@ typedef struct {
 #define SMPL                                    (0)                             //IMU sample rate = 1000Hz/ 1+SMPL
 #define MADGWICK_BETA                           (0.2) //0.999
 
-//Параметры записи логов во внешнюю флэш
+
+
+//Структура для записи логов во внешнюю флэш
+//безусловно в состав входит только timestamp
+//остальное набирается define'ами выше, чтобы не писать лишнее и не тратить место и время
+#ifdef USING_W25N
 struct logging_data_set {                             
   uint32_t timestamp;
-  int16_t accel[3];
-  int16_t gyro[3];                                                          
-  float q[4];
-  float angles[3]; //pitch, roll,yaw
-  uint16_t lidar_altitude_cm;
-  //uint16_t lidar_strength;
-  uint16_t baro_altitude_cm;
-  int16_t kalman_altitude_cm;
-  int16_t kalman_velocity_cm;
-  uint16_t altitude_setpoint_cm;
-  int16_t px4flow_position_x_cm;
-  int16_t px4flow_position_y_cm;
-  uint8_t px4flow_quality;
-  uint16_t voltage_mv;
-  uint16_t current_ca;    //сантиамперы, чтобы влезло в 2 байта
-  float throttle_command;
-  float pitch_command;
-  float roll_command;
-  float yaw_command;
-  uint16_t mode_command;
-  uint32_t engines[4];
-  uint16_t flags;
-  int8_t rssi_level;                                                  
+  #ifdef LOGGING_ACCEL_1 
+    int16_t accel_1[3];
+  #endif
+
+  #ifdef LOGGING_ACCEL_2 
+    int16_t accel_2[3];
+  #endif
+
+  #ifdef LOGGING_GYRO_1 
+    int16_t gyro_1[3];
+  #endif
+
+  #ifdef LOGGING_GYRO_2 
+    int16_t gyro_2[3];
+  #endif
+
+  #ifdef LOGGING_AVG_ACCEL
+    int16_t accel_avg[3];
+  #endif
+
+  #ifdef LOGGING_AVG_GYRO
+    int16_t gyro_avg[3];
+  #endif
+
+  #ifdef LOGGING_QUATERNION                                                          
+    float q[4];
+  #endif
+
+  #ifdef LOGGING_ANGLES 
+    float angles[3]; //pitch, roll,yaw
+  #endif
+
+  #ifdef LOGGING_LIDAR_PID
+    float error;
+    float P_component;
+    float I_component;
+    float D_component;
+  #endif
+
+  #ifdef LOGGING_LIDAR_ALTITUDE_CM
+    uint16_t lidar_altitude_cm;
+  #endif
+  
+  #ifdef LOGGING_BARO_ALTITUDE_CM
+    uint16_t baro_altitude_cm;
+  #endif
+
+  #ifdef LOGGING_KALMAN_ALTITUDE_CM
+    int16_t kalman_altitude_cm;
+  #endif
+
+  #ifdef LOGGING_KALMAN_VELOCITY
+    int16_t kalman_velocity_cm;
+  #endif
+
+  #ifdef LOGGING_ALTITUDE_SETPOINT_CM
+    uint16_t altitude_setpoint_cm;
+  #endif
+
+  #ifdef LOGGING_VOLTAGE_mV
+    uint16_t voltage_mv;
+  #endif
+
+  #ifdef LOGGING_CURRENT_cA
+    uint16_t current_ca;    //сантиамперы, чтобы влезло в 2 байта
+  #endif
+
+  #ifdef LOGGING_RC_COMMANDS
+    float throttle_command;
+    float pitch_command;
+    float roll_command;
+    float yaw_command;
+    uint16_t mode_command;
+  #endif
+
+  #ifdef LOGGING_ENGINES
+    uint32_t engines[4];
+  #endif
+
+  #ifdef LOGGING_ENGINES_FILTERED
+    uint32_t engines_filtered[4];
+  #endif
+
+  #ifdef LOGGING_FLAGS
+    uint16_t flags;
+  #endif
+
+  #ifdef LOGGING_RSSI_LEVEL
+  int8_t rssi_level;
+  #endif                                                  
 };
+#endif
 
 
 //ниже общие параметры
@@ -282,6 +402,7 @@ struct logging_data_set {
 #define MS5611_READ_AND_PROCESS_DATA_STACK_SIZE       (4096)
 #define PX4FLOW_READ_AND_PROCESS_DATA_STACK_SIZE      (4096)
 #define EMERGENCY_MODE_STACK_SIZE                     (4096)
+#define SENDING_SOMETHING_OVER_WIFI_STACK_SIZE        (4096)
 
 //приоритеты задач
 #define MCP23017_MONITORING_AND_CONTROL_PRIORITY      (1)
@@ -301,6 +422,7 @@ struct logging_data_set {
 #define MS5611_READ_AND_PROCESS_DATA_PRIORITY         (2)
 #define PX4FLOW_READ_AND_PROCESS_DATA_PRIORITY        (4)
 #define EMERGENCY_MODE_PRIORITY                       (1)
+#define SENDING_SOMETHING_OVER_WIFI_PRIORITY          (2)
 
 #define BATTERY_CAPACITY                              (2200) //мА*ч
 #define VERT_ACC_FILTER_F_CUT                         (8.0)  

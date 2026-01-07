@@ -12,6 +12,7 @@
 extern  char *TAG_RC;
 extern QueueHandle_t remote_control_queue_for_events;  //очередь для передачи событий от UART пульта управления (pattern detection) в задачу обработки данных пульта
 extern QueueHandle_t remote_control_to_main_queue; //очередь для передачи обработанных данных от пульта в main_flying_cycle
+extern QueueHandle_t remote_control_to_main_pid_queue; //очередь для передачи ПИД-коэффциентов от пульта в main_flying_cycle
 extern QueueHandle_t PCA9685_queue;
 extern TaskHandle_t task_handle_send_data_to_RC;
 
@@ -54,14 +55,16 @@ void RC_read_and_process_data(void * pvParameters)
   int16_t pos = 0;
   uint8_t remote_packets_counter = 0;
   uart_event_t remote_control_uart_event;
-  uint8_t incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2];
+  uint8_t incoming_message_buffer_remote[NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC * 2];
   uint16_t received_throttle = 0;
   uint16_t received_pitch = 2000;                       //среднее положение
   uint16_t received_roll = 2000;
   uint16_t received_yaw = 2000;
-  short trim_roll = -1;
-  short trim_pitch = 2;
+  //short trim_roll = -1;
+  //short trim_pitch = 2;
   data_from_rc_to_main_struct remote_control_data;
+    remote_control_data.lidar_altitude_hold_flag = 0;
+    remote_control_data.baro_altitude_hold_flag = 0;
   
   float rc_throttle_old = 0;
   float rc_pitch_old = 0;
@@ -77,8 +80,13 @@ void RC_read_and_process_data(void * pvParameters)
   uint8_t LED_status = 0;
   uint8_t start_flag_old = 0;
 
-  remote_control_data.lidar_altitude_hold_flag = 0;
-  remote_control_data.baro_altitude_hold_flag = 0;
+  uint8_t engines_start_flag_delay = 0;
+
+  pid_coeff_data_from_rc_to_main_struct pid_coeff_data;
+    pid_coeff_data.kp_alt_hold_coeff = 0;
+    pid_coeff_data.ki_alt_hold_coeff = 0;
+    pid_coeff_data.kd_alt_hold_coeff = 0;
+
   
   ESP_LOGI(TAG_RC,"Настраиваем UART для пульта управления.....");
   remote_control_uart_config();
@@ -95,7 +103,7 @@ void RC_read_and_process_data(void * pvParameters)
         case UART_PATTERN_DET:                                  //если это то что надо - 
           pos = uart_pattern_pop_pos(REMOTE_CONTROL_UART);      //запрашиваем на какой позиции в буфере обнаружен символ конца строки
           ESP_LOGD(TAG_RC, "[UART PATTERN DETECTED] pos: %d", pos);
-          if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-1))    //если это не то место, где он должен быть - значит пакет поступил не полностью из-за какого-то сбоя, 
+          if (pos != (NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC-1))    //если это не то место, где он должен быть - значит пакет поступил не полностью из-за какого-то сбоя, 
           {
             uart_flush_input(REMOTE_CONTROL_UART);              //очищаем входящий буфер и очередь  
             xQueueReset(remote_control_queue_for_events);
@@ -110,8 +118,8 @@ void RC_read_and_process_data(void * pvParameters)
                   
           ESP_ERROR_CHECK(uart_get_buffered_data_len(REMOTE_CONTROL_UART, (size_t*)&pos));  //запрашиваем сколько байт получено
           ESP_LOGD(TAG_RC, "Получено %d байт по data", pos);
-
-          if (pos != (NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC + 1))                              //если не столько сколько должно быть
+//если не совпадает по кол-ву ни с одним ожидаемым пакетом то в мусор
+          if ((pos != (NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC + 1)) && (pos != (NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC + 1)))                              //если не столько сколько должно быть
           {
             uart_flush_input(REMOTE_CONTROL_UART);              //очищаем входящий буфер и очередь  
             xQueueReset(remote_control_queue_for_events);
@@ -119,16 +127,17 @@ void RC_read_and_process_data(void * pvParameters)
           }                    
           else                                                 //если все ок     
             {                                                                                
-              int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos, 0);  //считываем в локальный буфер    
+              int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos, 0);  //считываем в локальный буфер 
+              ESP_LOGD(TAG_RC, "Всего получено %d байт", read_len);   
 
 #endif            
-            ESP_LOGD(TAG_RC, "Received in total %d bytes", read_len);
+            ESP_LOG_BUFFER_HEX(TAG_RC, incoming_message_buffer_remote, read_len);
 
-            //проверяем покет на целостность по заголовку и контрольной сумме
-            if ((incoming_message_buffer_remote[0] == RC_MESSAGE_HEADER) 
-            && (incoming_message_buffer_remote[NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC-2)))
+//проверяем пакет на целостность по заголовку и контрольной сумме
+            if ((incoming_message_buffer_remote[0] == RC_CONTROL_MESSAGE_HEADER) 
+            && (incoming_message_buffer_remote[NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC - 2] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC-2)))
             {
-              ESP_LOGD(TAG_RC, "CRC passed");
+              ESP_LOGD(TAG_RC, "Получен пакет данных управления с корректной CRC");
 //очищаем буфер
               uart_flush(REMOTE_CONTROL_UART);
 //моргаем одним из светодиодов на плате
@@ -182,17 +191,29 @@ void RC_read_and_process_data(void * pvParameters)
               remote_control_data.received_yaw = remote_control_data.received_yaw * RC_FILTER_COEFF + rc_yaw_old * (1 - RC_FILTER_COEFF);
               rc_yaw_old = remote_control_data.received_yaw;
 
-//формируем значения trim (не используется далее, но пусть будет)
-              if (incoming_message_buffer_remote[9] & 0b00001000) {                            //if roll negative values
-              trim_roll = (((~(incoming_message_buffer_remote[9] & 0b00001111)) & 0b00001111) + 1) * -1;}
-              else trim_roll = incoming_message_buffer_remote[9] & 0b00001111;
+//формируем значения trim 
+//если значения отрицательные то маскируем и переводим в доп код
+              if (incoming_message_buffer_remote[9] & 0b10000000) {                            
+              remote_control_data.trim_pitch = (((~((incoming_message_buffer_remote[9] >> 4) & 0b00001111)) & 0b00001111)  + 1) * -1;}
+//в противном случае берем как есть
+              else remote_control_data.trim_pitch = (incoming_message_buffer_remote[9] >> 4) & 0b00001111; 
 
-              if (incoming_message_buffer_remote[9] & 0b10000000) {                            //if pitch negative values
-              trim_pitch = (((~((incoming_message_buffer_remote[9] >> 4) & 0b00001111)) & 0b00001111)  + 1) * -1;}
-              else trim_pitch = (incoming_message_buffer_remote[9] >> 4) & 0b00001111; 
+              if (incoming_message_buffer_remote[9] & 0b00001000) {                            
+              remote_control_data.trim_roll = (((~(incoming_message_buffer_remote[9] & 0b00001111)) & 0b00001111) + 1) * -1;}
+              else remote_control_data.trim_roll = incoming_message_buffer_remote[9] & 0b00001111;
 
-//если ручка газа в нижнем положении и включен тумблер "старт двигателей" установить флаг engines_start_flag        
-              if ((remote_control_data.received_throttle < 8400) && (remote_control_data.mode & 0x0001)) remote_control_data.engines_start_flag = 1;
+//если ручка газа удерживается (на протяжении 15 посылок) в нижнем положении и включен тумблер "старт двигателей" установить флаг engines_start_flag        
+              if ((remote_control_data.received_throttle < 8400) && (remote_control_data.mode & 0x0001))
+              {
+                engines_start_flag_delay++;
+                if (engines_start_flag_delay > 15)
+                {
+                  remote_control_data.engines_start_flag = 1;
+                  engines_start_flag_delay = 0;
+                }
+              }  
+              else engines_start_flag_delay = 0;
+            
 //если тумблер "старт двигателей" выключен - обнуляем бит engines_start_flag (при любом положении ручки газа)                
               if (!(remote_control_data.mode & 0x01)) 
               { 
@@ -230,10 +251,7 @@ void RC_read_and_process_data(void * pvParameters)
 //копируем в структуру байт с уровнем RSSI 
               remote_control_data.rssi_level = (int8_t)incoming_message_buffer_remote[13];
 //отправляем сформированную структуру с обработанными данными от пульта в main_flying_cycle                
-              xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);
-//обнуляем на всякий случай буфер
-              for (i=0;i<NUMBER_OF_BYTES_TO_RECEIVE_FROM_RC * 2;i++) incoming_message_buffer_remote[i] = 0;           
-              
+              xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);                      
               mode_old = remote_control_data.mode;
               start_flag_old = remote_control_data.engines_start_flag;
 //каждый 3й раз пробуждаем задачу отправки телеметрии на пульт
@@ -246,14 +264,30 @@ void RC_read_and_process_data(void * pvParameters)
               }
 */  
             }
+            
+            else if ((incoming_message_buffer_remote[0] == RC_PID_COEFF_MESSAGE_HEADER) 
+            && (incoming_message_buffer_remote[NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC - 1] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC - 1)))
+            {
+              ESP_LOGD(TAG_RC, "Получен пакет данных с ПИД-коэффициентами с корректной CRC");
+//собираем полученные данные с ПИД-коэффициентами в структуру
+              pid_coeff_data.kp_alt_hold_coeff = (incoming_message_buffer_remote[1] << 8) | incoming_message_buffer_remote[2];
+              pid_coeff_data.ki_alt_hold_coeff = (incoming_message_buffer_remote[3] << 8) | incoming_message_buffer_remote[4];
+              pid_coeff_data.kd_alt_hold_coeff = (incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6];
+//отправляем эту структуру в очередь
+              xQueueSend(remote_control_to_main_pid_queue, (void *) &pid_coeff_data, NULL);  
+            }
+            
             else 
             { 
-              ESP_LOGW(TAG_RC, "CRC failed");
+              ESP_LOGW(TAG_RC, "Ошибка по заголовку или контрольной сумме");
               //for (j=0;j<13;j++) printf ("%02x ",incoming_message_buffer_remote[j]);       
               uart_flush(REMOTE_CONTROL_UART);
               xQueueReset(remote_control_queue_for_events);
             }  
           }
+
+//обнуляем на всякий случай буфер
+            for (i=0;i<NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC * 2;i++) incoming_message_buffer_remote[i] = 0; 
           break;
 
         case UART_FIFO_OVF:

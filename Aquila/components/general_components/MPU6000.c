@@ -135,12 +135,12 @@ esp_err_t MPU6000_init(spi_device_handle_t MPU_handle) {
     esp_err_t err = ESP_OK;
     uint8_t i = 0;
     uint8_t reg_value = 0;
-    uint8_t MPU6000_configuration_data[9][2] = {{MPU6000_PWR_MGMT_1,         0x80},         //resetting device         
-                                                {MPU6000_SIGNAL_PATH_RESET,  0x07},         //resetting device                 
-                                                {MPU6000_PWR_MGMT_1,         0x00},         //internal clock         
-                                                {MPU6000_CONFIG,             0b00000110},   //5Hz filter, was 20Hz all the time       
-                                                {MPU6000_SMPLRT_DIV,         SMPL},         //sampling frequency         
-                                                {MPU6000_GYRO_CONFIG,        0x00},         //250 deg per second                
+    uint8_t MPU6000_configuration_data[9][2] = {{MPU6000_PWR_MGMT_1,         0x80},         //сброс       
+                                                {MPU6000_SIGNAL_PATH_RESET,  0x07},         //сброс                
+                                                {MPU6000_PWR_MGMT_1,         0x00},         //внутренняя синхра        
+                                                {MPU6000_CONFIG,             0b00000110},   //фильтр на 5Гц    
+                                                {MPU6000_SMPLRT_DIV,         SMPL},         //частота сэмплирования       
+                                                {MPU6000_GYRO_CONFIG,        0x00},         //гироскоп 250 град в сек макс               
                                                 {MPU6000_ACCEL_CONFIG,       0x08},          
                                                 {MPU6000_USER_CTRL,          0b00010000},
                                                 {MPU6000_INT_ENABLE,         0x01}};         
@@ -150,7 +150,7 @@ esp_err_t MPU6000_init(spi_device_handle_t MPU_handle) {
         ets_delay_us(10000);  
     }
 
-    for (i=2; i<9; i++) { //checking against predefined configuration
+    for (i=2; i<9; i++) { //проверяем записанные значения
         reg_value = SPI_read_byte(MPU_handle, 0, 0, 8, MPU6000_configuration_data[i][0] | MPU6000_READ_FLAG, 0);
         if ( reg_value != MPU6000_configuration_data[i][1]) {
             err = ESP_FAIL;
