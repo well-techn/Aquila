@@ -20,7 +20,7 @@ RGB LED FL3195
 Барометр MS5611  
 
 Принципиальная схема всего этого хозяйства в сборе https://cloud.mail.ru/public/YBk3/L4gjcgRvh  
-Структура задач FreeRTOS https://cloud.mail.ru/public/YBk3/L4gjcgRvh  
+Структура задач FreeRTOS [https://cloud.mail.ru/public/YBk3/L4gjcgRvh  ](https://cloud.mail.ru/public/Susz/yzpGiBbRx)
 
 
 ## Дополнительно
