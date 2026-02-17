@@ -101,12 +101,9 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
   
    if (gpio_intr_status_1 & (1ULL << A2))   //сигнал от кнопки аварийной остановки на Holybro M9N, выключаем двигатели
   {
-    ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN, 0);   //аварийно останавливаем двигатели
-    gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN, 0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN, 0);
-    gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN, 0);
     gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
+    xTaskGenericNotifyFromISR(task_handle_emergency_mode, 0, 0x01 << 13, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken); //активировать аварийную задачу, передавая ей код вызвавшей ошибки
+    portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
   }  
   
   if (gpio_intr_status_1 & (1ULL << MPU6000_1_INTERRUPT_PIN))   //сигнал от IMU1
@@ -146,7 +143,7 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
     xTaskGenericNotifyFromISR(task_handle_main_flying_cycle, 0, 1, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken);     //1 - код что 1ый завис
   }
 
-  portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 //прерывание от таймера зависания основного полетного цикла
@@ -154,15 +151,9 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
 static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    
 { 
   BaseType_t xHigherPriorityTaskWoken  = pdFALSE;
-
-  ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN, 0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN, 0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN, 0);
-  gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN, 0);
   gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
-  xTaskGenericNotifyFromISR(task_handle_emergency_mode, 0, 1, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken); //активировать аварийную задачу
-  portYIELD_FROM_ISR( xHigherPriorityTaskWoken);
+  xTaskGenericNotifyFromISR(task_handle_emergency_mode, 0, 0x01 << 14, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken); //активировать аварийную задачу, передавая ей код вызвавшей ошибки
+  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 
@@ -317,6 +308,17 @@ void main_flying_cycle(void * pvParameters)
   float accel_2_converted_accumulated[3] = {0.0,0.0,0.0};
   float gyro_2_converted_accumulated[3] = {0.0,0.0,0.0};
 
+#ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES
+  float accel_1_total = 0;
+  float accel_2_total = 0;
+  float accel_1_total_max = 0;
+  float accel_2_total_max = 0;
+  uint8_t accel_1_exceed_limit_counter = 0;
+  uint8_t accel_2_exceed_limit_counter = 0;
+  uint8_t pitch_exceed_limit_counter = 0;
+  uint8_t roll_exceed_limit_counter = 0;
+#endif
+
 #ifdef USING_MAGNETOMETER
   const uint8_t madgwick_cycles = 1;
 #else 
@@ -421,6 +423,8 @@ void main_flying_cycle(void * pvParameters)
     rc_fresh_data.engines_start_flag = 0;
     rc_fresh_data.lidar_altitude_hold_flag = 0;
     rc_fresh_data.baro_altitude_hold_flag = 0;
+    rc_fresh_data.trim_pitch = 0;
+    rc_fresh_data.trim_roll = 0;
   data_from_main_to_rc_struct data_to_send_to_rc;
   uint32_t remote_control_lost_comm_counter = 0;
 
@@ -451,7 +455,7 @@ void main_flying_cycle(void * pvParameters)
   PIDController_t lidar_alt_hold_pid;
     lidar_alt_hold_pid.kp = 4.5;  //10       //  раб значения 8, 350, 0.2
     lidar_alt_hold_pid.kd = 200.0; //306      //
-    lidar_alt_hold_pid.ki = 0.15;  //0.4       //
+    lidar_alt_hold_pid.ki = 0.10;  //0.4       //
     lidar_alt_hold_pid.prev_error = 0;
     lidar_alt_hold_pid.alpha = 0.75; //0.6
     lidar_alt_hold_pid.integral_error = 0;
@@ -460,9 +464,9 @@ void main_flying_cycle(void * pvParameters)
     lidar_alt_hold_pid.throttle_limit = 0;
   
   PIDController_t baro_alt_hold_pid;
-    baro_alt_hold_pid.kp = 5.0;  //      //  раб значения 8, 290, 0.16
-    baro_alt_hold_pid.kd = 175.0; //      //
-    baro_alt_hold_pid.ki = 0.25;  //       //
+    baro_alt_hold_pid.kp = 4.5;        //  раб значения 5, 175, 0.25
+    baro_alt_hold_pid.kd = 200.0;       
+    baro_alt_hold_pid.ki = 0.10;         
     baro_alt_hold_pid.prev_error = 0;
     baro_alt_hold_pid.alpha = 0;
     baro_alt_hold_pid.integral_error = 0;
@@ -481,30 +485,29 @@ void main_flying_cycle(void * pvParameters)
   float INA219_fresh_data[4];
   float voltage_correction_coeff = 1.0;
   
-  //переменные для логирования
+//переменные для логирования
   uint64_t start_time = 0;
-  uint8_t flags_byte = 0;
-  struct logging_data_set set_to_log;
+  struct logging_data_set set_to_log = {0};
   struct logging_data_set* p_to_log_structure = &set_to_log;
 
 
 #ifdef USING_MAVLINK_TELEMETRY
-    mavlink_data_set_t main_to_mavlink_data;
+  mavlink_data_set_t main_to_mavlink_data;
     main_to_mavlink_data.latitude = 111111111;     //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
     main_to_mavlink_data.longtitude = 222222222;
-    mavlink_data_set_t* p_to_mavlink_data = &main_to_mavlink_data;
+  mavlink_data_set_t* p_to_mavlink_data = &main_to_mavlink_data;
 #endif
 
 #ifdef USING_MS5611
-    float baro_altitude_cm = 0;
+  float baro_altitude_cm = 0;
 #endif
 
 #ifdef USING_PX4FLOW
-    data_from_px4flow_to_main_struct_t px4flow_fresh_data;
+  data_from_px4flow_to_main_struct_t px4flow_fresh_data;
 #endif
 
-uint64_t temp;
-double* p_double;
+  uint64_t temp;
+  double* p_double;
 
 KalmanFilter2d_t Kalm_vert;
   Kalm_vert.dt = 0.001;                             // интервал времени
@@ -655,6 +658,14 @@ void prepare_logs(void) {
   for (i=0; i<3;i++) set_to_log.accel_2[i] = accel_raw_2[i];
 #endif
 
+#ifdef LOGGING_ACCEL_1_MAX
+   set_to_log.accel_1_max = accel_1_total_max;
+#endif
+
+#ifdef LOGGING_ACCEL_2_MAX
+   set_to_log.accel_2_max = accel_2_total_max;
+#endif
+
 #ifdef LOGGING_GYRO_1
   for (i=0; i<3;i++) set_to_log.gyro_1[i] = gyro_raw_1[i];
 #endif
@@ -685,15 +696,21 @@ void prepare_logs(void) {
 #endif
 
 #ifdef LOGGING_LIDAR_PID
-    set_to_log.error = lidar_alt_hold_pid.error;
-    set_to_log.P_component = lidar_alt_hold_pid.error * lidar_alt_hold_pid.kp;
-    set_to_log.I_component = lidar_alt_hold_pid.integral_error;
-    set_to_log.D_component = lidar_alt_hold_pid.kd * lidar_alt_hold_pid.error_diff_filtered;
+  set_to_log.lidar_pid_error = lidar_alt_hold_pid.error;
+  set_to_log.lidar_pid_P_component = lidar_alt_hold_pid.error * lidar_alt_hold_pid.kp;
+  set_to_log.lidar_pid_I_component = lidar_alt_hold_pid.integral_error;
+  set_to_log.lidar_pid_D_component = lidar_alt_hold_pid.kd * lidar_alt_hold_pid.error_diff_filtered;
 #endif
-
 
 #ifdef LOGGING_LIDAR_ALTITUDE_CM
   set_to_log.lidar_altitude_cm = (uint16_t)lidar_altitude_corrected;
+#endif
+
+#ifdef LOGGING_BARO_PID
+    set_to_log.baro_pid_error = baro_alt_hold_pid.error;
+    set_to_log.baro_pid_P_component = baro_alt_hold_pid.error * baro_alt_hold_pid.kp;
+    set_to_log.baro_pid_I_component = baro_alt_hold_pid.integral_error;
+    set_to_log.baro_pid_D_component = baro_alt_hold_pid.kd * baro_alt_hold_pid.error_diff_filtered;
 #endif
 
 #ifdef LOGGING_BARO_ALTITUDE_CM
@@ -736,16 +753,13 @@ void prepare_logs(void) {
   for (i=0;i<4;i++) set_to_log.engines_filtered[i] = engine_filtered[i];
 #endif
 
-#ifdef LOGGING_FLAGS
-  if (rc_fresh_data.engines_start_flag) flags_byte |= 0b00000001;                                 //bit0 - engine start flag
-   else flags_byte &= 0b11111110;
-  if (lidar_altitude_hold_mode_enabled) flags_byte |= 0b00000010;                                 //bit1 - lidar altitude hold flag
-  else flags_byte &= 0b11111101;
-  if (baro_altitude_hold_mode_enabled) flags_byte |= 0b00000100;                                 //bit2 - baro altitude hold flag
-  else flags_byte &= 0b11111011;
-  if ((remote_control_lost_comm_counter == RC_NO_COMM_DELAY_MAIN_CYCLES) && (rc_fresh_data.engines_start_flag)) flags_byte |= 0b10000000; //bit8 - comm lost flag
-   else flags_byte &= 0b01111111;
-  set_to_log.flags = flags_byte;
+#ifdef LOGGING_STATE_FLAGS
+  if (rc_fresh_data.engines_start_flag) set_to_log.state_flags |= 0b00000001;                                 //bit0 - engine start flag
+   else set_to_log.state_flags &= 0b11111110;
+  if (lidar_altitude_hold_mode_enabled) set_to_log.state_flags |= 0b00000010;                                 //bit1 - lidar altitude hold flag
+  else set_to_log.state_flags &= 0b11111101;
+  if (baro_altitude_hold_mode_enabled) set_to_log.state_flags |= 0b00000100;                                 //bit2 - baro altitude hold flag
+  else set_to_log.state_flags &= 0b11111011;
 #endif
 
 #ifdef LOGGING_RSSI_LEVEL
@@ -995,16 +1009,16 @@ void NVS_reading_calibration_values(void)
   if ((gyro_1_offset[0] || gyro_1_offset[1] || gyro_1_offset[2]) == 0)
   {
     ESP_LOGE(TAG_FLY,"Гироскопы не откалиброваны, запуститесь в сервисном режиме и проведите калибровку гироскопов\n");
-    uint16_t error_code = 23;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    uint16_t LED_error_code = 23;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&LED_error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
   }
 
   if ((accel_1_bias[0] || accel_1_bias[1] || accel_1_bias[2] || accel_2_bias[0] || accel_2_bias[1] || accel_2_bias[2]) == 0)
   {
     ESP_LOGE(TAG_FLY,"Акселерометры не откалиброваны, запуститесь в сервисном режиме и проведите калибровку акселерометров\n");
-    uint16_t error_code = 23;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    uint16_t LED_error_code = 23;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&LED_error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
   }
 //без этой задержки assertion не проходит, хз почему
@@ -1037,8 +1051,8 @@ while(1)
 //ждем прихода нотификации от обработчика прерываний      
     IMU_interrupt_status = ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 //на всякий случай проверяем что не нулевой      
-    if (IMU_interrupt_status != 0) {
-      
+    if (IMU_interrupt_status != 0) 
+    {
       gpio_set_level(LED_RED, 1);
 
       large_counter++;                //увеличиваем глобальный счетчик циклов 
@@ -1053,7 +1067,7 @@ while(1)
       {
         SPI_read_bytes(MPU6000_1, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_1, 14);
         for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i];
-        flags_byte |= 0b00001000;                                 //прописываем во флаги что имело место зависание IMU2
+        set_to_log.error_flags |= 0x01 << 1;                                 //прописываем во флаги что имело место зависание IMU2
         //ESP_LOGE(TAG_FLY, "Ошибка времени IMU2");
       }
 
@@ -1061,14 +1075,20 @@ while(1)
       {
         SPI_read_bytes(MPU6000_2, 0, 0, 8, MPU6000_ACCEL_XOUT_H | SPI_READ_FLAG, 0, sensor_data_2, 14);
         for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i];
-        flags_byte |= 0b00010000;                                 //прописываем во флаги что имело место зависание IMU1
+        set_to_log.error_flags |= 0x01;                                 //прописываем во флаги что имело место зависание IMU1
         //ESP_LOGE(TAG_FLY, "Ошибка времени IMU1");
       } 
       
       else //если статус не 1,2 или 5 то капец всему, хз что происходит
       {
-        ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0); //аварийная остановка моторов
-        xTaskNotifyGive(task_handle_emergency_mode);         //активируем аварийную задачу
+        set_to_log.error_flags |= 0b0000000000000011;                            //прописываем во флаги ошибка проверки по обоим IMU
+        set_to_log.error_flags |= (0x01 << 15);                                  //фиксируем аварийный режим
+        prepare_logs();
+        vTaskPrioritySet(task_handle_writing_logs_to_flash,10);      //повышаем приоритет задачи записи логов чтобы отобразить в логах текущее состояние
+        xQueueSend(W25N01_queue, &p_to_log_structure, 0);   //инициируем внеплановую запись в логи зафиксировать текущее состояние
+        uint8_t LED_error_code = 31;
+        xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&LED_error_code,0,NULL);
+        xTaskNotify(task_handle_emergency_mode, (uint32_t)set_to_log.error_flags,eSetValueWithOverwrite);
         while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);}
       }
 
@@ -1078,8 +1098,15 @@ while(1)
       else counter_for_equal_prev_IMU1 = 0;
       
       test_for_all_equal = all_array_elements_are_equal(sensor_data_1, 14);
-//если более 10 пакетов подряд равны между собой или весь пакет одинаковый          
-      if ((counter_for_equal_prev_IMU1 > 10) || (test_for_all_equal == 1)) IMU_1_data_fail = 1;    
+
+//если более 10 пакетов подряд равны между собой или весь пакет одинаковый
+      if ((counter_for_equal_prev_IMU1 > 10) || (test_for_all_equal == 1)) 
+      {
+        IMU_1_data_fail = 1;
+//детализируем проблему для логов 
+        if (counter_for_equal_prev_IMU1 > 10) set_to_log.error_flags |= 0x01 << 2;
+        if (test_for_all_equal == 1) set_to_log.error_flags |= 0x01 << 3;  
+      }    
       else IMU_1_data_fail = 0;
 
 //проверяем данные с IMU2 на предмет равенства всех элементов или равенства текущего пакета предыдущему с инкрементом счетчика одинаковых пакетов
@@ -1089,7 +1116,13 @@ while(1)
       
       test_for_all_equal = all_array_elements_are_equal(sensor_data_2, 14);
 //если более 10 пакетов подряд равны между собой или весь пакет одинаковый             
-      if ((counter_for_equal_prev_IMU2 > 10) || (test_for_all_equal == 1)) IMU_2_data_fail = 1;
+      if ((counter_for_equal_prev_IMU2 > 10) || (test_for_all_equal == 1)) 
+      {
+        IMU_2_data_fail = 1;
+//детализируем проблему для логов 
+        if (counter_for_equal_prev_IMU2 > 10) set_to_log.error_flags |= 0x01 << 4;
+        if (test_for_all_equal == 1) set_to_log.error_flags |= 0x01 << 5;
+      }    
       else IMU_2_data_fail = 0;
 
 //осуществляем корректирующие действия
@@ -1097,11 +1130,13 @@ while(1)
       if (IMU_1_data_fail && IMU_2_data_fail)  
       {
         ESP_LOGE(TAG_FLY,"Ошибка обоих IMU");
-        ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0); //аварийно выключаем моторы
-        flags_byte |= 0b01100000;                            //прописываем во флаги ошибка проверки по обоим IMU
-        uint8_t error_code = 4;
-        xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-        xTaskNotifyGive(task_handle_emergency_mode);    //активируем аварийную задачу
+        set_to_log.error_flags |= (0x01 << 15);  
+        prepare_logs();
+        vTaskPrioritySet(task_handle_writing_logs_to_flash,10);      //повышаем приоритет задачи записи логов чтобы отобразить в логах текущее состояние
+        xQueueSend(W25N01_queue, &p_to_log_structure, 0);            //инициируем внеплановую запись в логи зафиксировать текущее состояние
+        uint8_t LED_error_code = 30;
+        xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&LED_error_code,0,NULL);
+        xTaskNotify(task_handle_emergency_mode, (uint32_t)set_to_log.error_flags,eSetValueWithOverwrite);
         while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
       }
 //если не прошели проверку данные с  IMU1
@@ -1110,7 +1145,6 @@ while(1)
 //заменяем их данными с IMU2
         ESP_LOGE(TAG_FLY,"Ошибка по IMU1");
         for (i=0;i<14;i++) sensor_data_1[i] = sensor_data_2[i];
-        flags_byte |= 0b00100000;                                 //прописываем во флаги ошибка проверки по 1му IMU
       }
 //если не прошели проверку данные с  IMU2
       else if (IMU_2_data_fail) 
@@ -1118,7 +1152,6 @@ while(1)
 //заменяем их данными с IMU1
         ESP_LOGE(TAG_FLY,"Ошибка по IMU2");
         for (i=0;i<14;i++) sensor_data_2[i] = sensor_data_1[i];
-        flags_byte |= 0b01000000;                                 //прописываем во флаги ошибка проверки по 2му IMU
       }
 //сохраняем текущие данные в переменные для хранения старых данных
       for (i = 0;i<14;i++)
@@ -1155,12 +1188,9 @@ while(1)
       accel_2_converted[0] = (float)accel_2_A_inv[0][0]*accel_2_wo_hb[0] + (float)accel_2_A_inv[0][1]*accel_2_wo_hb[1] + (float)accel_2_A_inv[0][2]*accel_2_wo_hb[2];
       accel_2_converted[1] = (float)accel_2_A_inv[1][0]*accel_2_wo_hb[0] + (float)accel_2_A_inv[1][1]*accel_2_wo_hb[1] + (float)accel_2_A_inv[1][2]*accel_2_wo_hb[2];
       accel_2_converted[2] = (float)accel_2_A_inv[2][0]*accel_2_wo_hb[0] + (float)accel_2_A_inv[2][1]*accel_2_wo_hb[1] + (float)accel_2_A_inv[2][2]*accel_2_wo_hb[2];
-//ручная докалибровка блин
+//ручная докалибровка блин ((
       accel_2_converted[2] -=67;
       
-      //if (large_counter%100 == 0) printf("%f, %f, %f, %f\n",  accel_2_converted[0], accel_2_converted[1], accel_2_converted[2], 
-      //  sqrtf(accel_2_converted[0]*accel_2_converted[0]+accel_2_converted[1]*accel_2_converted[1]+accel_2_converted[2]*accel_2_converted[2]));
-
 //переводим показания акселерометра в G      
       for (i=0;i<3;i++) 
           {
@@ -1237,6 +1267,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
 //выполняем преобразование из кватерниона в углы Эйлера  
         Convert_Q_to_degrees_fast(q0, q1, q2, q3, &pitch, &roll, &yaw);
 //применяем триммирующие поправки, полуаемые от пульта управления(величина меняется от -7 до 7, коэффициент регулирует чувствительность)
+//если, например, коэффициент 0.5, то диапазон регулировки от -3.5 до +3.5 градусов
         pitch += rc_fresh_data.trim_pitch * 0.5;
         roll -= rc_fresh_data.trim_roll * 0.5;
       }
@@ -1308,6 +1339,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
             rc_fresh_data.lidar_altitude_hold_flag = 0;     //выходим из режима удержания высоты по лидару если был включен
             rc_fresh_data.baro_altitude_hold_flag = 0;      //выходим из режима удержания высоты по барометру если был включен
             rc_fresh_data.rssi_level = -127;                //чтобы в логах было четко видно когда теряется связь
+            set_to_log.error_flags |= 0x01 << 7;            //сохраняем ошибку в логи
           }
 //и оповещаем задачу моргания полетными огнями моргать в аварийном режиме (режим "0")
           xTaskNotify(task_handle_blinking_flight_lights,0,eSetValueWithOverwrite);  
@@ -1438,7 +1470,7 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
               if (rc_fresh_data.raw_throttle > 2448) altitude_setpoint += 0.00018204 * rc_fresh_data.raw_throttle - 0.4456; 
               if (rc_fresh_data.raw_throttle < 1648) altitude_setpoint += 0.00018204 * rc_fresh_data.raw_throttle - 0.3;
 //задаем пределы установки высоты (числа в сантиметрах)
-              if (altitude_setpoint >= 1000) altitude_setpoint = 1000;
+              if (altitude_setpoint >= 3000) altitude_setpoint = 3000;
               if (altitude_setpoint <= 1) altitude_setpoint = 1;
 
 //заменяем значение throttle от пульта вычисленным при помощи регулятора
@@ -1525,6 +1557,65 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
         }       
 #endif
 
+//ниже блок, выполняющий проверку обших ускорений и углов на предмет фиксации аварийной ситуации
+//если текущние показания превышают установленный предел заданное кол-во раз подряд - значит или перевернулись, или упали, или столкнулись с чем-то в воздухе
+//по фиксации превышений аварийно останавливаются моторы 
+ #ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES
+ 
+      if (current_state == FLIGHT_STATE)
+      {
+//находим полные вектора ускорений (в g)
+        accel_1_total = sqrtf(accel_1_converted[0] * accel_1_converted[0] + accel_1_converted[1] * accel_1_converted[1]  + accel_1_converted[2] * accel_1_converted[2]);
+        accel_2_total = sqrtf(accel_2_converted[0] * accel_2_converted[0] + accel_2_converted[1] * accel_2_converted[1]  + accel_2_converted[2] * accel_2_converted[2]);
+//сравниваем с заданным порогом по очереди для обоих акселерометров
+        if (accel_1_total > accel_1_total_max) accel_1_total_max = accel_1_total; //наблюдаем максиальный уровень для логирования
+        if (accel_1_total > MAX_ACCEL_LIMIT)        //если общее ускорение превышает заданынй порог 
+        {
+          accel_1_exceed_limit_counter++;           //увеличиваем счетчик превышений
+          set_to_log.error_flags |= (0x01 << 8);    //сохраняем ошибку в логи
+        } 
+        else accel_1_exceed_limit_counter = 0; 
+            
+        if (accel_2_total > accel_2_total_max) accel_2_total_max = accel_2_total; //наблюдаем максиальный уровень для логирования
+        if (accel_2_total > MAX_ACCEL_LIMIT) 
+        {
+          accel_2_exceed_limit_counter++;           
+          set_to_log.error_flags |= (0x01 << 9);    
+        } 
+        else accel_2_exceed_limit_counter = 0;
+
+//проверяем углы на превышение максимально допустимых значений. 
+//По превышению заносим во флаг и считаем кол-во превышений подряд. Если превышает лимит - фиксируем аварию
+        if (fabsf(pitch) >= MAX_ANGLES_LIMIT)            //проверяем pitch 
+        {
+          set_to_log.error_flags |= (0x01 << 10);        //сохраняем ошибку в логи
+          pitch_exceed_limit_counter++;
+        }
+        else pitch_exceed_limit_counter = 0;
+
+        if (fabsf(roll) >= MAX_ANGLES_LIMIT)             //проверяем roll
+        {
+          set_to_log.error_flags |= (0x01 << 11);        //сохраняем ошибку в логи
+          roll_exceed_limit_counter++;
+        }
+        else roll_exceed_limit_counter = 0;
+//если хоть один из счетчиков превысил порог "срабатываний подряд"
+        if ((accel_1_exceed_limit_counter > MAX_ACCEL_EXCEED_LIMIT_COUNTER) || 
+            (accel_2_exceed_limit_counter > MAX_ACCEL_EXCEED_LIMIT_COUNTER) ||
+            (pitch_exceed_limit_counter > MAX_ANGLE_EXCEED_LIMIT_COUNTER) ||
+            (roll_exceed_limit_counter > MAX_ANGLE_EXCEED_LIMIT_COUNTER))    
+        {
+          set_to_log.error_flags |= (0x01 << 15);                     //фиксируем аварию в логи
+          prepare_logs();
+          vTaskPrioritySet(task_handle_writing_logs_to_flash,10);      //повышаем приоритет задачи записи логов чтобы отобразить в логах текущее состояние
+          xQueueSend(W25N01_queue, &p_to_log_structure, 0);           //инициируем внеплановую запись в логи зафиксировать текущее состояние
+          uint8_t LED_error_code = 32;
+          xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&LED_error_code,0,NULL);
+          xTaskNotify(task_handle_emergency_mode, (uint32_t)set_to_log.error_flags,eSetValueWithOverwrite);
+        }
+      }  
+#endif
+
         gpio_set_level(LED_RED, 0);
         IMU_interrupt_status = 0;
 //сбрасываем таймер общего зависания, по сработке которого аварийно останавливаем двигатели и входим в emergency режим       
@@ -1533,85 +1624,10 @@ if ((large_counter % PID_LOOPS_RATIO) == 0) {
 //далее удобно что-то выводить, печатать 
 //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"Trim pitch %d, trim roll %d", rc_fresh_data.trim_pitch, rc_fresh_data.trim_roll);
 //if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"new are %0.2f, %0.2f, %0.2f, %0.2f", engine_filtered_new[0],engine_filtered_new[1],engine_filtered_new[2],engine_filtered_new[3]);        
-//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f", pitch, roll, yaw);
+//if ((large_counter % 1000) == 0) ESP_LOGI(TAG_FLY,"%0.3f, %0.3f, %0.3f\n", pitch, roll, yaw);
 //if ((large_counter % 200) == 0) printf("%0.4f\n", altitude_setpoint/100.0); // баро высота в cm
 
-/*
 
-if (large_counter == 10000) 
-        {
-            gpio_config_t INT_1 = {
-            .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_ENABLE,
-            .intr_type = GPIO_INTR_DISABLE
-            }; 
-
-            ESP_ERROR_CHECK(gpio_config(&INT_1));
-        }
-
-        if (large_counter == 15000) 
-        {
-
-          gpio_config_t INT_1 = {
-            .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_ENABLE,
-            .intr_type = GPIO_INTR_POSEDGE
-            }; 
-
-            ESP_ERROR_CHECK(gpio_config(&INT_1));
-
-            gpio_config_t INT_2 = {
-            .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_ENABLE,
-            .intr_type = GPIO_INTR_DISABLE
-            }; 
-
-            ESP_ERROR_CHECK(gpio_config(&INT_2));
-        }
-
-        if (large_counter == 20000) 
-        {
-            gpio_config_t INT_2 = {
-            .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_ENABLE,
-            .intr_type = GPIO_INTR_POSEDGE
-            }; 
-
-            ESP_ERROR_CHECK(gpio_config(&INT_2));
-        }
-
-                if (large_counter == 25000) 
-        {
-            gpio_config_t INT_1 = {
-            .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_ENABLE,
-            .intr_type = GPIO_INTR_DISABLE
-            }; 
-
-            ESP_ERROR_CHECK(gpio_config(&INT_1));
-          
-          
-          gpio_config_t INT_2 = {
-            .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
-            .mode = GPIO_MODE_INPUT,
-            .pull_up_en = GPIO_PULLUP_DISABLE,
-            .pull_down_en = GPIO_PULLDOWN_ENABLE,
-            .intr_type = GPIO_INTR_DISABLE
-            }; 
-
-            ESP_ERROR_CHECK(gpio_config(&INT_2));
-        }
- */
     } 
   }
 }

@@ -170,6 +170,7 @@ TaskHandle_t task_handle_MS5611_read_and_process_data;
 TaskHandle_t task_handle_px4flow_read_and_process_data;
 TaskHandle_t task_handle_emergency_mode;
 TaskHandle_t task_handle_sending_something_over_wifi;
+TaskHandle_t task_handle_RC_read_and_process_data;
 
 static void configure_IOs()
 {
@@ -775,18 +776,7 @@ if (tfminis_communication_check() != ESP_OK) {
 #endif        
         
   vTaskDelay(50/portTICK_PERIOD_MS);
-    
-  ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных с пульта управления (RC_read_and_process_data).....");
-  if (xTaskCreateStaticPinnedToCore(RC_read_and_process_data,"RC_read_and_process_data",RC_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,RC_READ_AND_PROCESS_DATA_PRIORITY,RC_read_and_process_data_stack,&RC_read_and_process_data_TCB_buffer,0) != NULL)
-    ESP_LOGI(TAG_INIT,"Задача для получения данных с пульта управления успешно создана на ядре 0\n");
-  else {
-    ESP_LOGE(TAG_INIT,"Задача для получения данных с пульта управления не создана\n");
-    error_code = 2;
-    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
-    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
-  }
 
-  vTaskDelay(50/portTICK_PERIOD_MS);
 /*
   ESP_LOGI(TAG_INIT,"Создаем задачу для отправки телеметрии на пульт управления.....");
   task_handle_send_data_to_RC = xTaskCreateStaticPinnedToCore(send_data_to_RC,"send_data_to_RC",SEND_DATA_TO_RC_STACK_SIZE ,NULL,SEND_DATA_TO_RC_PRIORITY,send_data_to_RC_stack,&send_data_to_RC_TCB_buffer,0);
@@ -868,6 +858,19 @@ if (tfminis_communication_check() != ESP_OK) {
       ESP_LOGI(TAG_INIT,"Проверка напряжения АКБ и тока потребления пройдена, напряжение %0.2fВ, ток %0.2fА\n", INA219_fresh_data_init[0],INA219_fresh_data_init[1]);
     }
 #endif
+
+  ESP_LOGI(TAG_INIT,"Создаем задачу для получения данных с пульта управления (RC_read_and_process_data).....");
+  task_handle_RC_read_and_process_data = xTaskCreateStaticPinnedToCore(RC_read_and_process_data,"RC_read_and_process_data",RC_READ_AND_PROCESS_DATA_STACK_SIZE,NULL,RC_READ_AND_PROCESS_DATA_PRIORITY,RC_read_and_process_data_stack,&RC_read_and_process_data_TCB_buffer,0);
+  if (task_handle_RC_read_and_process_data != NULL)
+    ESP_LOGI(TAG_INIT,"Задача для получения данных с пульта управления успешно создана на ядре 0\n");
+  else {
+    ESP_LOGE(TAG_INIT,"Задача для получения данных с пульта управления не создана\n");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }
+
+  vTaskDelay(50/portTICK_PERIOD_MS);
 
 #ifdef USING_W25N
   ESP_LOGI(TAG_INIT,"Создаем задачу записи логов во внешнюю flash-память (writing_logs_to_flash).....");

@@ -99,13 +99,13 @@ void W25N_program_execute(uint16_t page_address) {
   SPI_write_bytes (W25N01, 8, W25N_PROG_EXECUTE, 0, 0, 8, buf, 2);
   vTaskDelay(1/portTICK_PERIOD_MS); //700us delay tPP
 }
-
+//это команда считать содержимое страницы памяти в буфер
 void W25N_page_data_read(uint16_t page_address) {
   uint8_t buf[2];
   buf[0] = (uint8_t)((page_address & 0xFF00) >> 8); //MSB
   buf[1] = (uint8_t) page_address;  //LSB
   SPI_write_bytes (W25N01, 8, W25N_PAGE_DATA_READ, 0, 0, 8, buf, 2);
-  ets_delay_us(50); //verified practically
+  ets_delay_us(50); //проверено на практике
   }
 
 void W25N_read(uint16_t column_address, uint8_t* where_to_put_to, uint16_t number_of_bytes) {

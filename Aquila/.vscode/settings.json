@@ -155,5 +155,6 @@
   ],
   "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
     "clang-diagnostic-error"
-  ]
+  ],
+  "idf.currentSetup": "c:\\Users\\VVE\\esp\\v5.4\\esp-idf"
 }

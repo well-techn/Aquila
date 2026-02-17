@@ -43,7 +43,7 @@ void MS5611_read_and_process_data(void * pvParameters)
        vTaskDelay(20/portTICK_PERIOD_MS);
        xSemaphoreTake (semaphore_for_i2c_external, portMAX_DELAY);
        MS5611_raw_pressure = MS5611_I2C_read();
-       //ESP_LOGD(TAG_MS5611,"raw pressure %ld",MS5611_raw_pressure);
+       ESP_LOGD(TAG_MS5611,"raw pressure %ld",MS5611_raw_pressure);
 
        MS5611_I2C_request_D2();
        xSemaphoreGive (semaphore_for_i2c_external);

@@ -20,12 +20,12 @@ void reading_logs_from_external_flash(void *pvParameters)
   uint8_t i = 0;
   uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)]; // сюда считывается содержимое 1го пакета из flash-памяти
   uint8_t empty_timestamp_flag = 0;
+  uint8_t emergency_mode_flag = 0;
   struct logging_data_set *p_to_set_to_log;
 
   int16_t *client_fd = pvParameters;
   char message_to_print[300]; // сюда содержимое пакета печатается через snprintf (длина с запасом)
   uint16_t next = 0;
-  //char header[] = "time_us|ax|ay|az|gx|gy|gz|q0|q1|q2|q3|pitch|roll|yaw|lid_h|baro_h|Kalman_h|Kalman_v|alt_setp|v_mV|I_cA|thr_c|pitch_c|roll_c|yaw_c|mode_c|e1|e2|e3|e4|flags|rssi|EOL\r\n";
   char end_message[] = "Считывание логов из внешней flash-памяти завершено, перезапустите систему\r\n";
   char header_new[300];
 
@@ -41,6 +41,14 @@ void reading_logs_from_external_flash(void *pvParameters)
   next += snprintf(header_new + next, sizeof(header_new), "ax_raw_2|");
   next += snprintf(header_new + next, sizeof(header_new), "ay_raw_2|");
   next += snprintf(header_new + next, sizeof(header_new), "az_raw_3|");
+#endif
+
+#ifdef LOGGING_ACCEL_1_MAX
+  next += snprintf(header_new + next, sizeof(header_new), "accel_1_max|");
+#endif
+
+#ifdef LOGGING_ACCEL_2_MAX
+  next += snprintf(header_new + next, sizeof(header_new), "accel_2_max|");
 #endif
 
 #ifdef LOGGING_GYRO_1
@@ -76,11 +84,15 @@ void reading_logs_from_external_flash(void *pvParameters)
 #endif
 
 #ifdef LOGGING_LIDAR_PID
-  next += snprintf(header_new + next, sizeof(header_new), "error|P|I|D|");
+  next += snprintf(header_new + next, sizeof(header_new), "lid_er|lid_P|lid_I|lid_D|");
 #endif
 
 #ifdef LOGGING_LIDAR_ALTITUDE_CM
   next += snprintf(header_new + next, sizeof(header_new), "lid_h|");
+#endif
+
+#ifdef LOGGING_BARO_PID
+  next += snprintf(header_new + next, sizeof(header_new), "baro_er|baro_P|baro_I|baro_D|");
 #endif
 
 #ifdef LOGGING_BARO_ALTITUDE_CM
@@ -119,9 +131,11 @@ void reading_logs_from_external_flash(void *pvParameters)
   next += snprintf(header_new + next, sizeof(header_new), "e1_f|e2_f|e3_f|e4_f|");
 #endif
 
-#ifdef LOGGING_FLAGS
-  next += snprintf(header_new + next, sizeof(header_new), "flags|");
+#ifdef LOGGING_STATE_FLAGS
+  next += snprintf(header_new + next, sizeof(header_new), "state_flags|");
 #endif
+
+  next += snprintf(header_new + next, sizeof(header_new), "error_flags|");
 
 #ifdef LOGGING_RSSI_LEVEL
   next += snprintf(header_new + next, sizeof(header_new), "RSSI|");
@@ -137,22 +151,26 @@ void reading_logs_from_external_flash(void *pvParameters)
 #ifdef TELNET_CONF_MODE
     send(*client_fd, header_new, strlen(header_new), 0);
 #endif
-
-    while ((page_address < 65535) && (empty_timestamp_flag == 0)) // 65365 страниц на микросхеме памяти
+//пока не дошли до конца памяти (65365 страниц на микросхеме памяти), не нашли конец данных и не обнаружили флаг аварийной записи
+    while ((page_address < 65535) && (empty_timestamp_flag == 0) && (emergency_mode_flag == 0)) 
     {
-      W25N_page_data_read(page_address); // копируем содержимое страницы в буфер микросхемы
+// копируем содержимое страницы в буфер микросхемы      
+      W25N_page_data_read(page_address); 
       column_address = 0;
-
-      while ((column_address < (2048 - sizeof(struct logging_data_set))) && (empty_timestamp_flag == 0)) // пока в буфере помещается целый пакет данных
+// пока в буфере помещается целый пакет данных
+      while ((column_address < (2048 - sizeof(struct logging_data_set))) && (empty_timestamp_flag == 0) && (emergency_mode_flag == 0)) 
       {
-        W25N_read(column_address, receiving_logs_buffer, sizeof(struct logging_data_set)); // считываем первый пакет из буфера
+// считываем первый пакет из буфера микросхемы себе         
+        W25N_read(column_address, receiving_logs_buffer, sizeof(struct logging_data_set)); 
 
         p_to_set_to_log = (struct logging_data_set *)receiving_logs_buffer;
-
-        if (p_to_set_to_log->timestamp == 4294967295)
-          empty_timestamp_flag = 1; // в такое число считывается таймстэмп если ячейкм не запроганы (все FF)
-// в случае если не достигли конца записанных в микруху данных начинаем переводить числа в печатный вид при помощи snprintf
-        if (!empty_timestamp_flag)
+//если достигли конца записанных данных (в такое число считывается таймстэмп если ячейкм не запроганы (все FF))
+        if (p_to_set_to_log->timestamp == 4294967295) empty_timestamp_flag = 1; 
+//в случае если не достигли конца записанных в микруху данных 
+//и не обнаружили флаг экстренной записи начинаем переводить числа в печатный вид при помощи snprintf
+//второе условие нужно для того, чтобы после аварийно записанного пакета не дублировались данные с предыдущей страницы
+//так как по emergency пишем в микруху внепланово, а у нее при этом в буфере остаются данные предыдущей считанной страницы
+        if ((empty_timestamp_flag == 0) && (emergency_mode_flag == 0))
         {
           next += snprintf(message_to_print, sizeof(message_to_print), "%lu|", p_to_set_to_log->timestamp);
 #ifdef LOGGING_ACCEL_1
@@ -161,6 +179,14 @@ void reading_logs_from_external_flash(void *pvParameters)
 
 #ifdef LOGGING_ACCEL_2
           for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_2[i]);
+#endif
+
+#ifdef LOGGING_ACCEL_1_MAX
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->accel_1_max);
+#endif
+
+#ifdef LOGGING_ACCEL_2_MAX
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->accel_2_max);
 #endif
 
 #ifdef LOGGING_GYRO_1
@@ -188,12 +214,15 @@ void reading_logs_from_external_flash(void *pvParameters)
 #endif
 
 #ifdef LOGGING_LIDAR_PID
-  next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|%0.2f|%0.2f|%0.2f|",p_to_set_to_log->error, p_to_set_to_log->P_component, p_to_set_to_log->I_component, p_to_set_to_log->D_component);
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|%0.2f|%0.2f|%0.2f|",p_to_set_to_log->lidar_pid_error, p_to_set_to_log->lidar_pid_P_component, p_to_set_to_log->lidar_pid_I_component, p_to_set_to_log->lidar_pid_D_component);
 #endif
-
 
 #ifdef LOGGING_LIDAR_ALTITUDE_CM
           next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->lidar_altitude_cm);
+#endif
+
+#ifdef LOGGING_BARO_PID
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|%0.2f|%0.2f|%0.2f|",p_to_set_to_log->baro_pid_error, p_to_set_to_log->baro_pid_P_component, p_to_set_to_log->baro_pid_I_component, p_to_set_to_log->baro_pid_D_component);
 #endif
 
 #ifdef LOGGING_BARO_ALTITUDE_CM
@@ -236,9 +265,11 @@ void reading_logs_from_external_flash(void *pvParameters)
           for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%ld|", p_to_set_to_log->engines_filtered[i]);
 #endif
 
-#ifdef LOGGING_FLAGS
-          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->flags);
+#ifdef LOGGING_STATE_FLAGS
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->state_flags);
 #endif
+
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->error_flags);
 
 #ifdef LOGGING_RSSI_LEVEL
           next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->rssi_level);
@@ -251,13 +282,14 @@ void reading_logs_from_external_flash(void *pvParameters)
 #endif
           printf("%s", message_to_print);
           next = 0;
-          // переход на следующий пакет в буфере микросхемы
+//переход на следующий пакет в буфере микросхемы
           column_address += sizeof(struct logging_data_set);
         }
+//проверяем на emergency_mode_flag текущий только что выведенный пакет данных.
+        if ((p_to_set_to_log->error_flags)&(0x01 << 15)) emergency_mode_flag = 1;
       }
       page_address++; // переход к считыванию следующей страницы памяти
     }
-
     ESP_LOGI(TAG_W25N, "Считывание логов из внешней flash-памяти завершено, перезапустите систему");
 #ifdef TELNET_CONF_MODE
     send(*client_fd, end_message, strlen(end_message), 0);
@@ -273,6 +305,6 @@ void reading_logs_from_external_flash(void *pvParameters)
       gpio_set_level(LED_GREEN, 0);
       gpio_set_level(LED_BLUE, 0);
       vTaskDelay(500 / portTICK_PERIOD_MS);
-    };
+    }
   }
 }

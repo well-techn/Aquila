@@ -60,8 +60,6 @@ void RC_read_and_process_data(void * pvParameters)
   uint16_t received_pitch = 2000;                       //среднее положение
   uint16_t received_roll = 2000;
   uint16_t received_yaw = 2000;
-  //short trim_roll = -1;
-  //short trim_pitch = 2;
   data_from_rc_to_main_struct remote_control_data;
     remote_control_data.lidar_altitude_hold_flag = 0;
     remote_control_data.baro_altitude_hold_flag = 0;
@@ -126,9 +124,9 @@ void RC_read_and_process_data(void * pvParameters)
             ESP_LOGW(TAG_RC, "Некорректное кол-во байт, %d", pos);  
           }                    
           else                                                 //если все ок     
-            {                                                                                
-              int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos, 0);  //считываем в локальный буфер 
-              ESP_LOGD(TAG_RC, "Всего получено %d байт", read_len);   
+          {                                                                                
+            int read_len = uart_read_bytes(REMOTE_CONTROL_UART, incoming_message_buffer_remote, pos, 0);  //считываем в локальный буфер 
+            ESP_LOGD(TAG_RC, "Всего получено %d байт", read_len);   
 
 #endif            
             ESP_LOG_BUFFER_HEX(TAG_RC, incoming_message_buffer_remote, read_len);

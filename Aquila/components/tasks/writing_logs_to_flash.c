@@ -22,9 +22,12 @@ void writing_logs_to_flash(void * pvParameters)
     if (xQueueReceive(W25N01_queue, &buffer, portMAX_DELAY))
     {
       //for (int i = 0; i<sizeof(struct logging_data_set);i++) printf("%d",buffer[i]);
-      W25N_random_program_data_load(column_address, (uint8_t*)buffer, sizeof(struct logging_data_set));   //загружаем пакет данных в буфер начиная с column_address
-      column_address = column_address + sizeof(struct logging_data_set);                        //увеличиваем colunm_address на размер пакета данных 
-      if (column_address >= (2048-sizeof(struct logging_data_set)))   //проверяем что в буфер (на эту страницу) еще что-то влезет
+//загружаем пакет данных в буфер начиная с column_address      
+      W25N_random_program_data_load(column_address, (uint8_t*)buffer, sizeof(struct logging_data_set));   
+//увеличиваем colunm_address на размер пакета данных 
+      column_address = column_address + sizeof(struct logging_data_set);                     
+//проверяем что в буфер (на эту страницу) еще что-то влезет или пришел флаг что вошли в emergency_mode и надо срочно записать текущее значение      
+      if ((column_address >= (2048 - sizeof(struct logging_data_set))) || ((buffer->error_flags)&(0x01 << 15)))
       {                             //если буфер заполнен - записываем страницу и инкрементируем адрес страницы
         column_address = 0;
         W25N_program_execute(page_address);       //65536 страниц 

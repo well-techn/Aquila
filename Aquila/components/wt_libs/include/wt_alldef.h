@@ -3,7 +3,7 @@
 
 #include <inttypes.h>
 
-#define FW_VERSION          "2025-12"
+#define FW_VERSION          "2026-02"
 
 #define USING_W25N                                                //включаем в код функционал, связанный с записью логов во внешнюю флеш
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
@@ -14,12 +14,13 @@
 #define USING_MS5611
 #define BATTERY_COMPENSATION
 #define USING_MAVLINK_TELEMETRY
-//#define NO_RSSI
+//#define NO_RSSI                                                  //при включении активируется режим обнаружения пэттерна, убедиться что символ конца строки (пэттерн) уникален в пределах пакета
 //#define MEMORY_CONSUMPTION_MESUREMENT
 #define TELNET_CONF_MODE
 //#define USING_PX4FLOW
 #define PREFLIGHT_POWER_CHECKUP
 //#define WIFI_INFLIGHT_TEST
+#define ACCEL_AND_ANGLES_SAFETY_MEASURES                            //активирует проверки по максимальному допустимому углу и ускорению
 
 //набор дефайнов, определяющий какие данные будут записываться в "черный ящик" внешней флеш-памяти
 #ifdef USING_W25N
@@ -27,31 +28,33 @@
   //#define LOGGING_ACCEL_2
  // #define LOGGING_GYRO_1
   //#define LOGGING_GYRO_2
-  //#define LOGGING_AVG_ACCEL
-  //#define LOGGING_AVG_GYRO
+  #define LOGGING_AVG_ACCEL
+  #define LOGGING_AVG_GYRO
   //#define LOGGING_QUATERNION
-  //#define LOGGING_ANGLES
-
-  
+  #define LOGGING_ANGLES
 
   #ifdef USING_TFMINIS_I2C
-    #define LOGGING_LIDAR_PID
+    //#define LOGGING_LIDAR_PID
     #define LOGGING_LIDAR_ALTITUDE_CM
   #endif
   #ifdef USING_MS5611 
-    //#define LOGGING_BARO_ALTITUDE_CM
-    //#define LOGGING_KALMAN_ALTITUDE_CM
-    //#define LOGGING_KALMAN_VELOCITY
     //#define LOGGING_BARO_PID
+    //#define LOGGING_BARO_ALTITUDE_CM
+    #define LOGGING_KALMAN_ALTITUDE_CM
+    //#define LOGGING_KALMAN_VELOCITY
   #endif
   #define LOGGING_ALTITUDE_SETPOINT_CM
   #define LOGGING_VOLTAGE_mV
-  //#define LOGGING_CURRENT_cA
-  //#define LOGGING_RC_COMMANDS
-  #define LOGGING_ENGINES
+  #define LOGGING_CURRENT_cA
+  #define LOGGING_RC_COMMANDS
+  //#define LOGGING_ENGINES
   #define LOGGING_ENGINES_FILTERED
-  #define LOGGING_FLAGS
-  //#define LOGGING_RSSI_LEVEL
+  #define LOGGING_STATE_FLAGS
+  #define LOGGING_RSSI_LEVEL
+#ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES 
+  //#define LOGGING_ACCEL_1_MAX
+  //#define LOGGING_ACCEL_2_MAX
+#endif
 #endif
 
 //GPIO и параметры SPI для подключения IMU
@@ -253,7 +256,10 @@ typedef struct {
 #define MCP23017_INTERRUPT_PIN                  (37)                            //GPIO для сигнала прерывания от MCP23017 (пока не используется)
 #define GREEN_FLIGHT_LIGHTS                     (8)                             //GPIO для зеленых полетных огней (через транзистор)
 #define RED_FLIGHT_LIGHTS                       (36)                            //GPIO для зеленых полетных огней (через транзистор)
-
+#define A0                                      (4)
+#define A1                                      (5)
+#define A2                                      (6)                              //кнопка аварийной остановки
+#define A3                                      (7)                              //светодиод кнопки авариной остановки
 
 //команды для MCP23017, которые отправляются из любой задачи в задачу управления MCP23017 через очередь
 #define MCP23017_READ_COMMAND                   (0b10000000)                    //считать состояние входов                    
@@ -278,6 +284,14 @@ struct logging_data_set {
 
   #ifdef LOGGING_ACCEL_2 
     int16_t accel_2[3];
+  #endif
+
+  #ifdef LOGGING_ACCEL_1_MAX
+    float accel_1_max;
+  #endif
+
+  #ifdef LOGGING_ACCEL_2_MAX 
+    float accel_2_max;
   #endif
 
   #ifdef LOGGING_GYRO_1 
@@ -305,14 +319,21 @@ struct logging_data_set {
   #endif
 
   #ifdef LOGGING_LIDAR_PID
-    float error;
-    float P_component;
-    float I_component;
-    float D_component;
+    float lidar_pid_error;
+    float lidar_pid_P_component;
+    float lidar_pid_I_component;
+    float lidar_pid_D_component;
   #endif
 
   #ifdef LOGGING_LIDAR_ALTITUDE_CM
     uint16_t lidar_altitude_cm;
+  #endif
+
+  #ifdef LOGGING_BARO_PID
+    float baro_pid_error;
+    float baro_pid_P_component;
+    float baro_pid_I_component;
+    float baro_pid_D_component;
   #endif
   
   #ifdef LOGGING_BARO_ALTITUDE_CM
@@ -355,9 +376,11 @@ struct logging_data_set {
     uint32_t engines_filtered[4];
   #endif
 
-  #ifdef LOGGING_FLAGS
-    uint16_t flags;
+  #ifdef LOGGING_STATE_FLAGS
+    uint16_t state_flags;
   #endif
+
+    uint16_t error_flags;
 
   #ifdef LOGGING_RSSI_LEVEL
   int8_t rssi_level;
@@ -376,13 +399,11 @@ struct logging_data_set {
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
 #define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
 #define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по методу magnetto 
-#define NUMBER_OF_ACC_INPUTS                    (100)                            //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
-
-//GPIO
-#define A0                                            (4)
-#define A1                                            (5)
-#define A2                                            (6)                       //кнопка аварийной остановки
-#define A3                                            (7)                       //светодиод кнопки авариной остановки 
+#define NUMBER_OF_ACC_INPUTS                    (100)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
+#define MAX_ANGLES_LIMIT                        (60.0)                          //макимально допустимый уровень pitch или roll в градусах, по превышению фиксируем ошибку и/или глушим моторы
+#define MAX_ACCEL_LIMIT                         (3.9)                             //макимально допустимый уровень ускорения в G, по превышению фиксируем ошибку и/или глушим моторы
+#define MAX_ACCEL_EXCEED_LIMIT_COUNTER          (3)                             //столько циклов подряд общее ускорение должно превышать порог, чтобы зафиксировать факт аварии и остановить моторы
+#define MAX_ANGLE_EXCEED_LIMIT_COUNTER          (20)                            //столько циклов подряд угол должен превышать порог, чтобы зафиксировать факт аварии и остановить моторы
 
 //объем стэков для задач
 #define MCP23017_MONITORING_AND_CONTROL_STACK_SIZE    (4096)
@@ -416,7 +437,7 @@ struct logging_data_set {
 #define LIDAR_READ_AND_PROCESS_DATA_PRIORITY          (3)
 #define INA219_READ_AND_PROCESS_DATA_PRIORITY         (2) 
 #define MAG_READ_AND_PROCESS_DATA_PRIORITY            (6)
-#define WRITING_LOGS_TO_FLASH_PRIORITY                (0)
+#define WRITING_LOGS_TO_FLASH_PRIORITY                (1)
 #define PERFORMANCE_MEASUREMENT_PRIORITY              (2)
 #define MAVLINK_TELEMETRY_PRIORITY                    (0)
 #define MS5611_READ_AND_PROCESS_DATA_PRIORITY         (2)
@@ -432,7 +453,7 @@ struct logging_data_set {
 #define BARO_SIGMA2                                   (20)
 #define VERT_ALT_FILTER_F_CUT                         (4.0)
 
-//структура, хранящее текущее состояние системы
+//структура, хранящее текущее состояние системы - пока не используется
 typedef struct system_state {                             
   float acc_local[3];
   float gyro_local[3];
