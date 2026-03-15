@@ -1,0 +1,14 @@
+# Папка сборки (самое важное!)
+build/
+
+# Временные файлы Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Файлы настроек SDK 
+sdkconfig
+sdkconfig.old
+
+# Специфичные файлы VS Code
+.vscode/

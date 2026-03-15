@@ -14,7 +14,7 @@ void blinking_flight_lights(void * pvParameters)
 
   while(1) 
   {
-    xTaskNotifyWait(0,0,&blinking_mode,NULL);
+    xTaskNotifyWait(0,0,&blinking_mode,0);
   
     if (blinking_mode == 0)                 //аварийный режим (вместе 10Гц)
     {
@@ -44,7 +44,7 @@ void blinking_flight_lights(void * pvParameters)
       vTaskDelay(750/portTICK_PERIOD_MS);
     }
     
-    if (blinking_mode == 2)               //питание ниже 10,5В (4 зеленых 4 красных)
+    if (blinking_mode == 2)               //питание ниже 10,5В (4 зеленых 2 красных)
     {  
       for (uint8_t i = 0; i<4; i++)
       {
@@ -55,17 +55,17 @@ void blinking_flight_lights(void * pvParameters)
       }  
       vTaskDelay(500/portTICK_PERIOD_MS);
 
-      for (uint8_t i = 0; i<4; i++)
+      for (uint8_t i = 0; i<2; i++)
       {
         gpio_set_level(RED_FLIGHT_LIGHTS, 1);
         vTaskDelay(50/portTICK_PERIOD_MS);
         gpio_set_level(RED_FLIGHT_LIGHTS, 0);
-        vTaskDelay(50/portTICK_PERIOD_MS);
+        vTaskDelay(100/portTICK_PERIOD_MS);
       }
       vTaskDelay(250/portTICK_PERIOD_MS);
     }
 
-    if (blinking_mode == 3)               //питание ниже 9,5В (4 зеленых 6 красных)
+    if (blinking_mode == 3)               //питание ниже 9,5В (6 зеленых 3 красных)
     { 
       for (uint8_t i = 0; i<6; i++)
       {
@@ -76,12 +76,12 @@ void blinking_flight_lights(void * pvParameters)
       }  
       vTaskDelay(500/portTICK_PERIOD_MS);
 
-      for (uint8_t i = 0; i<6; i++)
+      for (uint8_t i = 0; i<3; i++)
       {
         gpio_set_level(RED_FLIGHT_LIGHTS, 1);
         vTaskDelay(50/portTICK_PERIOD_MS);
         gpio_set_level(RED_FLIGHT_LIGHTS, 0);
-        vTaskDelay(50/portTICK_PERIOD_MS);
+        vTaskDelay(100/portTICK_PERIOD_MS);
       }
       vTaskDelay(250/portTICK_PERIOD_MS);
     }

@@ -8,6 +8,9 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "inttypes.h"
+#include "driver/gpio.h"
+#include "esp_rom_sys.h"
+#include "Fusion.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
@@ -20,7 +23,6 @@ extern char *TAG_NVS;
 
 void mag_read_and_process_data (void * pvParameters)
 {
-  uint8_t i = 0;
   float cross_axis[3][3] =  {{0,  0,  0},    
                              {0,  0,  0},
                              {0,  0,  0}};
@@ -106,18 +108,16 @@ void mag_read_and_process_data (void * pvParameters)
   err = nvs_get_u64(NVS_handle, "mag_A_i[22]", &temp); 
   p_double = (double*) &temp;
   mag_A_inv[2][2] = *p_double;
-/*
-  for (uint8_t i = 0; i<3; i++) printf("%0.3f ", mag_hard_bias[i]);
-  printf("\n");
-    for (uint8_t i = 0; i<3; i++) 
-    {
-      for (uint8_t j = 0; j<3; j++)  printf("%0.3f ", mag_A_inv[i][j]);
-      printf("\n");
-    }
-*/
   }
 
+  //вносим калибровочные данные магнетометра в структуры фильтра Маджвика
+  const FusionVector_t hardIronOffset = {.array = {mag_hard_bias[0], mag_hard_bias[1], mag_hard_bias[2]}};  
+  const FusionMatrix_t softIronMatrix = {.array = {mag_A_inv[0][0], mag_A_inv[0][1], mag_A_inv[0][2], 
+                                                   mag_A_inv[1][0], mag_A_inv[1][1], mag_A_inv[1][2],
+                                                   mag_A_inv[2][0], mag_A_inv[2][1], mag_A_inv[2][2]}};
+
   IST8310_generate_cross_axis_matrix(cross_axis);
+
 
   while(1) {
     
@@ -126,7 +126,7 @@ void mag_read_and_process_data (void * pvParameters)
       xSemaphoreTake (semaphore_for_i2c_external,portMAX_DELAY);
       IST8310_request_data();
       xSemaphoreGive(semaphore_for_i2c_external);
-      vTaskDelay(5/portTICK_PERIOD_MS);   //delay of 5ms as per datasheet min sampling is 200Hz 5ms
+      vTaskDelay(5/portTICK_PERIOD_MS);   //5мс так как максимальная частота опроса 200Гц
       xSemaphoreTake (semaphore_for_i2c_external,portMAX_DELAY);
       IST8310_read_data(mag_raw_values);
       xSemaphoreGive(semaphore_for_i2c_external);
@@ -141,26 +141,26 @@ void mag_read_and_process_data (void * pvParameters)
       magn_data_axis_corrected[2] = cross_axis[2][0]*magn_data[0] + cross_axis[2][1]*magn_data[1] + cross_axis[2][2]*magn_data[2];
       //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_axis_corrected[0], magn_data_axis_corrected[1], magn_data_axis_corrected[2]); // for compass calibration
 
-
-      for (i=0;i<3;i++) magn_wo_hb[i] = (float)magn_data_axis_corrected[i] - mag_hard_bias[i];
+#ifdef USING_OLD_MADGWICK
+      for (uint8_t i = 0; i < 3; i++) magn_wo_hb[i] = (float)magn_data_axis_corrected[i] - mag_hard_bias[i];
       //printf ("%0.4f,%0.4f,%0.4f\n",magn_wo_hb[0], magn_wo_hb[1], magn_wo_hb[2]);
 
       magn_data_calibrated[0] = mag_A_inv[0][0]*magn_wo_hb[0] + mag_A_inv[0][1]*magn_wo_hb[1] + mag_A_inv[0][2]*magn_wo_hb[2];
       magn_data_calibrated[1] = mag_A_inv[1][0]*magn_wo_hb[0] + mag_A_inv[1][1]*magn_wo_hb[1] + mag_A_inv[1][2]*magn_wo_hb[2];
       magn_data_calibrated[2] = mag_A_inv[2][0]*magn_wo_hb[0] + mag_A_inv[2][1]*magn_wo_hb[1] + mag_A_inv[2][2]*magn_wo_hb[2];
-
-      //ESP_LOGI(TAG_IST8310,"Mag values are %d, %d, %d, %0.2f",(int16_t)magn_data_calibrated[0],(int16_t)magn_data_calibrated[1],(int16_t)magn_data_calibrated[2], 
-      //sqrt(magn_data_calibrated[0]*magn_data_calibrated[0] + magn_data_calibrated[1]*magn_data_calibrated[1] + magn_data_calibrated[2]*magn_data_calibrated[2]));
-      //printf ("%0.2f,%0.2f,%0.2f,%0.2f\n",magn_data_calibrated[0], magn_data_calibrated[1], magn_data_calibrated[2], sqrt(magn_data_calibrated[0]*magn_data_calibrated[0] + magn_data_calibrated[1]*magn_data_calibrated[1] + magn_data_calibrated[2]*magn_data_calibrated[2]));
-      //heading = atan2(magn_data_calibrated[1],magn_data_calibrated[0]) * (180/M_PI);
-      //heading -=90.0;
-      //if (heading<0) heading+=360.0;
-      //printf ("%d\n",(int16_t) heading);
-      //uart_write_bytes(REMOTE_CONTROL_UART, magn_data, NUMBER_OF_BYTES_TO_SEND_TO_RC);
-      //length = sprintf(M,"%i,%i,%i\n",magn_data[0],magn_data[1],magn_data[2]);
-      //uart_write_bytes(LIDAR_UART, M, length);
-                 
-      xQueueSend(magnetometer_queue, magn_data_calibrated, NULL); 
+#else
+//собираем данные в структуру фильтра Маджвика        
+      FusionVector_t magnetometer = {.array = {(float)magn_data_axis_corrected[0], (float)magn_data_axis_corrected[1],(float)magn_data_axis_corrected[2]}};
+//применяем soft и hard iron калибровки      
+      magnetometer = FusionModelMagnetic(magnetometer, softIronMatrix, hardIronOffset);
+//разворачиваем магнетометр в соответсвии с NED
+      magnetometer = FusionRemap(magnetometer,FusionRemapAlignmentPYPXNZ);  
+//копируем чтобы не переделывать очередь
+      magn_data_calibrated[0] = magnetometer.array[0];
+      magn_data_calibrated[1] = magnetometer.array[1];
+      magn_data_calibrated[2] = magnetometer.array[2];
+#endif
+      xQueueSend(magnetometer_queue, magn_data_calibrated, 0);
     }
   }  
 }

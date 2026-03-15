@@ -56,10 +56,14 @@ void quaternion_difference(float* q_current, float* q_desired, float* q_diff)
 
 void quat_from_angle_and_axis(float angle, float* axis, float* q)
 {
-    q[0] = cos((angle/2) * M_PI / 180.0);
-    q[1] = axis[0] * sinf((angle/2) * M_PI / 180.0);
-    q[2] = axis[1] * sinf((angle/2) * M_PI / 180.0);
-    q[3] = axis[2] * sinf((angle/2) * M_PI / 180.0);
+    float half_angle_rad = (angle/2) * M_PI / 180.0;
+   
+    q[0] = cosf(half_angle_rad);
+    
+    float temp = sinf(half_angle_rad);
+    q[1] = axis[0] * temp;
+    q[2] = axis[1] * temp;
+    q[3] = axis[2] * temp;
 }
 
 void angle_and_axis_from_quat(float* q, float* angle, float* axis)

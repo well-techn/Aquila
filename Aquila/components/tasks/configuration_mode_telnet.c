@@ -97,10 +97,26 @@ void configuration_mode_telnet(void *arg)
 //модифицируем стринг welcome_message, внося соответствующие изменения
         sprintf(flight_time_buffer, "********** Налет %02uч %02uм %02uс ***********\r\n", hours, minutes, seconds);
         }
-    // Инициализируем WiFi
+// Инициализируем WiFi
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_ap();
+
+//Получаем указатель на интерфейс AP
+    esp_netif_t* netif_ap = esp_netif_create_default_wifi_ap();
+
+//Останавливаем DHCP-сервер, чтобы изменить настройки
+    esp_netif_dhcps_stop(netif_ap);
+
+//Задаем адрес сервера
+    esp_netif_ip_info_t ip_info;
+    IP4_ADDR(&ip_info.ip, 192, 168, 200, 1);      
+    IP4_ADDR(&ip_info.gw, 192, 168, 200, 1);      
+    IP4_ADDR(&ip_info.netmask, 255, 255, 255, 0); 
+
+    esp_netif_set_ip_info(netif_ap, &ip_info);
+
+//Запускаем DHCP-сервер обратно
+    esp_netif_dhcps_start(netif_ap);
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));

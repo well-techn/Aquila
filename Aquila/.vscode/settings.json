@@ -153,8 +153,5 @@
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
-    "clang-diagnostic-error"
-  ],
-  "idf.currentSetup": "c:\\Users\\VVE\\esp\\v5.4\\esp-idf"
+  "idf.currentSetup": "C:/Users/VVE/.espressif/Espressif/frameworks/esp-idf-v5.5.3/"
 }

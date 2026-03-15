@@ -68,7 +68,7 @@ void advanced_mag_calibration (void *pvParameters)
 #ifdef TELNET_CONF_MODE
   send(*client_fd, "Начинаем калибровку магнетометра, вращайте коптер\r\n", sizeof("Начинаем калибровку магнетометра, вращайте коптер\r\n"), 0);
 #endif
-  ESP_LOGI(TAG_SERVICE,"Начинаем калибровку магнетометра");
+  ESP_LOGI(TAG_SERVICE,"Начинаем калибровку магнетометра, вращайте коптер");
 
    while (i < NUMBER_OF_MAG_INPUTS)
     {

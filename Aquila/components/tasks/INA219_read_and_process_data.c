@@ -38,7 +38,7 @@ void INA219_read_and_process_data(void * pvParameters)
       ESP_LOGI(TAG_INA219, "V: %0.3fV, I: %0.3fA, P: %0.3fW, A: %0.3fmAh",INA219_data[0], INA219_data[1], INA219_data[2], INA219_data[3]);
       
       prev_time = current_time;
-      xQueueSend(INA219_to_main_queue, (void *) INA219_data, NULL); 
+      xQueueSend(INA219_to_main_queue, (void *) INA219_data, 0); 
       }
   }
 }

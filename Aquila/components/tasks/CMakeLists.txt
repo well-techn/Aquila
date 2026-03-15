@@ -22,53 +22,31 @@ idf_component_register(SRCS
 "./emergency_mode.c"
 "./sending_something_over_wifi.c"
 
-"${PROJECT_DIR}/components/general_components/AES_crypto.c"
-"${PROJECT_DIR}/components/general_components/filters.c"
-"${PROJECT_DIR}/components/general_components/FL3195.c"
-"${PROJECT_DIR}/components/general_components/HMC5983.c"
-"${PROJECT_DIR}/components/general_components/INA219.c"
-
-"${PROJECT_DIR}/components/general_components/IST8310.c"
-"${PROJECT_DIR}/components/general_components/madgwick.c"
-"${PROJECT_DIR}/components/general_components/mavlink_crc.c"
-"${PROJECT_DIR}/components/general_components/mavlink_wt.c"
-"${PROJECT_DIR}/components/general_components/MCP23017.c"
-
-"${PROJECT_DIR}/components/general_components/MPU6000.c"
-"${PROJECT_DIR}/components/general_components/MS5611.c"
-"${PROJECT_DIR}/components/general_components/PCA9685.c"
-#"${PROJECT_DIR}/components/general_components/PMW3901.c"
-
-"${PROJECT_DIR}/components/general_components/q_operations.c"
-"${PROJECT_DIR}/components/general_components/TfminiS.c"
-"${PROJECT_DIR}/components/general_components/timing.c"
-#"${PROJECT_DIR}/components/general_components/VL53L1x.c"
-"${PROJECT_DIR}/components/general_components/winbondW25N.c"
-"${PROJECT_DIR}/components/general_components/CRCs.c"
-"${PROJECT_DIR}/components/general_components/pid.c"
-"${PROJECT_DIR}/components/general_components/advanced_math.c"
-"${PROJECT_DIR}/components/general_components/px4flow.c"
-
-"${PROJECT_DIR}/components/service_tasks/engines_test.c"
-"${PROJECT_DIR}/components/service_tasks/reading_logs_from_external_flash.c"
-"${PROJECT_DIR}/components/service_tasks/gyro_calibration.c"
-"${PROJECT_DIR}/components/service_tasks/advanced_acc_calibration.c"
-"${PROJECT_DIR}/components/service_tasks/advanced_mag_calibration.c"
-"${PROJECT_DIR}/components/service_tasks/printing_calibration_coefficients.c"
-
 INCLUDE_DIRS
 "./include" 
-"${IDF_PATH}/"
-"${PROJECT_DIR}/components/service_tasks/include/"
-"${PROJECT_DIR}/components/general_components/include"
-"${PROJECT_DIR}/components/wt_libs/include"
-"${IDF_PATH}/components/esp_driver_spi/include/driver/"
-"${IDF_PATH}/components/esp_driver_i2c/include/driver/"
-"${IDF_PATH}/components/esp_driver_gpio/include/"
-"${IDF_PATH}/components/esp_driver_uart/include/"
-"${IDF_PATH}/components/esp_driver_gptimer/include/"
-"${IDF_PATH}/components/esp_driver_ledc/include/"
-"${IDF_PATH}/components/esp_partition/include/"
-"${IDF_PATH}/components/nvs_flash/include/"
-"${IDF_PATH}/components/esp_driver_usb_serial_jtag/include/driver/"
-REQUIRES esp_wifi mbedtls)
+
+REQUIRES         
+# Основные системные компоненты
+        nvs_flash
+        esp_system
+        esp_event
+        esp_common
+        esp_partition
+        freertos
+        
+# Драйверы (в 5.0+ они часто разделены, но 'driver' — это мета-компонент)
+        driver
+        esp_driver_ledc
+        esp_driver_gpio
+        
+# Сеть и безопасность
+        esp_wifi
+        esp_event
+        lwip
+        mbedtls
+        
+# Локальные компоненты
+        wt_libs
+        general_components
+        service_tasks
+)

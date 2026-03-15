@@ -69,8 +69,8 @@ emergency_pack.longtitude = 111111;
 //поэтому для этих случаев запись происходит непосредственно из emergency_mode, по сути надо записать только код ошибки
 //но приходится писать всю структуру
 struct logging_data_set emergency_set_to_log = {0};             //создаем инициализированную только нулями
-struct logging_data_set* p_to_emer_log_structure = &emergency_set_to_log;
-  
+struct logging_data_set* p_to_emer_log_structure = &emergency_set_to_log; 
+
 while(1) 
   {
 //принимаем запрос на активацию аварийной процедуры с кодом ошибки    
@@ -81,10 +81,10 @@ while(1)
         printf("Входим в аварийный режим с кодом ошибки %ld\n", caused_error_code);
 //аварийно останавливаем моторы
         ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);  //аварийно останавливаем моторы
-        gpio_set_level(ENGINE_PWM_OUTPUT_0_PIN, 0);
-        gpio_set_level(ENGINE_PWM_OUTPUT_1_PIN, 0);
-        gpio_set_level(ENGINE_PWM_OUTPUT_2_PIN, 0);
-        gpio_set_level(ENGINE_PWM_OUTPUT_3_PIN, 0);
+        gpio_set_level(ENGINE_OUTPUT_0_PIN, 0);
+        gpio_set_level(ENGINE_OUTPUT_1_PIN, 0);
+        gpio_set_level(ENGINE_OUTPUT_2_PIN, 0);
+        gpio_set_level(ENGINE_OUTPUT_3_PIN, 0);
                 
 //отключаем прерывания по IMU      
         gpio_config_t INT_1 = {

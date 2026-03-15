@@ -3,12 +3,11 @@
 
 #include <inttypes.h>
 
-#define FW_VERSION          "2026-02"
+#define FW_VERSION          "2026-03"
 
-#define USING_W25N                                                //включаем в код функционал, связанный с записью логов во внешнюю флеш
-//#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N
-#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+//#define USING_OLD_MADGWICK
+#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
+#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
 #define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
 #define USING_MS5611
@@ -17,45 +16,47 @@
 //#define NO_RSSI                                                  //при включении активируется режим обнаружения пэттерна, убедиться что символ конца строки (пэттерн) уникален в пределах пакета
 //#define MEMORY_CONSUMPTION_MESUREMENT
 #define TELNET_CONF_MODE
-//#define USING_PX4FLOW
+#define USING_PX4FLOW
 #define PREFLIGHT_POWER_CHECKUP
 //#define WIFI_INFLIGHT_TEST
 #define ACCEL_AND_ANGLES_SAFETY_MEASURES                            //активирует проверки по максимальному допустимому углу и ускорению
+#define USING_PWM_ESC_CONTROL
 
 //набор дефайнов, определяющий какие данные будут записываться в "черный ящик" внешней флеш-памяти
-#ifdef USING_W25N
-  //#define LOGGING_ACCEL_1
-  //#define LOGGING_ACCEL_2
- // #define LOGGING_GYRO_1
-  //#define LOGGING_GYRO_2
-  #define LOGGING_AVG_ACCEL
-  #define LOGGING_AVG_GYRO
+  #define LOGGING_ACCEL_1
+  #define LOGGING_ACCEL_2
+  #define LOGGING_GYRO_1
+  #define LOGGING_GYRO_2
+  //#define LOGGING_AVG_ACCEL
+  //#define LOGGING_AVG_GYRO
   //#define LOGGING_QUATERNION
   #define LOGGING_ANGLES
+  //#define LOGGING_YAW_SETPOINT
 
   #ifdef USING_TFMINIS_I2C
     //#define LOGGING_LIDAR_PID
-    #define LOGGING_LIDAR_ALTITUDE_CM
+    //#define LOGGING_LIDAR_ALTITUDE_CM
   #endif
   #ifdef USING_MS5611 
     //#define LOGGING_BARO_PID
     //#define LOGGING_BARO_ALTITUDE_CM
-    #define LOGGING_KALMAN_ALTITUDE_CM
+    //#define LOGGING_KALMAN_ALTITUDE_CM
     //#define LOGGING_KALMAN_VELOCITY
   #endif
-  #define LOGGING_ALTITUDE_SETPOINT_CM
+  //#define LOGGING_ALTITUDE_SETPOINT_CM
   #define LOGGING_VOLTAGE_mV
   #define LOGGING_CURRENT_cA
   #define LOGGING_RC_COMMANDS
-  //#define LOGGING_ENGINES
+  #define LOGGING_ENGINES
   #define LOGGING_ENGINES_FILTERED
-  #define LOGGING_STATE_FLAGS
-  #define LOGGING_RSSI_LEVEL
-#ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES 
-  //#define LOGGING_ACCEL_1_MAX
-  //#define LOGGING_ACCEL_2_MAX
-#endif
-#endif
+  //#define LOGGING_STATE_FLAGS
+  //#define LOGGING_RSSI_LEVEL
+  #ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES 
+    //#define LOGGING_ACCEL_1_MAX
+    //#define LOGGING_ACCEL_2_MAX
+  #endif
+  #define LOGGING_CYCLE_TIMES                                        //запускает высчитывание сколько времени занимает выполнение main_flying_cycle с сохранением максимального значения
+
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -233,18 +234,31 @@ typedef struct {
   #define PX4FLOW_F_PIXELS                                (666.667)
 #endif
 
-//GPIO и параметры для модуля ШИМ (LEDC) для управления моторами
-#define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT)             //разрешение таймера для управления ШИМ
-#define ENGINE_PWM_MIN_DUTY                     (6553)                          //минимальная длительности ШИМ сигнала 1мс: ((2 ^ 14) - 1) / 2,5мс (400Гц) = 6553,2
-#define ENGINE_PWM_FREQUENCY                    (400)                           //частота ШИМ сигнала, Гц
-#define ENGINE_PWM_TIMER                        (LEDC_TIMER_0)                  //используемый таймер
-#define ENGINE_PWM_MODE                         (LEDC_LOW_SPEED_MODE)           //режим работы ШИМ
-#define ENGINE_PWM_OUTPUT_0_PIN                 (9)                             //GPIO для выхода 0
-#define ENGINE_PWM_OUTPUT_1_PIN                 (10)                            //GPIO для выхода 1                        
-#define ENGINE_PWM_OUTPUT_2_PIN                 (11)                            //GPIO для выхода 2 
-#define ENGINE_PWM_OUTPUT_3_PIN                 (12)                            //GPIO для выхода 3
+#define ENGINE_OUTPUT_0_PIN                     (9)                              //GPIO для выхода на ESC 0
+#define ENGINE_OUTPUT_1_PIN                     (10)                              //GPIO для выхода на ESC 1                        
+#define ENGINE_OUTPUT_2_PIN                     (11)                              //GPIO для выхода на ESC 2 
+#define ENGINE_OUTPUT_3_PIN                     (12)                              //GPIO для выхода на ESC 3
 #define TIME_TO_KEEP_RUNNING_AT_CHECK_MS        (10000)                         //длительность вращения двигателей при поочередном тестировании
 #define LENGTH_OF_ESC_FILTER                    (6)                             //глубина выходного фильтра (фильтруем данные скользящим средним перед выдачей на моторы)
+
+
+#define USING_PWM_ESC_CONTROL
+#ifndef USING_PWM_ESC_CONTROL 
+ #define USING_DSHOT_ESC_CONTROL
+#endif
+
+#ifdef USING_PWM_ESC_CONTROL
+//GPIO и параметры для модуля ШИМ (LEDC) для управления моторами
+  #define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT)             //разрешение таймера для управления ШИМ
+  #define ENGINE_PWM_FREQUENCY                    (400)                           //частота ШИМ сигнала, Гц
+  #define ENGINE_PWM_TIMER                        (LEDC_TIMER_0)                  //используемый таймер
+  #define ENGINE_PWM_MODE                         (LEDC_LOW_SPEED_MODE)           //режим работы ШИМ
+#endif
+
+
+  #define DSHOT_ESC_RESOLUTION_HZ                  (10*1000*1000)
+  #define DSHOT_BITRATE                            (150*1000)
+  #define ENGINE_MIN_SIGNAL                       (6553)                          //минимальная длительности ШИМ сигнала 1мс: ((2 ^ 14) - 1) / 2,5мс (400Гц) = 6553,2
 
 
 //другие GPIO 
@@ -273,11 +287,11 @@ typedef struct {
 
 
 //Структура для записи логов во внешнюю флэш
-//безусловно в состав входит только timestamp
+//безусловно в состав входит только timestamp и error_flags
 //остальное набирается define'ами выше, чтобы не писать лишнее и не тратить место и время
-#ifdef USING_W25N
 struct logging_data_set {                             
   uint32_t timestamp;
+
   #ifdef LOGGING_ACCEL_1 
     int16_t accel_1[3];
   #endif
@@ -316,6 +330,10 @@ struct logging_data_set {
 
   #ifdef LOGGING_ANGLES 
     float angles[3]; //pitch, roll,yaw
+  #endif
+
+  #ifdef LOGGING_YAW_SETPOINT
+    float yaw_sp;
   #endif
 
   #ifdef LOGGING_LIDAR_PID
@@ -384,9 +402,14 @@ struct logging_data_set {
 
   #ifdef LOGGING_RSSI_LEVEL
   int8_t rssi_level;
-  #endif                                                  
+  #endif
+  
+  #ifdef LOGGING_CYCLE_TIMES
+  uint32_t avg_cycle_time_us;
+  uint32_t max_cycle_time_us;
+  #endif
 };
-#endif
+
 
 
 //ниже общие параметры
@@ -400,7 +423,7 @@ struct logging_data_set {
 #define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
 #define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по методу magnetto 
 #define NUMBER_OF_ACC_INPUTS                    (100)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
-#define MAX_ANGLES_LIMIT                        (60.0)                          //макимально допустимый уровень pitch или roll в градусах, по превышению фиксируем ошибку и/или глушим моторы
+#define MAX_ANGLES_LIMIT                        (45.0)                          //макимально допустимый уровень pitch или roll в градусах, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_LIMIT                         (3.9)                             //макимально допустимый уровень ускорения в G, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_EXCEED_LIMIT_COUNTER          (3)                             //столько циклов подряд общее ускорение должно превышать порог, чтобы зафиксировать факт аварии и остановить моторы
 #define MAX_ANGLE_EXCEED_LIMIT_COUNTER          (20)                            //столько циклов подряд угол должен превышать порог, чтобы зафиксировать факт аварии и остановить моторы

@@ -55,13 +55,13 @@ void advanced_acc_calibration(void *pvParameters)
     send(*client_fd, "Настройка MPU#1.....\r\n", sizeof("Настройка MPU#1.....\r\n"), 0);
 #endif
     ESP_LOGI(TAG_SERVICE, "Настройка MPU#1.....");
-    if (MPU6000_init(MPU6000_1) != ESP_OK) vTaskDelete(NULL);
+    if (MPU6000_init(MPU6000_1, 0x06) != ESP_OK) vTaskDelete(NULL);
 
 #ifdef TELNET_CONF_MODE
     send(*client_fd, "Настройка MPU#2.....\r\n", sizeof("Настройка MPU#2.....\r\n"), 0);
 #endif
     ESP_LOGI(TAG_SERVICE, "Настройка MPU#2.....");
-    if (MPU6000_init(MPU6000_2) != ESP_OK) vTaskDelete(NULL);
+    if (MPU6000_init(MPU6000_2, 0x02) != ESP_OK) vTaskDelete(NULL);
 
 #ifdef TELNET_CONF_MODE
     send(*client_fd, "Перенастройка SPI на 20МГц.....\r\n", sizeof("Перенастройка SPI на 20МГц.....\r\n"), 0);

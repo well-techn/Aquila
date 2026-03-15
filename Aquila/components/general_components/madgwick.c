@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include "math.h"
 #include "wt_alldef.h"
+#include "esp_attr.h"
 
 volatile float q0 = 1.0; 
 volatile float q1 = 0.0; 

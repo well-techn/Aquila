@@ -127,7 +127,7 @@ void gps_read_and_process_data(void * pvParameters)
 //статус ставим в 1 если считаем данные достоверными
                         gps_data.status = 1;
 //отправляем сформированную структуру в очередь
-                        xQueueSend(gps_to_main_queue, (void *) &gps_data, NULL);
+                        xQueueSend(gps_to_main_queue, (void *) &gps_data, 0);
 //очищаем локальный буфер
                         for (i = 1;i < NUMBER_OF_BYTES_TO_RECEIVE_FROM_GPS; i++) incoming_message_buffer_gps[i] = 0;
                         }

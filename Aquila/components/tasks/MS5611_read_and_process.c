@@ -104,7 +104,7 @@ void MS5611_read_and_process_data(void * pvParameters)
               if (altitude_baro_cm < 0) altitude_baro_cm = 0;
               altitude_baro_cm = avg_filter_1d(altitude_baro_cm_filter_pool, altitude_baro_cm, 20);
               //printf("%d, ", (uint16_t)altitude_baro_cm);
-              xQueueSend(MS5611_to_main_queue, &altitude_baro_cm, NULL); 
+              xQueueSend(MS5611_to_main_queue, &altitude_baro_cm, 0); 
             }                         
     } 
   }

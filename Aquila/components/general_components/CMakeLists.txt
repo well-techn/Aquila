@@ -19,14 +19,21 @@ idf_component_register(SRCS
 "pid.c"
 "advanced_math.c"
 "px4flow.c"
+"CRCs.c"
+"FusionAhrs.c"
+"FusionBias.c"
+"FusionCompass.c"
+"dshot_esc_encoder.c"
 
 
-INCLUDE_DIRS 
-"./include"
-"${IDF_PATH}/"
-"${PROJECT_DIR}/components/wt_libs/include/"
-"${IDF_PATH}/components/esp_driver_spi/include/driver/"
-"${IDF_PATH}/components/esp_driver_i2c/include/driver/"
-"${IDF_PATH}/components/nvs_flash/include/"
-"${IDF_PATH}/components/esp_partition/include/"
-REQUIRES esp_wifi mbedtls)
+INCLUDE_DIRS
+    "include" 
+
+
+REQUIRES 
+    esp_wifi 
+    mbedtls
+    driver
+    wt_libs
+)
+   

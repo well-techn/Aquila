@@ -24,7 +24,6 @@ void gyro_calibration (void *pvParameters)
     int16_t gyro_raw_2[3] = {0,0,0};
   
     uint16_t counter = 0;
-    uint8_t i = 0;
             
     float Gyro_X_cal_1 = 0.0;
     float Gyro_Y_cal_1 = 0.0;
@@ -59,7 +58,7 @@ void gyro_calibration (void *pvParameters)
     send(*client_fd, "Настройка MPU#1.....\r\n", sizeof("Настройка MPU#1.....\r\n"), 0);
 #endif
   ESP_LOGI(TAG_SERVICE,"Настройка MPU#1.....");
-  if (MPU6000_init(MPU6000_1) != ESP_OK) {
+  if (MPU6000_init(MPU6000_1, 0x06) != ESP_OK) {
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
@@ -68,7 +67,7 @@ void gyro_calibration (void *pvParameters)
 #endif
 
   ESP_LOGI(TAG_SERVICE,"Настройка MPU#2.....");
-  if (MPU6000_init(MPU6000_2) != ESP_OK) {
+  if (MPU6000_init(MPU6000_2, 0x02) != ESP_OK) {
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
   }
 
@@ -124,8 +123,8 @@ void gyro_calibration (void *pvParameters)
         gyro_2_offset[1] = (Gyro_Y_cal_2 / (NUMBER_OF_IMU_CALIBRATION_COUNTS - 1));
         gyro_2_offset[2] = (Gyro_Z_cal_2 / (NUMBER_OF_IMU_CALIBRATION_COUNTS - 1));
           
-        for (i=0;i<3;i++) ESP_LOGI(TAG_SERVICE,"MPU#1 сдвиг нуля гироскопа %d",gyro_1_offset[i]);
-        for (i=0;i<3;i++) ESP_LOGI(TAG_SERVICE,"MPU#2 сдвиг нуля гироскопа %d",gyro_2_offset[i]);
+        for (uint8_t i = 0; i < 3; i++) ESP_LOGI(TAG_SERVICE,"MPU#1 сдвиг нуля гироскопа %d",gyro_1_offset[i]);
+        for (uint8_t i = 0; i < 3; i++) ESP_LOGI(TAG_SERVICE,"MPU#2 сдвиг нуля гироскопа %d",gyro_2_offset[i]);
 
 #ifdef TELNET_CONF_MODE
         char message_to_print[90];

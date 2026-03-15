@@ -40,7 +40,7 @@ void reading_logs_from_external_flash(void *pvParameters)
 #ifdef LOGGING_ACCEL_2 
   next += snprintf(header_new + next, sizeof(header_new), "ax_raw_2|");
   next += snprintf(header_new + next, sizeof(header_new), "ay_raw_2|");
-  next += snprintf(header_new + next, sizeof(header_new), "az_raw_3|");
+  next += snprintf(header_new + next, sizeof(header_new), "az_raw_2|");
 #endif
 
 #ifdef LOGGING_ACCEL_1_MAX
@@ -60,7 +60,7 @@ void reading_logs_from_external_flash(void *pvParameters)
 #ifdef LOGGING_GYRO_2 
   next += snprintf(header_new + next, sizeof(header_new), "gx_raw_2|");
   next += snprintf(header_new + next, sizeof(header_new), "gy_raw_2|");
-  next += snprintf(header_new + next, sizeof(header_new), "gz_raw_3|");
+  next += snprintf(header_new + next, sizeof(header_new), "gz_raw_2|");
 #endif
 
 #ifdef LOGGING_AVG_ACCEL
@@ -81,6 +81,10 @@ void reading_logs_from_external_flash(void *pvParameters)
 
 #ifdef LOGGING_ANGLES 
   next += snprintf(header_new + next, sizeof(header_new), "pitch|roll|yaw|");
+#endif
+
+#ifdef LOGGING_YAW_SETPOINT
+    next += snprintf(header_new + next, sizeof(header_new), "yaw_sp|");
 #endif
 
 #ifdef LOGGING_LIDAR_PID
@@ -139,6 +143,10 @@ void reading_logs_from_external_flash(void *pvParameters)
 
 #ifdef LOGGING_RSSI_LEVEL
   next += snprintf(header_new + next, sizeof(header_new), "RSSI|");
+#endif
+
+#ifdef LOGGING_CYCLE_TIMES
+  next += snprintf(header_new + next, sizeof(header_new), "AVG_CYCLE|MAX_CYCLE|");
 #endif
 
   next += snprintf(header_new + next, sizeof(header_new), "EOL\r\n");
@@ -213,6 +221,10 @@ void reading_logs_from_external_flash(void *pvParameters)
           for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->angles[i]);
 #endif
 
+#ifdef LOGGING_YAW_SETPOINT
+    next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|",p_to_set_to_log->yaw_sp);
+#endif
+
 #ifdef LOGGING_LIDAR_PID
           next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|%0.2f|%0.2f|%0.2f|",p_to_set_to_log->lidar_pid_error, p_to_set_to_log->lidar_pid_P_component, p_to_set_to_log->lidar_pid_I_component, p_to_set_to_log->lidar_pid_D_component);
 #endif
@@ -274,6 +286,11 @@ void reading_logs_from_external_flash(void *pvParameters)
 #ifdef LOGGING_RSSI_LEVEL
           next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->rssi_level);
 #endif
+
+#ifdef LOGGING_CYCLE_TIMES
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%lu|%lu|", p_to_set_to_log->avg_cycle_time_us, p_to_set_to_log->max_cycle_time_us);
+#endif
+
           next += snprintf(message_to_print + next, sizeof(message_to_print), "*\r\n"); // конец строки
 
 // Печаем или отправляем сформированную строку в telnet

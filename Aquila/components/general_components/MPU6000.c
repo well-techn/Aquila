@@ -30,7 +30,6 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
  float factory_trim_calculated_values_accel[3];
  int8_t factory_trim_values_gyro[3];
  float factory_trim_calculated_values_gyro[3];
- uint8_t i;
  uint8_t sensor_data[14];
  int16_t accel_raw[3];
  int16_t gyro_raw[3];
@@ -56,7 +55,7 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
     ESP_LOGI(TAG_MPU6000,"Factory trim values для акселерометра %d, %d, %d",factory_trim_values_accel[0],factory_trim_values_accel[1],factory_trim_values_accel[2]);
     ESP_LOGI(TAG_MPU6000,"Factory trim values для гироскопа %d, %d, %d",factory_trim_values_gyro[0],factory_trim_values_gyro[1],factory_trim_values_gyro[2]);
     
-    for (i=0;i<3;i++) {
+    for (uint8_t i = 0; i < 3; i++) {
         if (factory_trim_values_accel[i] == 0) factory_trim_calculated_values_accel[i] = 0;
         else factory_trim_calculated_values_accel[i] = 4096.0 * 0.34 * powf((0.92 / 0.34),((float)(factory_trim_values_accel[i] - 1.0) / 30.0));
         
@@ -111,7 +110,7 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
     ESP_LOGI(TAG_MPU6000,"Данные с гироскопа в режиме самодиагностики %d, %d, %d",gyro_raw_test[0],gyro_raw_test[1],gyro_raw_test[2]);
 
     //calculating difference
-    for (i=0;i<3;i++) {
+    for (uint8_t i = 0; i < 3; i++) {
         str_accel[i] = accel_raw_test[i] - accel_raw[i]; //fabs as per https://github.com/natanaeljr/esp32-MPU-driver/blob/master/src/MPU.cpp????
         str_gyro[i] = gyro_raw_test[i] - gyro_raw[i];    //fabs????
 
@@ -130,27 +129,26 @@ esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle) {
     return err;
 }     
 
-esp_err_t MPU6000_init(spi_device_handle_t MPU_handle) {
+esp_err_t MPU6000_init(spi_device_handle_t MPU_handle, uint8_t filter_value) {
 
     esp_err_t err = ESP_OK;
-    uint8_t i = 0;
     uint8_t reg_value = 0;
     uint8_t MPU6000_configuration_data[9][2] = {{MPU6000_PWR_MGMT_1,         0x80},         //сброс       
                                                 {MPU6000_SIGNAL_PATH_RESET,  0x07},         //сброс                
                                                 {MPU6000_PWR_MGMT_1,         0x00},         //внутренняя синхра        
-                                                {MPU6000_CONFIG,             0b00000110},   //фильтр на 5Гц    
+                                                {MPU6000_CONFIG,             filter_value},   //фильтр на 5Гц    
                                                 {MPU6000_SMPLRT_DIV,         SMPL},         //частота сэмплирования       
                                                 {MPU6000_GYRO_CONFIG,        0x00},         //гироскоп 250 град в сек макс               
-                                                {MPU6000_ACCEL_CONFIG,       0x08},          
+                                                {MPU6000_ACCEL_CONFIG,       0x08},         //+-4G
                                                 {MPU6000_USER_CTRL,          0b00010000},
                                                 {MPU6000_INT_ENABLE,         0x01}};         
 
-    for (i=0;i<9;i++) {
+    for (uint8_t i = 0; i < 9; i++) {
         SPI_write_byte (MPU_handle, 0, 0, 8, MPU6000_configuration_data[i][0], 0, MPU6000_configuration_data[i][1]);
         ets_delay_us(10000);  
     }
 
-    for (i=2; i<9; i++) { //проверяем записанные значения
+    for (uint8_t i = 2; i < 9; i++) { //проверяем записанные значения
         reg_value = SPI_read_byte(MPU_handle, 0, 0, 8, MPU6000_configuration_data[i][0] | MPU6000_READ_FLAG, 0);
         if ( reg_value != MPU6000_configuration_data[i][1]) {
             err = ESP_FAIL;

@@ -4,7 +4,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "string.h"
-#include "usb_serial_jtag.h"
+#include "driver/usb_serial_jtag.h"
 #include "reading_logs_from_external_flash.h"
 #include "engines_test.h"
 #include "gyro_calibration.h"

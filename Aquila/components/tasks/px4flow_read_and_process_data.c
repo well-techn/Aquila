@@ -71,7 +71,7 @@ void px4flow_read_and_process_data(void * pvParameters)
       //printf("%0.2f, %0.2f\n",px4flow_data.flow_x_meters, compensated_flow_x);
       //printf("%0.2f, %0.2f, %d, %ld\n",px4flow_data.optical_x, px4flow_data.optical_y, px4flow_int_frame.quality, height_for_optical_flow);
 
-      xQueueSend(px4flow_to_main_queue, (void *) &px4flow_data, NULL);
+      xQueueSend(px4flow_to_main_queue, (void *) &px4flow_data, 0);
     } 
 }
 

@@ -78,7 +78,7 @@ void lidar_read_and_process_data(void * pvParameters)
         else lidar_data.valid = 1;
         lidar_data.strength = raw_strength;
 
-        xQueueSend(lidar_to_main_queue, (void *) &lidar_data, NULL);
+        xQueueSend(lidar_to_main_queue, (void *) &lidar_data, 0);
          
       }  
     }

@@ -284,6 +284,109 @@ void printing_calibration_coefficients (void *pvParameters)
 #ifdef TELNET_CONF_MODE
     pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
     send(*client_fd, message_to_print, pos, 0);
+#endif
+
+  printf ("Корректировочные значения сдвигов (bias) для магнетометра = [");
+  err = nvs_get_u64(NVS_handle, "mag_h_bias[0]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f ", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "\nBias магнетометра = [%0.3f ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif   
+
+  err = nvs_get_u64(NVS_handle, "mag_h_bias[1]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f ", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif  
+
+  err = nvs_get_u64(NVS_handle, "mag_h_bias[2]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f]\n", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif   
+
+ printf ("Корректирующая матрица Ainv магнетометра\n"); 
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "Корректирующая матрица Ainv магнетометра\r\n");
+    send(*client_fd, message_to_print, pos, 0);
+#endif 
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[00]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("[%0.3f, ", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "[%0.3f, ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif   
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[01]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f, ", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif   
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[02]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f\n", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif 
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[10]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf(" %0.3f, ", *p_double); 
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif 
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[11]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f, ", *p_double); 
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif 
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[12]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f\n", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif  
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[20]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf(" %0.3f, ", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif  
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[21]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f, ", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
+#endif  
+
+  err = nvs_get_u64(NVS_handle, "mag_A_i[22]", &temp_uint64); 
+  p_double = (double*) &temp_uint64;
+  printf("%0.3f]\n\n", *p_double);
+#ifdef TELNET_CONF_MODE
+    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
+    send(*client_fd, message_to_print, pos, 0);
 #endif   
 
   nvs_close(NVS_handle);

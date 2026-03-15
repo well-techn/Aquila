@@ -150,30 +150,29 @@ void RC_read_and_process_data(void * pvParameters)
               remote_control_data.mode = ~incoming_message_buffer_remote[10];
 //начинаем приводить их к желаемому виду
               remote_control_data.raw_throttle = received_throttle;              
-//remote_control_data.received_throttle = 7836.0f + 48.98f * sqrt((double)received_throttle);
-              if(remote_control_data.received_throttle <=0) remote_control_data.received_throttle = 1;//так как логарифм
+              if (remote_control_data.received_throttle <=0) remote_control_data.received_throttle = 1;//так как логарифм, на всякий случай
               remote_control_data.received_throttle = 1760 + 1127 * log((float)received_throttle);
-
 
               if ((received_pitch > 360)&&( received_pitch < 1800)) remote_control_data.received_pitch = 0.02083333f*(float)received_pitch - 37.5f;
                 else if ((received_pitch > 2245) && (received_pitch < 3741)) remote_control_data.received_pitch  = 0.02005348*(float)received_pitch - 45.020053f;
                 else if (received_pitch >= 3741) remote_control_data.received_pitch  = 30.0;  //градусы наклона
                 else if (received_pitch <= 360) remote_control_data.received_pitch  = -30.0;
                 else remote_control_data.received_pitch = 0;
-//reversed signs             
+           
               if ((received_roll > 360)&&( received_roll < 1800)) remote_control_data.received_roll = -0.02083333f*(float)received_roll + 37.5f;              
                 else if ((received_roll > 2245) && (received_roll < 3741)) remote_control_data.received_roll = -0.02005348*(float)received_roll + 45.020053f; 
                 else if (received_roll >= 3741) remote_control_data.received_roll = -30.0;  //градусы наклона
                 else if (received_roll <= 360) remote_control_data.received_roll = 30.0;
                 else remote_control_data.received_roll = 0;
 
-              if ((received_yaw > 200)&&( received_yaw < 1848)) remote_control_data.received_yaw = -0.0910194f*(float)received_yaw + 168.203885;
-                else if ((received_yaw < 3896)&&( received_yaw > 2248)) remote_control_data.received_yaw = -0.0910194f*(float)received_yaw + 204.61165;
-                else if (received_yaw >= 3896) remote_control_data.received_yaw = -150.0;     //градусы в секунду
-                else if (received_yaw <= 200) remote_control_data.received_yaw = 150.0;
+              if ((received_yaw > 150)&&( received_yaw < 1898)) remote_control_data.received_yaw = -0.1029748f * (float)received_yaw + 195.446224;
+                else if ((received_yaw < 3946)&&( received_yaw > 2198)) remote_control_data.received_yaw = -0.1029748f * (float)received_yaw + 226.338673;
+                else if (received_yaw >= 3946) remote_control_data.received_yaw = -180.0;     //градусы в секунду
+                else if (received_yaw <= 150) remote_control_data.received_yaw = 180.0;
                 else remote_control_data.received_yaw = 0;
 
-//слегка подфильтровываем значения от джойстиков        
+//слегка подфильтровываем значения от джойстиков
+//Значения raw_throttle нужны для при установке высоты в режиме полета по датчику высоты        
               remote_control_data.raw_throttle = remote_control_data.raw_throttle * RC_FILTER_COEFF + raw_rc_throttle_old * (1 - RC_FILTER_COEFF);
               raw_rc_throttle_old = remote_control_data.raw_throttle;
 
@@ -222,7 +221,7 @@ void RC_read_and_process_data(void * pvParameters)
                 baro_alt_hold_set_allowed = 0;
               }
 #ifdef USING_TFMINIS_I2C              
-//переменные ***_alt_hold_set_allowed нужны для того, чтобы избежать ситуации, когда мы полетали в ударжании, выключили engines_start_bit оставив включенными тумблера режимов удержания выооты и потом опять включили engines_start - в этом случае режим удержания не включится, пока не выключим тумблер удержания и опять не включим
+//переменные ***_alt_hold_set_allowed нужны для того, чтобы избежать ситуации, когда мы полетали в удержании, выключили engines_start_bit оставив включенными тумблера режимов удержания выооты и потом опять включили engines_start - в этом случае режим удержания не включится, пока не выключим тумблер удержания и опять не включим
 //если  тумблер "удержание высоты по лидару" включен при запущенных двигателях - устанавливаем флаг lidar_altitude_hold_flag 
               if ((remote_control_data.mode & 0x02) && (lidar_alt_hold_set_allowed == 1) && (remote_control_data.engines_start_flag)) remote_control_data.lidar_altitude_hold_flag = 1;
 //в противном случае обнуляем этот флаг              
@@ -238,18 +237,18 @@ void RC_read_and_process_data(void * pvParameters)
               if ((remote_control_data.mode & 0x08) ^ (mode_old & 0x08))  {
                 if (remote_control_data.mode & 0x08) command_for_PCA9685 = 0x0103;
                 else command_for_PCA9685 = 0x011A;
-              xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
+              xQueueSend(PCA9685_queue, &command_for_PCA9685, 0);
               }
 //при изменении состояния флага engine_start отправить в очередь задачи управления PCA9685 команду на изменение сигнала
               if (remote_control_data.engines_start_flag ^ start_flag_old)  {
                 if (remote_control_data.engines_start_flag) command_for_PCA9685 = 0x015A;
                 else command_for_PCA9685 = 0x0100;
-              xQueueSend(PCA9685_queue, &command_for_PCA9685, NULL);
+              xQueueSend(PCA9685_queue, &command_for_PCA9685, 0);
               }
 //копируем в структуру байт с уровнем RSSI 
               remote_control_data.rssi_level = (int8_t)incoming_message_buffer_remote[13];
 //отправляем сформированную структуру с обработанными данными от пульта в main_flying_cycle                
-              xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, NULL);                      
+              xQueueSend(remote_control_to_main_queue, (void *) &remote_control_data, 0);                      
               mode_old = remote_control_data.mode;
               start_flag_old = remote_control_data.engines_start_flag;
 //каждый 3й раз пробуждаем задачу отправки телеметрии на пульт
@@ -272,7 +271,7 @@ void RC_read_and_process_data(void * pvParameters)
               pid_coeff_data.ki_alt_hold_coeff = (incoming_message_buffer_remote[3] << 8) | incoming_message_buffer_remote[4];
               pid_coeff_data.kd_alt_hold_coeff = (incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6];
 //отправляем эту структуру в очередь
-              xQueueSend(remote_control_to_main_pid_queue, (void *) &pid_coeff_data, NULL);  
+              xQueueSend(remote_control_to_main_pid_queue, (void *) &pid_coeff_data, 0);  
             }
             
             else 

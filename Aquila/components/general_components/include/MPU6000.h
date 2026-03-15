@@ -122,6 +122,6 @@
 
 esp_err_t MPU6000_communication_check (spi_device_handle_t MPU_handle);
 esp_err_t MPU6000_self_test(spi_device_handle_t MPU_handle);
-esp_err_t MPU6000_init(spi_device_handle_t MPU_handle);
+esp_err_t MPU6000_init(spi_device_handle_t MPU_handle, uint8_t filter_value);
 
 #endif
