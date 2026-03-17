@@ -159,6 +159,8 @@ void Transpose_Square_Matrix(double *A, int n)
     double temp;
     int i, j;
 
+    if (A == NULL || n <= 0) return;
+
     for (i = 0; i < n; A += n + 1, i++)
     {
         pA = A + 1;
@@ -175,6 +177,8 @@ void Transpose_Square_Matrix(double *A, int n)
 void Get_Submatrix(double *S, int mrows, int mcols, double *A, int ncols, int row, int col)
 {
     int number_of_bytes = sizeof(double) * mcols;
+    
+    if (S == NULL) return;
 
     for (A += row * ncols + col; mrows > 0; A += ncols, S += mcols, mrows--)
         memcpy(S, A, number_of_bytes);
@@ -275,6 +279,8 @@ int Lower_Triangular_Inverse(double *L, int n)
     double *p_i, *p_j, *p_k;
     double sum;
 
+    if (L == NULL || n <= 0) return(0);
+
     //         Invert the diagonal elements of the lower triangular matrix L.
 
     for (k = 0, p_k = L; k < n; p_k += (n + 1), k++)
@@ -332,6 +338,8 @@ void Multiply_Matrices(double *C, double *A, int nrows, int ncols, double *B, in
     double *pB;
     double *p_B;
     int i, j, k;
+
+    if ((C == NULL) || (A == NULL)) return;
 
     for (i = 0; i < nrows; A += ncols, i++)
         for (p_B = B, j = 0; j < mcols; C++, p_B++, j++)
@@ -395,6 +403,8 @@ int Hessenberg_Form_Elementary(double *A, double *S, int n)
     double max;
     double s;
     double *pA, *pB, *pC, *pS;
+
+    if ((A == NULL) || (S == NULL)) return(0);
 
     // n x n matrices for which n <= 2 are already in Hessenberg form
 

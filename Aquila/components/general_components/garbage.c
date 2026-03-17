@@ -1,4 +1,4 @@
-typedef struct
+/*typedef struct
 {
 	float * pointer;
 	float state[1];
@@ -97,7 +97,7 @@ static void NVS_read_write_test(void * pvParameters)
     }
 }
 
-/*
+
         //if (large_counter > 10000) {vTaskDelay(1000/portTICK_PERIOD_MS);}   
         if ((large_counter % 1000) == 0)
         {

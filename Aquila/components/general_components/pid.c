@@ -47,4 +47,52 @@ float PID_Compute(PIDController_t *pid, float setpoint, float measured_value, fl
     return output;
 }
 
-   
+
+// typedef struct {
+//     float Kp, Ki, Kd, Kf;     // Коэффициенты (Kf - это наш Feed-Forward)
+//     float integral;           // Накопленная ошибка для I
+//     float prev_error;         // Предыдущая ошибка для D
+//     float prev_setpoint;      // Предыдущая уставка для FF
+// } PIDController;
+
+// float PID_Compute(PIDController *pid, float setpoint, float measurement, float dt) {
+//     // 1. Считаем ошибку (для P, I, D)
+//     float error = setpoint - measurement;
+
+//     // --- СТАНДАРТНЫЙ PID ---
+//     // Пропорциональная часть (реакция на отклонение)
+//     float P_out = pid->Kp * error;
+
+//     // Интегральная часть (борьба со статикой)
+//     pid->integral += error * dt;
+//     float I_out = pid->Ki * pid->integral;
+
+//     // Дифференциальная часть (подавление раскачки)
+//     float derivative = (error - pid->prev_error) / dt;
+//     float D_out = pid->Kd * derivative;
+//     pid->prev_error = error;
+
+//     // --- FEED-FORWARD (FF) ---
+//     // Считаем, как быстро мы двигаем стиком (уставкой)
+//     float setpoint_rate = (setpoint - pid->prev_setpoint) / dt;
+    
+//     // FF выдает сигнал пропорционально СКОРОСТИ движения стика
+//     float FF_out = pid->Kf * setpoint_rate;
+//     pid->prev_setpoint = setpoint;
+
+//     // Итоговый выход: сумма PID + наше "предчувствие" FF
+//     return P_out + I_out + D_out + FF_out;
+// }
+
+//    // Считаем производную по измерению (чище для моторов)
+// float current_diff = (measurement - pid->prev_measurement) / dt;
+
+// if (pid->alpha > 0.0f) {
+//     // ФНЧ: сглаживаем резкие шумы от вибраций моторов
+//     pid->d_filtered = pid->alpha * pid->d_filtered + (1.0f - pid->alpha) * current_diff;
+// } else {
+//     pid->d_filtered = current_diff;
+// }
+
+// float D_out = -pid->Kd * pid->d_filtered;
+// pid->prev_measurement = measurement;

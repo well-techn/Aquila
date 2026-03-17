@@ -578,7 +578,7 @@ KalmanFilter2d_t Kalm_vert;
 //внешний pitch по углу   
     pid_pitch_angle = PID_Compute(&pitch_pid_angle,rc_fresh_data.received_pitch, pitch, throttle);
 //внутренний pitch по угловой скорости
-    gyro_pitch = 0.1 * (((gyro_1_converted[0] + gyro_2_converted[1]) / 2.0) * (180.0 / (float)M_PI)) + 0.9 * gyro_pitch_old;
+    gyro_pitch = 0.1 * (((gyro_1_converted[0] + gyro_2_converted[1]) / 2.0) * (180.0f / (float)M_PI)) + 0.9 * gyro_pitch_old;
     gyro_pitch_old = gyro_pitch;
     //pid_pitch_rate = PID_Compute(&pitch_pid_rate,rc_fresh_data.received_pitch, gyro_pitch, throttle);
     pid_pitch_rate = PID_Compute(&pitch_pid_rate,pid_pitch_angle, gyro_pitch, throttle);
@@ -586,7 +586,7 @@ KalmanFilter2d_t Kalm_vert;
 //внешний roll по углу   
     pid_roll_angle = PID_Compute(&roll_pid_angle,rc_fresh_data.received_roll, roll, throttle);
 //внутренний roll по угловой скорости
-    gyro_roll = 0.1 * (((gyro_1_converted[1] - gyro_2_converted[0]) / 2.0 ) * (180.0 / (float)M_PI)) + 0.9 * gyro_roll_old;
+    gyro_roll = 0.1f * (((gyro_1_converted[1] - gyro_2_converted[0]) / 2.0f ) * (180.0f / (float)M_PI)) + 0.9f * gyro_roll_old;
     gyro_roll_old = gyro_roll;
     //pid_pitch_rate = PID_Compute(&roll_pid_rate,rc_fresh_data.received_roll, gyro_roll, throttle);  
     pid_roll_rate = PID_Compute(&roll_pid_rate,pid_roll_angle, gyro_roll, throttle);
@@ -599,8 +599,8 @@ KalmanFilter2d_t Kalm_vert;
 //внешний yaw по углу
     if (throttle < 9000.0) yaw_setpoint = yaw;  //чтобы ошибка не накапливалась пока стоит на земле
     error_yaw_angle = -yaw_setpoint + yaw;
-    if (error_yaw_angle <= -180.0) error_yaw_angle = error_yaw_angle + 360.0; 
-    if (error_yaw_angle >= 180.0)  error_yaw_angle = error_yaw_angle - 360.0;
+    if (error_yaw_angle <= -180.0f) error_yaw_angle = error_yaw_angle + 360.0; 
+    if (error_yaw_angle >= 180.0f)  error_yaw_angle = error_yaw_angle - 360.0;
 
     integral_yaw_error_angle = integral_yaw_error_angle + Ki_yaw_angle * error_yaw_angle;
     if (integral_yaw_error_angle > 500.0) integral_yaw_error_angle = 500.0;
@@ -612,7 +612,7 @@ KalmanFilter2d_t Kalm_vert;
     error_yaw_angle_old = error_yaw_angle;
    
 //внутренний yaw по угловой скорости
-    gyro_yaw = ((((gyro_1_converted[2] * (-1.0)) - gyro_2_converted[2]) / 2.0) * (180.0 / (float)M_PI));  
+    gyro_yaw = ((((gyro_1_converted[2] * (-1.0f)) - gyro_2_converted[2]) / 2.0f) * (180.0f / (float)M_PI));  
     //pid_yaw_rate = PID_Compute(&yaw_pid_rate, rc_fresh_data.received_yaw, gyro_yaw, throttle);
     pid_yaw_rate = PID_Compute(&yaw_pid_rate, pid_yaw_angle, gyro_yaw, throttle);
 
@@ -1019,7 +1019,7 @@ void NVS_reading_calibration_values(void)
   p_double = (double*) &temp;
   accel_2_A_inv[2][2] = *p_double;
 //подсчет минут в воздухе (включенные двигатели)
-    err = nvs_get_u32(NVS_handle, "flight_time", &flight_time); 
+  err = nvs_get_u32(NVS_handle, "flight_time", &flight_time); 
   switch (err) {
       case ESP_OK:
           ESP_LOGD(TAG_NVS,"flight time = %ld", flight_time);
@@ -1314,8 +1314,8 @@ while(1)
             //гироскопы калибруем только стандартным способом, вычитая оффсет           
                   for (uint8_t i = 0; i < 3; i++) 
                       {
-                        gyro_1_converted[i]  = (((float)gyro_raw_1[i] - (float)gyro_1_offset[i]) / 131.0) * ((float)M_PI / 180.0);   //в рад/с
-                        gyro_2_converted[i]  = (((float)gyro_raw_2[i] - (float)gyro_2_offset[i]) / 131.0) * ((float)M_PI / 180.0);   //в рад/с
+                        gyro_1_converted[i]  = (((float)gyro_raw_1[i] - (float)gyro_1_offset[i]) / 131.0f) * ((float)M_PI / 180.0f);   //в рад/с
+                        gyro_2_converted[i]  = (((float)gyro_raw_2[i] - (float)gyro_2_offset[i]) / 131.0f) * ((float)M_PI / 180.0f);   //в рад/с
                       }
 
                   for (uint8_t i = 0; i < 3; i++) 
@@ -1433,13 +1433,13 @@ while(1)
         //gyroscope_1 = FusionBiasUpdate(&bias, gyroscope_1);
         //gyroscope_2 = FusionBiasUpdate(&bias, gyroscope_2);
         
-        gyro_1_converted[0] = gyroscope_1.array[0] * ((float)M_PI / 180.0);   //в рад/с;
-        gyro_1_converted[1] = gyroscope_1.array[1] * ((float)M_PI / 180.0);
-        gyro_1_converted[2] = gyroscope_1.array[2] * ((float)M_PI / 180.0);
+        gyro_1_converted[0] = gyroscope_1.array[0] * ((float)M_PI / 180.0f);   //в рад/с;
+        gyro_1_converted[1] = gyroscope_1.array[1] * ((float)M_PI / 180.0f);
+        gyro_1_converted[2] = gyroscope_1.array[2] * ((float)M_PI / 180.0f);
 
-        gyro_2_converted[0] = gyroscope_2.array[0] * ((float)M_PI / 180.0);
-        gyro_2_converted[1] = gyroscope_2.array[1] * ((float)M_PI / 180.0);
-        gyro_2_converted[2] = gyroscope_2.array[2] * ((float)M_PI / 180.0);
+        gyro_2_converted[0] = gyroscope_2.array[0] * ((float)M_PI / 180.0f);
+        gyro_2_converted[1] = gyroscope_2.array[1] * ((float)M_PI / 180.0f);
+        gyro_2_converted[2] = gyroscope_2.array[2] * ((float)M_PI / 180.0f);
 
 //переформатируем вектора в соответствие с фактической установкой на борту 
         accelerometer_1 = FusionRemap(accelerometer_1,FusionRemapAlignmentPYPXNZ);
@@ -1565,7 +1565,7 @@ while(1)
           new_lidar_data_arrived_flag = 1;
           //ESP_LOGI(TAG_FLY,"высота %0.3f", lidar_fresh_data.altitude); // высота в cm
 //корректируем показания лидара с учетом текущего наклона по pitch и roll 
-          if (lidar_fresh_data.altitude < 1200) lidar_altitude_corrected = lidar_fresh_data.altitude * cosf(pitch * M_PI / 180.0) * cosf(roll * M_PI / 180.0);
+          if (lidar_fresh_data.altitude < 1200) lidar_altitude_corrected = lidar_fresh_data.altitude * cosf(pitch * M_PI / 180.0f) * cosf(roll * M_PI / 180.0f);
 //передаем актуальную высоту в задачу обработки данных от PX4Flow
 #ifdef USING_PX4FLOW 
           xTaskNotify(task_handle_px4flow_read_and_process_data, (uint32_t)lidar_altitude_corrected,eSetValueWithOverwrite);

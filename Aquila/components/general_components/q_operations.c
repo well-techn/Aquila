@@ -56,7 +56,7 @@ void quaternion_difference(float* q_current, float* q_desired, float* q_diff)
 
 void quat_from_angle_and_axis(float angle, float* axis, float* q)
 {
-    float half_angle_rad = (angle/2) * M_PI / 180.0;
+    float half_angle_rad = (angle/2) * M_PI / 180.0f;
    
     q[0] = cosf(half_angle_rad);
     
@@ -69,9 +69,9 @@ void quat_from_angle_and_axis(float angle, float* axis, float* q)
 void angle_and_axis_from_quat(float* q, float* angle, float* axis)
 {
     *angle = 2 * acos(q[0]) * 180 / M_PI;
-    axis[1] = q[1] / sinf((*angle/2) * M_PI / 180.0);
-    axis[2] = q[2] / sinf((*angle/2) * M_PI / 180.0);
-    axis[3] = q[3] / sinf((*angle/2) * M_PI / 180.0);
+    axis[1] = q[1] / sinf((*angle/2) * M_PI / 180.0f);
+    axis[2] = q[2] / sinf((*angle/2) * M_PI / 180.0f);
+    axis[3] = q[3] / sinf((*angle/2) * M_PI / 180.0f);
 }
 
 void calculate_desired_quat_from_angles_and_yaw_rate(float pitch, float roll, float yaw_rate_degrees, float time, float* q_desired)
@@ -90,7 +90,7 @@ void calculate_desired_quat_from_angles_and_yaw_rate(float pitch, float roll, fl
     //for (int i = 0; i<4;i++) printf("%0.3f ", q_roll[i]);
     //printf("\n");
     
-    float angular_rate_rads = yaw_rate_degrees * 3.14/180.0;
+    float angular_rate_rads = yaw_rate_degrees * 3.14/180.0f;
     //printf("%0.3f\n", angular_rate_rads);
     float half_dt = time / 2.0;
     float q_omega[4] = {0,0,0,0};

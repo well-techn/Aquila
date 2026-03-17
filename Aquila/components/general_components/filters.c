@@ -154,7 +154,7 @@ float Butterworth_filter(float input, Butterworth_t* state)
     return output;
 }
 
-uint8_t arrays_are_equal (uint8_t* array_1, uint8_t* array_2, uint8_t length)
+uint8_t arrays_are_equal (const  uint8_t* array_1, const uint8_t* array_2, uint8_t length)
 {
     for (int i = 0; i<length; i++) 
     {
@@ -163,7 +163,7 @@ uint8_t arrays_are_equal (uint8_t* array_1, uint8_t* array_2, uint8_t length)
     return 1;
 }
 
-uint8_t all_array_elements_are_equal(uint8_t* array, uint8_t length) 
+uint8_t all_array_elements_are_equal(const uint8_t* array, uint8_t length) 
 {
      for (uint8_t i = 1; i < length; i++) {
         if (array[i] != array[0]) 

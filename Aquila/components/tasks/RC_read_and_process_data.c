@@ -167,8 +167,8 @@ void RC_read_and_process_data(void * pvParameters)
 
               if ((received_yaw > 150)&&( received_yaw < 1898)) remote_control_data.received_yaw = -0.1029748f * (float)received_yaw + 195.446224;
                 else if ((received_yaw < 3946)&&( received_yaw > 2198)) remote_control_data.received_yaw = -0.1029748f * (float)received_yaw + 226.338673;
-                else if (received_yaw >= 3946) remote_control_data.received_yaw = -180.0;     //градусы в секунду
-                else if (received_yaw <= 150) remote_control_data.received_yaw = 180.0;
+                else if (received_yaw >= 3946) remote_control_data.received_yaw = -180.0f;     //градусы в секунду
+                else if (received_yaw <= 150) remote_control_data.received_yaw = 180.0f;
                 else remote_control_data.received_yaw = 0;
 
 //слегка подфильтровываем значения от джойстиков
