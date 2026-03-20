@@ -28,10 +28,10 @@ void send_data_to_RC(void * pvParameters)
       if (xQueueReceive(main_to_rc_queue, &data_to_send_to_rc, (TickType_t)portMAX_DELAY)) 
       {
         
-        outcoming_message_buffer_remote[0] = RC_CONTROL_MESSAGE_HEADER;
+        outcoming_message_buffer_remote[0] = RC_CONTROL_MESSAGE_HEADER; 
         outcoming_message_buffer_remote[1] = 0; //reserved
         outcoming_message_buffer_remote[2] = 0; //reserved
-        outcoming_message_buffer_remote[3] = 0; //reserved
+        outcoming_message_buffer_remote[3] = 0; //reserved 
         outcoming_message_buffer_remote[4] = ((int8_t)(data_to_send_to_rc.pitch) & 0xFF00) >> 8;                          //angles in format MSB + LSB    pitch
         outcoming_message_buffer_remote[5] = ((int8_t)(data_to_send_to_rc.pitch) & 0x00FF);
         outcoming_message_buffer_remote[6] = (uint8_t)(((uint16_t)(data_to_send_to_rc.yaw) & 0xFF00) >> 8);                                   //yaw

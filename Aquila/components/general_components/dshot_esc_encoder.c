@@ -179,7 +179,7 @@ for (uint8_t i = 0; i < number_of_channels; i++)
             .mem_block_symbols = 48,          
             .resolution_hz = DSHOT_ESC_RESOLUTION_HZ,
             .flags.with_dma = 0,
-            .flags.io_loop_back = 0,
+            //.flags.io_loop_back = 0,
             .trans_queue_depth = 10,           
         };
         ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &tx_channel[i]));

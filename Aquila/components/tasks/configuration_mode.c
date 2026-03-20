@@ -11,6 +11,7 @@
 #include "advanced_acc_calibration.h"
 #include "advanced_mag_calibration.h"
 #include "printing_calibration_coefficients.h"
+#include "clearing_NVS.h"
 #include "nvs_flash.h"
 #include "wt_alldef.h"
 
@@ -21,7 +22,8 @@ const char *TAG_SERVICE = "SERVICE";
 
 void configuration_mode(void *arg)
 {
-    nvs_handle_t NVS_handle;
+    nvs_handle_t flight_time_NVS_handle;
+
     uint32_t flight_time = 0;    
     
 //Настраиваем USB SERIAL JTAG
@@ -44,7 +46,7 @@ uint8_t len = 0;
     esp_err_t ret = nvs_flash_init();
     ESP_ERROR_CHECK(ret);
 //открываем на считывание flash   
-    ret = nvs_open("storage", NVS_READWRITE, &NVS_handle);
+    ret = nvs_open("perm_storage", NVS_READWRITE, &flight_time_NVS_handle);
      if (ret != ESP_OK) 
         {
             ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(ret));
@@ -53,14 +55,14 @@ uint8_t len = 0;
         {
 //считываем flight_time (время налета в секундах)
 //если это первый запуск и переменной нет - создаем ее
-  ret = nvs_get_u32(NVS_handle, "flight_time", &flight_time); 
+  ret = nvs_get_u32(flight_time_NVS_handle, "flight_time", &flight_time); 
   switch (ret) {
       case ESP_OK:
           ESP_LOGD(TAG_SERVICE,"flight time = %ld", flight_time);
           break;
       case ESP_ERR_NVS_NOT_FOUND:
           ESP_LOGW(TAG_SERVICE,"flight time не определен, используем нулевое значение");
-          //ret = nvs_set_u32(NVS_handle, "flight_time", 0);
+          //ret = nvs_set_u32(flight_time_NVS_handle, "flight_time", 0);
           break;
       default :
           ESP_LOGE(TAG_SERVICE,"Error (%s) reading!\n", esp_err_to_name(ret));
@@ -82,7 +84,8 @@ printf("4 -> калибровка ESC (пока не готово)\n");
 printf("5 -> продвинутая калибровка акселерометра (по magnetto)\n");
 printf("6 -> продвинутая калибровка магнетометра (по magnetto)\n");
 printf("7 -> вывести сохраненные калибровочные коэффициенты\r\n");
-printf("8 -> продолжить загрузку в обычном режиме\n");
+printf("8 -> стереть калибровочные коэффициенты в NVS8\r\n");
+printf("9 -> продолжить загрузку в обычном режиме\n");
 printf("ESC -> перезапуск\n\n");
 
     while (1) {
@@ -128,7 +131,12 @@ printf("ESC -> перезапуск\n\n");
                     break;
                 
                 case '8':
-                    printf("8 - Продолжаем обычную загрузку\n");
+                    printf("8 - Стираем содержимое NVS\n");
+                    xTaskCreate(clearing_NVS,"clearing_NVS",16384,NULL,0,NULL); 
+                    break;
+                
+                case '9':
+                    printf("9 - Продолжаем обычную загрузку\n");
                     vTaskResume(task_handle_init);
                     vTaskDelete(NULL);  
                     break;

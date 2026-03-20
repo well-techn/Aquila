@@ -35,9 +35,15 @@ REQUIRES
         freertos
         
 # Драйверы (в 5.0+ они часто разделены, но 'driver' — это мета-компонент)
-        driver
-        esp_driver_ledc
+
+        esp_driver_i2c
+        esp_driver_spi
+        esp_driver_gptimer
         esp_driver_gpio
+        esp_driver_rmt
+        esp_driver_ledc
+        esp_driver_uart
+        esp_driver_usb_serial_jtag
         
 # Сеть и безопасность
         esp_wifi

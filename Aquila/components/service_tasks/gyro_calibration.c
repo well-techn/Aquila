@@ -152,36 +152,36 @@ void gyro_calibration (void *pvParameters)
         ESP_ERROR_CHECK( err );
 
         ESP_LOGI(TAG_SERVICE,"Открываем NVS... ");
-        nvs_handle_t NVS_handle;
-        err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
+        nvs_handle_t coeff_NVS_handle;
+        err = nvs_open("coeff_storage", NVS_READWRITE, &coeff_NVS_handle);
         if (err != ESP_OK) ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
         else 
         {
           ESP_LOGI(TAG_SERVICE,"Записываем gyro_1_X offset %d... ", gyro_1_offset[0]);
-          err = nvs_set_i16(NVS_handle, "gyro_1_off_0", gyro_1_offset[0]);
+          err = nvs_set_i16(coeff_NVS_handle, "gyro_1_off[0]", gyro_1_offset[0]);
           
           ESP_LOGI(TAG_SERVICE,"Записываем gyro_1_Y offset %d... ", gyro_1_offset[1]);
-          err = nvs_set_i16(NVS_handle, "gyro_1_off_1", gyro_1_offset[1]);
+          err = nvs_set_i16(coeff_NVS_handle, "gyro_1_off[1]", gyro_1_offset[1]);
         
           ESP_LOGI(TAG_SERVICE,"Записываем gyro_1_Z offset %d... ", gyro_1_offset[2]);
-          err = nvs_set_i16(NVS_handle, "gyro_1_off_2", gyro_1_offset[2]);
+          err = nvs_set_i16(coeff_NVS_handle, "gyro_1_off[2]", gyro_1_offset[2]);
 
           ESP_LOGI(TAG_SERVICE,"Записываем gyro_2_X offset %d... ", gyro_2_offset[0]);
-          err = nvs_set_i16(NVS_handle, "gyro_2_off_0", gyro_2_offset[0]);
+          err = nvs_set_i16(coeff_NVS_handle, "gyro_2_off[0]", gyro_2_offset[0]);
           
           ESP_LOGI(TAG_SERVICE,"Записываем gyro_2_Y offset %d... ", gyro_2_offset[1]);
-          err = nvs_set_i16(NVS_handle, "gyro_2_off_1", gyro_2_offset[1]);
+          err = nvs_set_i16(coeff_NVS_handle, "gyro_2_off[1]", gyro_2_offset[1]);
         
           ESP_LOGI(TAG_SERVICE,"Записываем gyro_2_Z offset %d... ", gyro_2_offset[2]);
-          err = nvs_set_i16(NVS_handle, "gyro_2_off_2", gyro_2_offset[2]);
+          err = nvs_set_i16(coeff_NVS_handle, "gyro_2_off[2]", gyro_2_offset[2]);
 
           ESP_LOGI(TAG_SERVICE,"Сохраняем данные в NVS... ");
 #ifdef TELNET_CONF_MODE
       send(*client_fd, "Сохраняем данные в NVS ... ", sizeof("Сохраняем данные в NVS...\r\n"), 0);
 #endif
-          err = nvs_commit(NVS_handle);
+          err = nvs_commit(coeff_NVS_handle);
 
-          nvs_close(NVS_handle);
+          nvs_close(coeff_NVS_handle);
         }
 
       ESP_LOGI(TAG_SERVICE,"Калибровка IMU завершена, перезапустите систему.");

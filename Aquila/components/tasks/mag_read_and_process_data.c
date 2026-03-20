@@ -15,6 +15,7 @@
 //собственные библиотеки
 #include "wt_alldef.h"
 #include "IST8310.h" 
+#include "NVS_operations.h"
 
 extern SemaphoreHandle_t semaphore_for_i2c_external;
 extern QueueHandle_t magnetometer_queue;
@@ -41,74 +42,89 @@ void mag_read_and_process_data (void * pvParameters)
   uint64_t temp;
   double* p_double;
 
-  esp_err_t err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      // если нет места - пробуем стереть и переинициазировать, при этом сотрутся все переменные
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      err = nvs_flash_init();
-  }
-  ESP_ERROR_CHECK( err );
+  nvs_handle_t coeff_NVS_handle;
 
-  ESP_LOGI(TAG_NVS,"Открываем NVS... ");
-  nvs_handle_t NVS_handle;
-  err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
-  if (err != ESP_OK) {
-      ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
-  } else {
-        ESP_LOGI(TAG_NVS,"NVS открыт");
+//   esp_err_t err = nvs_flash_init();
+//   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+//       // если нет места - пробуем стереть и переинициазировать, при этом сотрутся все переменные
+//       ESP_ERROR_CHECK(nvs_flash_erase());
+//       err = nvs_flash_init();
+//   }
+//   ESP_ERROR_CHECK( err );
 
-  // Начинаем считывание сохраненных переменных
-  ESP_LOGI(TAG_NVS,"Считываем данные калибровки магнетометра из NVS ... ");
+//   ESP_LOGI(TAG_NVS,"Открываем NVS... ");
+//   nvs_handle_t coeff_NVS_handle;
+//   err = nvs_open("coeff_storage", NVS_READWRITE, &coeff_NVS_handle);
+//   if (err != ESP_OK) {
+//       ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
+//   } else {
+//         ESP_LOGI(TAG_NVS,"NVS открыт");
 
-  err = nvs_get_u64(NVS_handle, "mag_h_bias[0]", &temp); 
-  p_double = (double*) &temp;
-  mag_hard_bias[0] = *p_double;
+//инициализируем и открываем NVS  
+  ESP_ERROR_CHECK(NVS_prepare(&coeff_NVS_handle, "coeff_storage"));
 
-  err = nvs_get_u64(NVS_handle, "mag_h_bias[1]", &temp); 
-  p_double = (double*) &temp;
-  mag_hard_bias[1] = *p_double;
+//считываем массив hard bias магнетометра
+  nvs_read_double_array(coeff_NVS_handle, "mag_h_bias", (double*)mag_hard_bias, 3);
 
-  err = nvs_get_u64(NVS_handle, "mag_h_bias[2]", &temp); 
-  p_double = (double*) &temp;
-  mag_hard_bias[2] = *p_double;
+//   // Начинаем считывание сохраненных переменных
+//   ESP_LOGI(TAG_NVS,"Считываем данные калибровки магнетометра из NVS ... ");
+
+//   //считываем массивы оффсетов акселерометров 1 и 2
+//   nvs_read_double_array(coeff_NVS_handle, "accel_1_off", (double*)accel_1_bias, 3);
+//   nvs_read_double_array(coeff_NVS_handle, "accel_2_off", (double*)accel_2_bias, 3);
+
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_h_bias[0]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_hard_bias[0] = *p_double;
+
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_h_bias[1]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_hard_bias[1] = *p_double;
+
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_h_bias[2]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_hard_bias[2] = *p_double;
 
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[00]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[0][0] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[00]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[0][0] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[01]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[0][1] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[01]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[0][1] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[02]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[0][2] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[02]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[0][2] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[10]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[1][0] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[10]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[1][0] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[11]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[1][1] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[11]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[1][1] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[12]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[1][2] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[12]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[1][2] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[20]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[2][0] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[20]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[2][0] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[21]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[2][1] = *p_double;
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[21]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[2][1] = *p_double;
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[22]", &temp); 
-  p_double = (double*) &temp;
-  mag_A_inv[2][2] = *p_double;
-  }
+//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[22]", &temp); 
+//   p_double = (double*) &temp;
+//   mag_A_inv[2][2] = *p_double;
+//   }
+
+//считываем массив Ainv магнетометра
+  nvs_read_double_array(coeff_NVS_handle, "mag_Ai", (double*)mag_A_inv, 9);
 
   //вносим калибровочные данные магнетометра в структуры фильтра Маджвика
   const FusionVector_t hardIronOffset = {.array = {mag_hard_bias[0], mag_hard_bias[1], mag_hard_bias[2]}};  

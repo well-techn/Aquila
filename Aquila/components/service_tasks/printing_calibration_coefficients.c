@@ -7,389 +7,167 @@
 #include <rom/ets_sys.h>
 #include "math.h"
 #include "string.h"
+#include "NVS_operations.h"
 #ifdef TELNET_CONF_MODE
   #include <lwip/sockets.h>
 #endif
-
 
 extern const char *TAG_SERVICE;
 
 void printing_calibration_coefficients (void *pvParameters)
 {
-  int16_t temp_int16 = 0;
-  uint64_t temp_uint64 = 0;
-  double* p_double;
+  nvs_handle_t coeff_NVS_handle;
+
+  int16_t gyro_1_offset[3] = {0,0,0};
+  int16_t gyro_2_offset[3] = {0,0,0};
+
+  double accel_1_bias[3] = {0,0,0};
+  double accel_1_A_inv[3][3] = {{0,0,0},
+                                {0,0,0},
+                                {0,0,0}};
+  
+  double accel_2_bias[3] = {0,0,0};
+  double accel_2_A_inv[3][3] = {{0,0,0},
+                                {0,0,0},
+                                {0,0,0}};
+  double mag_hard_bias[3] = {0,0,0};     
+  
+  double mag_A_inv[3][3] = {{0,  0,  0},    
+                            {0,  0,  0},
+                            {0,  0,  0}};   
+
 #ifdef TELNET_CONF_MODE
   int16_t *client_fd = pvParameters;
-  char message_to_print[150];
+  char message_to_print[256];
   uint8_t pos = 0;
-#endif    
-  esp_err_t err = nvs_flash_init();
-  ESP_ERROR_CHECK( err );
-
-  nvs_handle_t NVS_handle;
-  err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
-  if (err != ESP_OK) 
-  {
-      ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
-  } 
-  else 
-  {
-//считываем и выводим на печать калибровочные коэффициенты гироскопов из флеш-памяти
-   ESP_ERROR_CHECK(nvs_get_i16(NVS_handle, "gyro_1_off_0", &temp_int16)); 
-   printf("Bias гироскопа 1 = [%d, ", temp_int16);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "Bias гироскопа 1 = [%d, ", temp_int16);
-    send(*client_fd, message_to_print, pos, 0);
- #endif
-
-   ESP_ERROR_CHECK(nvs_get_i16(NVS_handle, "gyro_1_off_1", &temp_int16));
-   printf("%d, ", temp_int16);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%d, ", temp_int16);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-   ESP_ERROR_CHECK(nvs_get_i16(NVS_handle, "gyro_1_off_2", &temp_int16));
-   printf("%d]\n", temp_int16); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%d]\r\n", temp_int16);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-   ESP_ERROR_CHECK(nvs_get_i16(NVS_handle, "gyro_2_off_0", &temp_int16));
-   printf("Bias гироскопа 2 = [%d, ", temp_int16); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "Bias гироскопа 2 = [%d, ", temp_int16);
-    send(*client_fd, message_to_print, pos, 0);
- #endif
-
-   ESP_ERROR_CHECK(nvs_get_i16(NVS_handle, "gyro_2_off_1", &temp_int16));
-   printf("%d, ", temp_int16);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%d, ", temp_int16);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-   ESP_ERROR_CHECK(nvs_get_i16(NVS_handle, "gyro_2_off_2", &temp_int16));
-   printf("%d]\n\n", temp_int16);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%d]\r\n", temp_int16);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-//считываем и выводим на печать калибровочные коэффициенты по магнетто акселерометров из флеш-памяти
-  
-  printf ("Корректировочные значения сдвигов (bias) для акселерометра 1 = [");
-  err = nvs_get_u64(NVS_handle, "accel_1_bias[0]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "\nBias акселерометра 1 = [%0.3f ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  err = nvs_get_u64(NVS_handle, "accel_1_bias[1]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_1_bias[2]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f]\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  printf ("Корректирующая матрица Ainv\n"); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "Корректирующая матрица Ainv\r\n");
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[00]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("[%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "[%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[01]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[02]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[10]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf(" %0.3f, ", *p_double); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[11]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[12]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[20]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf(" %0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[21]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[22]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f]\n\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  printf ("Корректировочные значения сдвигов (bias) для акселерометра 2 = [");
-  err = nvs_get_u64(NVS_handle, "accel_2_bias[0]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "\nBias акселерометра 2 = [%0.3f ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  err = nvs_get_u64(NVS_handle, "accel_2_bias[1]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_2_bias[2]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f]\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
- printf ("Корректирующая матрица Ainv\n"); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "Корректирующая матрица Ainv\r\n");
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[00]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("[%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "[%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[01]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[02]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[10]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf(" %0.3f, ", *p_double); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[11]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[12]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[20]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf(" %0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[21]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[22]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f]\n\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
 #endif
 
-  printf ("Корректировочные значения сдвигов (bias) для магнетометра = [");
-  err = nvs_get_u64(NVS_handle, "mag_h_bias[0]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "\nBias магнетометра = [%0.3f ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
+//инициализируем и открываем NVS хранения калибровочных коэффициентов  
+  ESP_ERROR_CHECK(NVS_prepare(&coeff_NVS_handle, "coeff_storage"));
 
-  err = nvs_get_u64(NVS_handle, "mag_h_bias[1]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
+//считываем массив оффсетов гироскопов 1 и 2
+  nvs_read_i16_array(coeff_NVS_handle, "gyro_1_off", gyro_1_offset, 3);
+  nvs_read_i16_array(coeff_NVS_handle, "gyro_2_off", gyro_2_offset, 3);
 
-  err = nvs_get_u64(NVS_handle, "mag_h_bias[2]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f]\n", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
+//считываем массивы оффсетов акселерометров 1 и 2
+  nvs_read_double_array(coeff_NVS_handle, "accel_1_off", (double*)accel_1_bias, 3);
+  nvs_read_double_array(coeff_NVS_handle, "accel_2_off", (double*)accel_2_bias, 3);
 
- printf ("Корректирующая матрица Ainv магнетометра\n"); 
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "Корректирующая матрица Ainv магнетометра\r\n");
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
+//считываем массивы Ainv акселерометров 1 и 2
+  nvs_read_double_array(coeff_NVS_handle, "accel_1_Ai", (double*)accel_1_A_inv, 9);
+  nvs_read_double_array(coeff_NVS_handle, "accel_2_Ai", (double*)accel_2_A_inv, 9);
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[00]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("[%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "[%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
+//считываем массив hard bias магнетометра
+  nvs_read_double_array(coeff_NVS_handle, "mag_h_bias", (double*)mag_hard_bias, 3);
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[01]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double);
-#ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
+//считываем массив Ainv магнетометра
+  nvs_read_double_array(coeff_NVS_handle, "mag_Ai", (double*)mag_A_inv, 9);
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[02]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f\n", *p_double);
+//выводим данные на печать
+pos = snprintf(message_to_print, sizeof(message_to_print), "Bias гироскопа 1 = [%d, %d, %d]\r\n", gyro_1_offset[0], gyro_1_offset[1], gyro_1_offset[2]);
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[10]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf(" %0.3f, ", *p_double); 
+pos = snprintf(message_to_print, sizeof(message_to_print), "Bias гироскопа 2 = [%d, %d, %d]\r\n\r\n", gyro_2_offset[0], gyro_2_offset[1], gyro_2_offset[2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE 
+        send(*client_fd, message_to_print, pos, 0); 
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), "Корректировочные значения сдвигов (bias) для акселерометра 1 = [%0.3f, %0.3f, %0.3f]\r\n",accel_1_bias[0], accel_1_bias[1], accel_1_bias[2]);
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[11]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double); 
+pos = snprintf(message_to_print, sizeof(message_to_print), "Корректирующая матрица Ainv\r\n");
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif 
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[12]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f\n", *p_double);
+pos = snprintf(message_to_print, sizeof(message_to_print), "[%0.3f, %0.3f, %0.3f\r\n",accel_1_A_inv[0][0], accel_1_A_inv[0][1], accel_1_A_inv[0][2]);
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[20]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf(" %0.3f, ", *p_double);
+pos = snprintf(message_to_print, sizeof(message_to_print), " %0.3f, %0.3f, %0.3f\r\n",accel_1_A_inv[1][0], accel_1_A_inv[1][1], accel_1_A_inv[1][2]);
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[21]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f, ", *p_double);
+pos = snprintf(message_to_print, sizeof(message_to_print), " %0.3f, %0.3f, %0.3f]\r\n\r\n",accel_1_A_inv[2][0], accel_1_A_inv[2][1], accel_1_A_inv[2][2]);
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f, ", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif  
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  err = nvs_get_u64(NVS_handle, "mag_A_i[22]", &temp_uint64); 
-  p_double = (double*) &temp_uint64;
-  printf("%0.3f]\n\n", *p_double);
+
+pos = snprintf(message_to_print, sizeof(message_to_print), "Корректировочные значения сдвигов (bias) для акселерометра 2 = [%0.3f, %0.3f, %0.3f]\r\n",accel_2_bias[0], accel_2_bias[1], accel_2_bias[2]);
+printf("%s", message_to_print);
 #ifdef TELNET_CONF_MODE
-    pos = sprintf(message_to_print, "%0.3f]\r\n", *p_double);
-    send(*client_fd, message_to_print, pos, 0);
-#endif   
+        send(*client_fd, message_to_print, pos, 0);
+#endif
 
-  nvs_close(NVS_handle);
+pos = snprintf(message_to_print, sizeof(message_to_print), "Корректирующая матрица Ainv\r\n"); 
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), "[%0.3f, %0.3f, %0.3f\r\n",accel_2_A_inv[0][0], accel_2_A_inv[0][1], accel_2_A_inv[0][2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), " %0.3f, %0.3f, %0.3f\r\n",accel_2_A_inv[1][0], accel_2_A_inv[1][1], accel_2_A_inv[1][2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), " %0.3f, %0.3f, %0.3f]\r\n\r\n",accel_2_A_inv[2][0], accel_2_A_inv[2][1], accel_2_A_inv[2][2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+
+pos = snprintf(message_to_print, sizeof(message_to_print), "Корректировочные значения сдвигов (bias) для магнетометра = [%0.3f, %0.3f, %0.3f]\r\n",mag_hard_bias[0], mag_hard_bias[1], mag_hard_bias[2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), "Корректирующая матрица Ainv\r\n"); 
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), "[%0.3f, %0.3f, %0.3f\r\n",mag_A_inv[0][0], mag_A_inv[0][1], mag_A_inv[0][2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), " %0.3f, %0.3f, %0.3f\r\n",mag_A_inv[1][0], mag_A_inv[1][1], mag_A_inv[1][2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+pos = snprintf(message_to_print, sizeof(message_to_print), " %0.3f, %0.3f, %0.3f]\r\n\r\n",mag_A_inv[2][0], mag_A_inv[2][1], mag_A_inv[2][2]);
+printf("%s", message_to_print);
+#ifdef TELNET_CONF_MODE
+        send(*client_fd, message_to_print, pos, 0);
+#endif
+
+  nvs_close(coeff_NVS_handle);
   vTaskDelete(NULL); 
-  } 
-}
+} 

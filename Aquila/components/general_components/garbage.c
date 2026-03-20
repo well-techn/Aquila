@@ -56,7 +56,7 @@ static void NVS_read_write_test(void * pvParameters)
 
   ESP_LOGI(TAG_NVS,"Открываем EEPROM... ");
   nvs_handle_t my_handle;
-  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+  err = nvs_open("coeff_storage", NVS_READWRITE, &my_handle);
   if (err != ESP_OK) {
       ESP_LOGE(TAG_NVS,"Error (%s) opening NVS handle!\n", esp_err_to_name(err));
   } else {
@@ -71,7 +71,7 @@ static void NVS_read_write_test(void * pvParameters)
 
         // Commit written value.
         // After setting any values, nvs_commit() must be called to ensure changes are written
-        // to flash storage. Implementations may write to storage at other times,
+        // to flash coeff_storage. Implementations may write to coeff_storage at other times,
         // but this is not guaranteed.
         ESP_LOGI(TAG_NVS,"Committing updates in NVS ... ");
         err = nvs_commit(my_handle);

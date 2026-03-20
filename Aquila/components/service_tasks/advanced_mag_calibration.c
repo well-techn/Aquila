@@ -145,36 +145,36 @@ void advanced_mag_calibration (void *pvParameters)
 
     esp_err_t err = nvs_flash_init();   
     ESP_ERROR_CHECK( err );
-    nvs_handle_t NVS_handle;
+    nvs_handle_t coeff_NVS_handle;
 
-    err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
+    err = nvs_open("coeff_storage", NVS_READWRITE, &coeff_NVS_handle);
     if (err != ESP_OK) ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
     else 
     {
         //Записываем mag_hard_bias[0] - mag_hard_bias[2]
         p_uint64 = (uint64_t*)&B[0];
-        err = nvs_set_u64(NVS_handle, "mag_h_bias[0]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_h_bias[1]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_h_bias[2]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[0]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[1]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[2]", *(p_uint64++));
 
         //Записываем mag_A_i[00]-mag_A_inv[33] 
         p_uint64 = (uint64_t*)&A_1[0]; 
-        err = nvs_set_u64(NVS_handle, "mag_A_i[00]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[01]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[02]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[10]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[11]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[12]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[20]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[21]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "mag_A_i[22]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[0]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[1]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[2]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[3]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[4]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[5]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[6]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[7]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[8]", *(p_uint64++));
     }
     
     printf("Сохраняем данные в NVS ... ");
 #ifdef TELNET_CONF_MODE
         send(*client_fd, "\r\nСохраняем данные в NVS ...\r\n", sizeof("\r\nСохраняем данные в NVS ...\r\n"), 0);   
 #endif
-    err = nvs_commit(NVS_handle);
+    err = nvs_commit(coeff_NVS_handle);
     if (err == ESP_OK) 
     {
       printf("Данные сохранены\n");
@@ -189,7 +189,7 @@ void advanced_mag_calibration (void *pvParameters)
         send(*client_fd, "Ошибка сохранения данных!\r\n", sizeof("Ошибка сохранения данных!\r\n"), 0);   
 #endif
         }
-    nvs_close(NVS_handle);
+    nvs_close(coeff_NVS_handle);
     printf("Для перезапуска нажмите ESC\r\n");
 #ifdef TELNET_CONF_MODE
         send(*client_fd, "Для перезапуска нажмите ESC (придется переподключиться к WiFi)\r\n", sizeof("\r\nДля перезапуска нажмите ESC (придется переподключиться к WiFi)\r\n"), 0);   

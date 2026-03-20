@@ -849,6 +849,7 @@ int QR_Hessenberg_Matrix(double *H, double *S, double eigen_real[], double eigen
     double shift = 0.0;
     double *pH;
 
+    if ((H == NULL) || (S == NULL)) return (0);
     for (row = n - 1; row >= 0; row--)
     {
         found_eigenvalue = 0;

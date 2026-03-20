@@ -24,12 +24,12 @@ extern const char *TAG_SERVICE;
 
 void sending_something_over_wifi(void *pvParameters)
 {
-    nvs_handle_t NVS_handle;
+    nvs_handle_t coeff_NVS_handle;
 // Инициализируем NVS
     esp_err_t ret = nvs_flash_init();
     ESP_ERROR_CHECK(ret);
 //открываем на считывание flash   
-    ret = nvs_open("storage", NVS_READWRITE, &NVS_handle);
+    ret = nvs_open("coeff_storage", NVS_READWRITE, &coeff_NVS_handle);
      if (ret != ESP_OK) 
         {
             ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(ret));

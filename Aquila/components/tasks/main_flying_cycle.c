@@ -35,6 +35,9 @@
 #include "pid.h"
 #include "q_operations.h"
 #include "emergency_mode.h"
+#include "NVS_operations.h"
+#include "timers_ops.h"
+#include "gpio_ops.h"
 
 //timers handles
 gptimer_handle_t Madgwick_timer;
@@ -81,7 +84,9 @@ extern QueueHandle_t px4flow_to_main_queue;
 
 /********************************************************************    ПРЕРЫВАНИЯ    ***********************************************************************************************/
 
-//прерывания от GPIO - IMU, аварийная остановка
+//функция контролирует прерывания от 2х IMU и пина аварйиной остановки.
+//для IMU контролирует что сигнал пришел вовремя, без зерержки и передает в основной цикл соответствующий статус
+//по полученному статусу main_flying_cycle может замещать данные потенциально неисправного IMU 
 static void IRAM_ATTR gpio_interrupt_handler(void *args)
 {
   uint32_t gpio_intr_status_1 = 0;
@@ -149,93 +154,14 @@ static void IRAM_ATTR gpio_interrupt_handler(void *args)
 
 //прерывание от таймера зависания основного полетного цикла
 //этот таймер сбрасывается в основном цикле полета. Если он переполнился - значит основной цикл завис, аварийно останавливаем двигетели
-static void IRAM_ATTR general_suspension_timer_interrupt_handler(void *args)    
+static bool IRAM_ATTR general_suspension_timer_interrupt_handler(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_ctx)  
 { 
   BaseType_t xHigherPriorityTaskWoken  = pdFALSE;
   gpio_set_level(A3, 0);                        //включить светодиод на кнопке аварийной остановки
   xTaskGenericNotifyFromISR(task_handle_emergency_mode, 0, 0x01 << 14, eSetValueWithOverwrite, NULL, &xHigherPriorityTaskWoken); //активировать аварийную задачу, передавая ей код вызвавшей ошибки
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+
+  return (xHigherPriorityTaskWoken == pdTRUE); 
 }
-
-
-/********************************************************************   ОБЩИЕ ФУНКЦИИ  ***********************************************************************************************/
-
-//настройка пинов, которые используются для прерываний
-static void configure_pins_for_interrupt()
-{
-//вход прерывания от IMU1
-  ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_1_INTERRUPT_PIN));
-  gpio_config_t INT_1 = {
-    .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
-    .mode = GPIO_MODE_INPUT,
-    .pull_up_en = GPIO_PULLUP_DISABLE,
-    .pull_down_en = GPIO_PULLDOWN_ENABLE,
-    .intr_type = GPIO_INTR_POSEDGE
-  }; 
-//вход прерывания от IMU2 
-  ESP_ERROR_CHECK(gpio_reset_pin(MPU6000_2_INTERRUPT_PIN));
-  gpio_config_t INT_2 = {
-    .pin_bit_mask = 1ULL << MPU6000_2_INTERRUPT_PIN,
-    .mode = GPIO_MODE_INPUT,
-    .pull_up_en = GPIO_PULLUP_DISABLE,
-    .pull_down_en = GPIO_PULLDOWN_ENABLE,
-    .intr_type = GPIO_INTR_POSEDGE
-  }; 
-//на A2 подключен кнопка аварийной остановки на Holybro M9N
-  ESP_ERROR_CHECK(gpio_reset_pin(A2));               
-  gpio_config_t INT_3 = {
-    .pin_bit_mask = 1ULL << A2,
-    .mode = GPIO_MODE_INPUT,
-    .pull_up_en = GPIO_PULLUP_DISABLE,
-    .pull_down_en = GPIO_PULLDOWN_ENABLE,
-    .intr_type = GPIO_INTR_POSEDGE
-  };
-
-  ESP_ERROR_CHECK(gpio_config(&INT_1));
-  ESP_ERROR_CHECK(gpio_config(&INT_2));
-  ESP_ERROR_CHECK(gpio_config(&INT_3));
-
-  ESP_ERROR_CHECK(gpio_isr_register(gpio_interrupt_handler, 0, 0, NULL)); 
-}
-
-//общая функция создание таймера без прерывания
-static void create_and_start_timer(uint32_t frequency_hz, gptimer_handle_t* timer_handle)                    
-{
-  gptimer_config_t timer_config = {
-      .clk_src = GPTIMER_CLK_SRC_DEFAULT,
-      .direction = GPTIMER_COUNT_UP,
-      .resolution_hz = frequency_hz,
-  };
-  ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, timer_handle));
-  ESP_ERROR_CHECK(gptimer_enable(*timer_handle));
-  ESP_ERROR_CHECK(gptimer_start(*timer_handle));
-}
-
-//создание таймера контроля зависания основного полетного цикла
-static void create_and_start_general_suspension_timer()                    
-{
-  gptimer_config_t timer_config = {
-      .clk_src = GPTIMER_CLK_SRC_DEFAULT,
-      .direction = GPTIMER_COUNT_UP,
-      .resolution_hz = 1 * 1000 * 1000, // 1MHz, 1 tick = 1us
-  };
-  ESP_ERROR_CHECK(gptimer_new_timer(&timer_config, &general_suspension_timer));
-
-  gptimer_alarm_config_t alarm_config = {                 //setting alarm threshold
-      .alarm_count = SUSPENSION_TIMER_DELAY_SEC * 1000 * 1000,   //1 second
-      //.reload_count = NULL,
-  };
-  ESP_ERROR_CHECK(gptimer_set_alarm_action(general_suspension_timer, &alarm_config));
-
-  gptimer_event_callbacks_t  Suspension_timer_interrupt = {       //this function will be launched when timer alarm occures
-      .on_alarm = (gptimer_alarm_cb_t)general_suspension_timer_interrupt_handler,     // register user callback
-  };
-  ESP_ERROR_CHECK(gptimer_register_event_callbacks(general_suspension_timer, &Suspension_timer_interrupt, NULL));
-
-  ESP_ERROR_CHECK(gptimer_enable(general_suspension_timer));
-  ESP_ERROR_CHECK(gptimer_start(general_suspension_timer));
-}
-
 
 
 
@@ -545,7 +471,8 @@ KalmanFilter2d_t Kalm_vert;
 
   drone_state current_state = GROUND_STATE;
 
-  nvs_handle_t NVS_handle;
+  nvs_handle_t coeff_NVS_handle;
+  nvs_handle_t flight_time_NVS_handle;
 
   //переменные для контроля времени выполнения одного цикла
   uint32_t start_CPU_cycles = 0;
@@ -563,15 +490,6 @@ KalmanFilter2d_t Kalm_vert;
     };
   dshot_esc_throttle_t dshot_signal[4] = {0}; 
 #endif
-
-/*
-  uint8_t long_cycle_flag = 0;
-  float q_from_RC[4] = {1,0,0,0};
-  
-  float q_difference[4] = {0,0,0,0};
-  float q_angle = 0;
-  float q_axis[4];
-*/
   
   void calculate_pids_2(void) {
 
@@ -827,221 +745,41 @@ void prepare_mavlink_data(void) {
 }
 #endif
 
-//функция считывания сохраненных калибровочных коэффициентов из флеш-памяти
-void NVS_reading_calibration_values(void)
-{
-  esp_err_t err = nvs_flash_init();
-  if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      // если нет места - пробуем стереть и переинициазировать, при этом сотрутся все переменные
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      err = nvs_flash_init();
-  }
-  ESP_ERROR_CHECK( err );
 
-  ESP_LOGI(TAG_NVS,"Открываем NVS... ");
-  
-  err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
-  if (err != ESP_OK) {
-      ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
-  } else {
-        ESP_LOGI(TAG_NVS,"NVS открыт");
+//*********************************************************НЕПОСРЕДСТВЕННО НАЧИНАЕТСЯ ЗАДАЧА************************************************************************** */
+ 
+//считываем из флеш самого ESP калибровочные коэффициенты IMU и проверяем что они записаны
+//инициализируем и открываем NVS хранения калибровочных коэффициентов  
+  ESP_ERROR_CHECK(NVS_prepare(&coeff_NVS_handle, "coeff_storage"));
 
-  // Начинаем считывание сохраненных переменных
-  //коэффициенты простой калибровки
-  ESP_LOGI(TAG_NVS,"Считываем данные калибровки гироскопов из NVS ... ");
-  
-   err = nvs_get_i16(NVS_handle, "gyro_1_off_0", &gyro_1_offset[0]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"gyro_1_offset[0] = %d", gyro_1_offset[0]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"gyro_1_offset[0] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
+//считываем массив оффсетов гироскопов 1 и 2
+  nvs_read_i16_array(coeff_NVS_handle, "gyro_1_off", gyro_1_offset, 3);
+  nvs_read_i16_array(coeff_NVS_handle, "gyro_2_off", gyro_2_offset, 3);
 
-  err = nvs_get_i16(NVS_handle, "gyro_1_off_1", &gyro_1_offset[1]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"gyro_1_offset[1] = %d", gyro_1_offset[1]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"gyro_1_offset[1] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
+//считываем массивы оффсетов акселерометров 1 и 2
+  nvs_read_double_array(coeff_NVS_handle, "accel_1_off", (double*)accel_1_bias, 3);
+  nvs_read_double_array(coeff_NVS_handle, "accel_2_off", (double*)accel_2_bias, 3);
 
-  err = nvs_get_i16(NVS_handle, "gyro_1_off_2", &gyro_1_offset[2]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"gyro_1_offset[2] = %d", gyro_1_offset[2]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"gyro_1_offset[2] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
+//считываем массивы Ainv акселерометров 1 и 2
+  nvs_read_double_array(coeff_NVS_handle, "accel_1_Ai", (double*)accel_1_A_inv, 9);
+  nvs_read_double_array(coeff_NVS_handle, "accel_2_Ai", (double*)accel_2_A_inv, 9);
 
-  err = nvs_get_i16(NVS_handle, "gyro_2_off_0", &gyro_2_offset[0]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"gyro_2_offset[0] = %d", gyro_2_offset[0]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"gyro_2_offset[0] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "gyro_2_off_1", &gyro_2_offset[1]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"gyro_2_offset[1] = %d", gyro_2_offset[1]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"gyro_2_offset[1] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
-
-  err = nvs_get_i16(NVS_handle, "gyro_2_off_2", &gyro_2_offset[2]); 
-  switch (err) {
-      case ESP_OK:
-          ESP_LOGD(TAG_NVS,"gyro_2_offset[2] = %d", gyro_2_offset[2]);
-          break;
-      case ESP_ERR_NVS_NOT_FOUND:
-          ESP_LOGW(TAG_NVS,"gyro_2_offset[2] не определен!");
-          break;
-      default :
-          ESP_LOGE(TAG_NVS,"Ошибка считывания (%s)!\n", esp_err_to_name(err));
-  }
-  
-//коэффициенты калибровки по магнетто для акселерометров
-  err = nvs_get_u64(NVS_handle, "accel_1_bias[0]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_bias[0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_bias[1]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_bias[1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_bias[2]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_bias[2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_bias[0]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_bias[0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_bias[1]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_bias[1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_bias[2]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_bias[2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[00]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[0][0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[01]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[0][1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[02]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[0][2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[10]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[1][0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[11]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[1][1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[12]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[1][2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[20]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[2][0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[21]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[2][1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_1_A_i[22]", &temp); 
-  p_double = (double*) &temp;
-  accel_1_A_inv[2][2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[00]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[0][0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[01]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[0][1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[02]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[0][2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[10]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[1][0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[11]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[1][1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[12]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[1][2] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[20]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[2][0] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[21]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[2][1] = *p_double;
-
-  err = nvs_get_u64(NVS_handle, "accel_2_A_i[22]", &temp); 
-  p_double = (double*) &temp;
-  accel_2_A_inv[2][2] = *p_double;
-//подсчет минут в воздухе (включенные двигатели)
-  err = nvs_get_u32(NVS_handle, "flight_time", &flight_time); 
+//инициализируем и открываем NVS хранения flight_time 
+  ESP_ERROR_CHECK(NVS_prepare(&flight_time_NVS_handle, "perm_storage"));
+  esp_err_t err = nvs_get_u32(flight_time_NVS_handle, "flight_time", &flight_time); 
   switch (err) {
       case ESP_OK:
           ESP_LOGD(TAG_NVS,"flight time = %ld", flight_time);
           break;
       case ESP_ERR_NVS_NOT_FOUND:
           ESP_LOGW(TAG_NVS,"flight time не определен, прописываем нулевое значение");
-          err = nvs_set_u32(NVS_handle, "flight_time", flight_time);
+          err = nvs_set_u32(flight_time_NVS_handle, "flight_time", flight_time);
+          nvs_commit(flight_time_NVS_handle); 
           break;
       default :
           ESP_LOGE(TAG_NVS,"Error (%s) reading!\n", esp_err_to_name(err));
-  }
 
-  //nvs_close(NVS_handle);
-  }
-}
-
-
-
-//*********************************************************НЕПОСРЕДСТВЕННО НАЧИНАЕТСЯ ЗАДАЧА************************************************************************** */
- 
-//считываем из флеш самого ESP калибровочные коэффициенты IMU и проверяем что они записаны
- NVS_reading_calibration_values();
+    }
     
   if ((gyro_1_offset[0] || gyro_1_offset[1] || gyro_1_offset[2]) == 0)
   {
@@ -1061,9 +799,8 @@ void NVS_reading_calibration_values(void)
 //без этой задержки assertion не проходит, хз почему
   vTaskDelay(100/portTICK_PERIOD_MS);
   
-  #ifndef USING_OLD_MADGWICK
   ESP_LOGI(TAG_FLY,"Подготавливаем структуры нового Маджвика.....");
-  #define SAMPLE_RATE (1000) // replace with actual sample rate
+  #define SAMPLE_RATE (1000)
 
 //калибровочные данные IMU1
   const FusionMatrix_t gyroscopeMisalignment_1 = {.array = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f}};
@@ -1107,7 +844,7 @@ void NVS_reading_calibration_values(void)
   FusionAhrsSetSettings(&ahrs, &settings);
 
   ESP_LOGI(TAG_FLY,"Подготовка структур нового Маджвика завершена");
-#endif
+
 
 #ifdef USING_DSHOT_ESC_CONTROL
   ESP_LOGI(TAG_FLY,"Подготавливаем структуры для Dshot.....");
@@ -1138,17 +875,26 @@ void NVS_reading_calibration_values(void)
   Butterworth_init(1000.0, VERT_ACC_FILTER_F_CUT, &accel_Btw_filter);
 
   ESP_LOGI(TAG_FLY,"Создаем и запускаем таймер контроля зависания основного полетного цикла.....");
-  create_and_start_general_suspension_timer();
+  ESP_ERROR_CHECK(create_and_start_timer_with_interrupt(&general_suspension_timer, 1 * 1000 * 1000, SUSPENSION_TIMER_DELAY_SEC * 1000 * 1000,  general_suspension_timer_interrupt_handler)); 
   ESP_LOGI(TAG_FLY,"Таймер контроля зависания основного полетного цикла запущен\n");
 
   ESP_LOGI(TAG_FLY,"Создаем и запускаем таймер для фильтра Маджвика.....");
-  create_and_start_timer(10000000, &Madgwick_timer);
+  create_and_start_timer(10 * 1000 * 1000, &Madgwick_timer);
   ESP_LOGI(TAG_FLY,"Таймер для фильтра Маджвика создан и запущен\n");
 
   ESP_LOGI(TAG_FLY,"Создаем и запускаем таймеры контроля зависания IMU#1, IMU2 и активируем прерывания.....");
-  create_and_start_timer(1000000, &IMU_1_suspension_timer);
-  create_and_start_timer(1000000, &IMU_2_suspension_timer);
-  configure_pins_for_interrupt();
+  create_and_start_timer(1 * 1000 * 1000, &IMU_1_suspension_timer);
+  create_and_start_timer(1 * 1000 * 1000, &IMU_2_suspension_timer);
+  
+  ESP_LOGI(TAG_FLY,"Активируем прерывания от IMU#1, IMU2 и аварийной остановки.....");
+//активируем прерывание по входу от IMU1
+  сonfigure_pin_for_interrupt(MPU6000_1_INTERRUPT_PIN, GPIO_PULLDOWN_ENABLE, GPIO_INTR_POSEDGE);
+//активируем прерывание по входу от IMU2  
+  сonfigure_pin_for_interrupt(MPU6000_2_INTERRUPT_PIN, GPIO_PULLDOWN_ENABLE, GPIO_INTR_POSEDGE);
+//активируем прерывание по кнопке аварийной остановки на Holibro  
+  сonfigure_pin_for_interrupt(A2, GPIO_PULLDOWN_ENABLE, GPIO_INTR_POSEDGE);
+//активируем обработчик прерываний
+  ESP_ERROR_CHECK(gpio_isr_register(gpio_interrupt_handler, 0, 0, NULL)); 
 
   ESP_LOGI(TAG_FLY,"К ПОЛЕТУ ГОТОВ!\n");
 
@@ -1285,139 +1031,7 @@ while(1)
       gyro_raw_2[1] = (sensor_data_2[10] << 8) | sensor_data_2[11];          //Y
       gyro_raw_2[2] = (sensor_data_2[12] << 8) | sensor_data_2[13];          //Z
 
-
-      
-#ifdef USING_OLD_MADGWICK
-            //применяем к акселерометру калибровку по методу Magnetto при помощи вычисленных калибровочных коэффициентов bias и матрицы A_inv в сервисном режиме
-            //убираем bias      
-                  for (uint8_t i = 0; i < 3; i++) accel_1_wo_hb[i] = (float)accel_raw_1[i] - (float)accel_1_bias[i];
-            //умножаем матрицу A_inv на показания      
-                  accel_1_converted[0] = (float)accel_1_A_inv[0][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[0][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[0][2]*accel_1_wo_hb[2];
-                  accel_1_converted[1] = (float)accel_1_A_inv[1][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[1][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[1][2]*accel_1_wo_hb[2];
-                  accel_1_converted[2] = (float)accel_1_A_inv[2][0]*accel_1_wo_hb[0] + (float)accel_1_A_inv[2][1]*accel_1_wo_hb[1] + (float)accel_1_A_inv[2][2]*accel_1_wo_hb[2];
-            //то же самое делаем с показаниями второго акселерометра      
-                  for (uint8_t i = 0; i < 3; i++) accel_2_wo_hb[i] = (float)accel_raw_2[i] - (float)accel_2_bias[i];
-                  
-                  accel_2_converted[0] = (float)accel_2_A_inv[0][0]*accel_2_wo_hb[0] + (float)accel_2_A_inv[0][1]*accel_2_wo_hb[1] + (float)accel_2_A_inv[0][2]*accel_2_wo_hb[2];
-                  accel_2_converted[1] = (float)accel_2_A_inv[1][0]*accel_2_wo_hb[0] + (float)accel_2_A_inv[1][1]*accel_2_wo_hb[1] + (float)accel_2_A_inv[1][2]*accel_2_wo_hb[2];
-                  accel_2_converted[2] = (float)accel_2_A_inv[2][0]*accel_2_wo_hb[0] + (float)accel_2_A_inv[2][1]*accel_2_wo_hb[1] + (float)accel_2_A_inv[2][2]*accel_2_wo_hb[2];
-            //ручная докалибровка блин ((
-                  accel_2_converted[2] -=67;
-                  
-            //переводим показания акселерометра в G      
-                  for (uint8_t i = 0; i < 3; i++) 
-                      {
-                        accel_1_converted[i] = accel_1_converted[i] / 8192.0;        
-                        accel_2_converted[i] = accel_2_converted[i] / 8192.0;        
-                      }
-
-            //гироскопы калибруем только стандартным способом, вычитая оффсет           
-                  for (uint8_t i = 0; i < 3; i++) 
-                      {
-                        gyro_1_converted[i]  = (((float)gyro_raw_1[i] - (float)gyro_1_offset[i]) / 131.0f) * ((float)M_PI / 180.0f);   //в рад/с
-                        gyro_2_converted[i]  = (((float)gyro_raw_2[i] - (float)gyro_2_offset[i]) / 131.0f) * ((float)M_PI / 180.0f);   //в рад/с
-                      }
-
-                  for (uint8_t i = 0; i < 3; i++) 
-                      {
-            //накапливаем значения акселерометор и гироскопов для "редкого" вычисления углов Маджвиком          
-                      accel_1_converted_accumulated[i] += accel_1_converted[i];
-                      gyro_1_converted_accumulated[i] += gyro_1_converted[i];
-
-                      accel_2_converted_accumulated[i] += accel_2_converted[i];
-                      gyro_2_converted_accumulated[i] += gyro_2_converted[i];
-                      }  
-
-            //Приступаем к расчетам углов фильтром Маджвика. 
-            //Расчет этот ведем каждый PID_LOOPS_RATIO цикл относительно получения данных от IMU.
-            //В данном случае данные от IMU поступают с частотой 1кГц, углы Маджвиком считаем с частотой 200Гц (каждый 5й цикл)          
-            if ((large_counter % PID_LOOPS_RATIO) == 0) {
-                    for (uint8_t i = 0; i < madgwick_cycles; i++) {
-              
-            //считываем время прошедшее с прошлого цикла расчета 
-                      ESP_ERROR_CHECK(gptimer_get_raw_count(Madgwick_timer, &timer_value));
-                      ESP_ERROR_CHECK(gptimer_set_raw_count(Madgwick_timer, 0));
-            //если используем модуль с компасом и GPS запускаем фильтр Маджвика с учетом данных от магнетометра, используя в качестве входных параметров усредненные накопленные за предыдущие циклы 
-            //показания гироскопов и акселерометров, а также считав данные из очереди от магнетометра
-            #ifdef USING_MAGNETOMETER 
-                    xQueueReceive(magnetometer_queue, mag_fresh_data, 0);
-
-                    MadgwickAHRSupdate((gyro_1_converted_accumulated[1] - gyro_2_converted_accumulated[0]) / (2.0 * PID_LOOPS_RATIO), 
-                                          (gyro_1_converted_accumulated[0] + gyro_2_converted_accumulated[1]) / (2.0 * PID_LOOPS_RATIO), 
-                                          ((gyro_1_converted_accumulated[2] * (-1.0)) - gyro_2_converted_accumulated[2]) / (2.0 * PID_LOOPS_RATIO), 
-                                          (-accel_1_converted_accumulated[1] + accel_2_converted_accumulated[0]) / (2.0 * PID_LOOPS_RATIO), 
-                                          (accel_1_converted_accumulated[0] + accel_2_converted_accumulated[1]) / (-2.0 * PID_LOOPS_RATIO), 
-                                          ((accel_1_converted_accumulated[2]) + accel_2_converted_accumulated[2]) / (2.0 * PID_LOOPS_RATIO), 
-                                          mag_fresh_data[1],            
-                                          mag_fresh_data[0],            
-                                          mag_fresh_data[2],   
-                                          timer_value);
-            //запрашиваем очередную порцию данных от магнетометра
-                    xTaskNotifyGive(task_handle_mag_read_and_process_data);    
-
-            //если не используем модуль с компасом и GPS - запускаем маджвика без учета данных от магнетометра используя в качестве входных параметров усредненные накопленные за предыдущие циклы 
-            //показания гироскопов и акселерометров      
-            #else
-                      MadgwickAHRSupdateIMU((gyro_1_converted_accumulated[1] - gyro_2_converted_accumulated[0]) / (2.0 * PID_LOOPS_RATIO) , 
-                                            (gyro_1_converted_accumulated[0] + gyro_2_converted_accumulated[1]) / (2.0 * PID_LOOPS_RATIO) ,
-                                            ((gyro_1_converted_accumulated[2] * (-1.0)) - gyro_2_converted_accumulated[2]) / (2.0 * PID_LOOPS_RATIO) , 
-                                            (-accel_1_converted_accumulated[1] + accel_2_converted_accumulated[0]) / (2.0 * PID_LOOPS_RATIO), 
-                                            (accel_1_converted_accumulated[0] + accel_2_converted_accumulated[1]) / (-2.0 * PID_LOOPS_RATIO), 
-                                            ((accel_1_converted_accumulated[2]) + accel_2_converted_accumulated[2]) / (2.0 * PID_LOOPS_RATIO), 
-                                            timer_value);
-                      
-                
-            #endif  
-          } 
-            
-                          //очищаем накопленные данные от гироскопов и акселерометров         
-                      for (uint8_t i = 0; i < 3; i++)
-                      {
-                        accel_1_converted_accumulated[i] = 0;
-                        gyro_1_converted_accumulated[i] = 0;
-
-                        accel_2_converted_accumulated[i] = 0;
-                        gyro_2_converted_accumulated[i] = 0;
-                      }
-              //выполняем преобразование из кватерниона в углы Эйлера  
-                      Convert_Q_to_degrees_fast(q0, q1, q2, q3, &pitch, &roll, &yaw);
-              //применяем триммирующие поправки, полуаемые от пульта управления(величина меняется от -7 до 7, коэффициент регулирует чувствительность)
-              //если, например, коэффициент 0.5, то диапазон регулировки от -3.5 до +3.5 градусов
-                      pitch += rc_fresh_data.trim_pitch * 0.5;
-                      roll -= rc_fresh_data.trim_roll * 0.5;
-                    }
-     
-     //if (((large_counter + 1) % PID_LOOPS_RATIO) == 0) Convert_Q_to_degrees(q0, q1, q2, q3, &pitch, &roll, &yaw);    
- 
-//далее идут действия по вычислению вектора ускорения в вертикальной плоскости, 
-//для чего разворачиваем векторы Z акселерометров имеющимся кватернионом текущей ориентации
-//копируем текущий кватернион
-          q_current[0] = -q0;     //хз почему минус, по-другому не работает, возможно из-за направления оси
-          q_current[1] = q1;
-          q_current[2] = q2;
-          q_current[3] = q3;
-//составляем 4-х компонентный кватернион из вектора гравитации 1 в G в системе NED в соответствие с раcположением IMU 
-          accel_1_full[0] = 0;
-          accel_1_full[1] = -accel_1_converted[1];
-          accel_1_full[2] = -accel_1_converted[0];
-          accel_1_full[3] = accel_1_converted[2];
-//разворачиваем показания акселерометра 1
-          vector_back_rotation(accel_1_full, q_current, accel_1_rotated);
-//составляем 4-х компонентный кватернион из вектора гравитации 2 в G в системе NED в соответствие с раcположением IMU 
-          accel_2_full[0] = 0;
-          accel_2_full[1] = accel_2_converted[0];
-          accel_2_full[2] = -accel_2_converted[1];
-          accel_2_full[3] = accel_2_converted[2];
-//разворачиваем показания акселерометра 2
-          vector_back_rotation(accel_2_full, q_current, accel_2_rotated);
-//фильтруем усредненные показания акселерометров фильтром Баттерворта 
-          accel_z_ave_rotated_filtered = Butterworth_filter((accel_1_rotated[3] + accel_2_rotated[3])/2.0, &accel_Btw_filter);
-//убираем гравитацию
-          accel_z_ave_rotated_filtered -= 1.0;
-
- #else
-
-//загоняем сырые показания датчиков в соответствующие структуры              
+//загоняем сырые показания датчиков в соответствующие структуры алгоритма Fusion              
         FusionVector_t gyroscope_1 = {.array = {(float)gyro_raw_1[0], (float)gyro_raw_1[1], (float)gyro_raw_1[2]}};
         FusionVector_t accelerometer_1 = {.array = {(float)accel_raw_1[0], (float)accel_raw_1[1], (float)accel_raw_1[2]}};
 
@@ -1453,10 +1067,10 @@ while(1)
         FusionVector_t magnetometer = {.array = {(float)mag_fresh_data[0], (float)mag_fresh_data[1],(float) mag_fresh_data[2]}};
 #endif
 //вычисляем среднее арифметическое показаний двух IMU 
-      FusionVector_t accelerometer_avg = FusionVectorAverage(accelerometer_1, accelerometer_2);
-      FusionVector_t gyroscope_avg = FusionVectorAverage(gyroscope_1, gyroscope_2);       
+        FusionVector_t accelerometer_avg = FusionVectorAverage(accelerometer_1, accelerometer_2);
+        FusionVector_t gyroscope_avg = FusionVectorAverage(gyroscope_1, gyroscope_2);       
 
-      for (uint8_t i = 0; i < madgwick_cycles; i++)
+        for (uint8_t i = 0; i < madgwick_cycles; i++)
               {
 //вычисляем время
                 ESP_ERROR_CHECK(gptimer_get_raw_count(Madgwick_timer, &timer_value));
@@ -1487,9 +1101,7 @@ while(1)
 //вектор ускорения с минус, так как исходный в NED, то есть вниз положительное
         accel_z_ave_rotated_filtered = Butterworth_filter(-accelerometer_rotated.axis.z, &accel_Btw_filter);
         accel_z_ave_rotated_filtered -= 0.00737; //ручная докалибровка
-#endif
         
-
 //производим запрос данных от INA219 (раз в X циклов, то есть (1000/X) в секунду)
 //по результатам считывания корректируем уровень газа, поэтому очень медленно нельзя 
         if ((large_counter % 25) == 0) xTaskNotifyGive(task_handle_INA219_read_and_process_data);      
@@ -1704,8 +1316,8 @@ while(1)
 //при переходе от состояния с включенным двигателем в выключенное записываем во флеш счетчик времени в полете
           if (current_state == FLIGHT_STATE)
           {
-            nvs_set_u32(NVS_handle, "flight_time", flight_time);
-            nvs_commit(NVS_handle);
+            nvs_set_u32(flight_time_NVS_handle, "flight_time", flight_time);
+            nvs_commit(flight_time_NVS_handle);
             current_state = GROUND_STATE;
           }           
         }
@@ -1758,13 +1370,10 @@ if (rc_fresh_data.engines_start_flag)
       if (current_state == FLIGHT_STATE)
       {
 //находим полные вектора ускорений (в g)
-#ifdef USING_OLD_MADGWICK
-        accel_1_total = sqrtf(accel_1_converted[0] * accel_1_converted[0] + accel_1_converted[1] * accel_1_converted[1]  + accel_1_converted[2] * accel_1_converted[2]);
-        accel_2_total = sqrtf(accel_2_converted[0] * accel_2_converted[0] + accel_2_converted[1] * accel_2_converted[1]  + accel_2_converted[2] * accel_2_converted[2]);
-#else
+
         accel_1_total = FusionVectorNorm(accelerometer_1);
         accel_2_total = FusionVectorNorm(accelerometer_2);
-#endif
+
         //сравниваем с заданным порогом по очереди для обоих акселерометров
         if (accel_1_total > accel_1_total_max) accel_1_total_max = accel_1_total; //наблюдаем максиальный уровень для логирования
         if (accel_1_total > MAX_ACCEL_LIMIT)        //если общее ускорение превышает заданынй порог 

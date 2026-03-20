@@ -18,6 +18,7 @@
 #include "advanced_mag_calibration.h"
 #include "engines_test.h"
 #include "printing_calibration_coefficients.h"
+#include "clearing_NVS.h"
 
 
 #define ESP_WIFI_SSID "aquila"
@@ -46,7 +47,8 @@ char *welcome_messages[] =
         "5 -> продвинутая калибровка акселерометра (по magnetto)\r\n",
         "6 -> продвинутая калибровка магнетометра (по magnetto)\r\n",
         "7 -> вывести сохраненные калибровочные коэффициенты\r\n",
-        "8 -> продолжить загрузку в обычном режиме (не использовать)\r\n",
+        "8 -> стереть калибровочные коэффициенты в NVS\r\n",
+        "9 -> продолжить загрузку в обычном режиме (не использовать)\r\n",
         "ESC -> перезапуск\r\n\n",
         NULL};
 
@@ -56,20 +58,21 @@ char r_3[] = "3 - Запускаем тестирование двигателе
 char r_5[] = "5 - Запускаем продвинутую калибровку акселерометра (по magnetto)\r\n";
 char r_6[] = "6 - Запускаем продвинутую калибровку магнетометра (по magnetto)\r\n";
 char r_7[] = "7 - Считываем из flash калибровочные коэффициенты\r\n";
-char r_8[] = "8 - Выключаем WiFi и продолжаем обычную загрузку\r\n";
+char r_8[] = "8 - Стираем NVS\r\n";
+char r_9[] = "9 - Выключаем WiFi и продолжаем обычную загрузку\r\n";
 char n_1[] = "Неизвестное меню, повторите ввод\r\n";
 char esc[] = "ESC - перезапускаемся\n\n";
 
 void configuration_mode_telnet(void *arg)
 {
-    nvs_handle_t NVS_handle;
+    nvs_handle_t coeff_NVS_handle;
     uint32_t flight_time;
 
 // Инициализируем NVS
     esp_err_t ret = nvs_flash_init();
     ESP_ERROR_CHECK(ret);
 //открываем на считывание flash   
-    ret = nvs_open("storage", NVS_READWRITE, &NVS_handle);
+    ret = nvs_open("perm_storage", NVS_READWRITE, &coeff_NVS_handle);
      if (ret != ESP_OK) 
         {
             ESP_LOGE(TAG,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(ret));
@@ -78,14 +81,14 @@ void configuration_mode_telnet(void *arg)
         {
 //считываем flight_time (время налета в секундах)
 //если это первый запуск и переменной нет - создаем ее
-  ret = nvs_get_u32(NVS_handle, "flight_time", &flight_time); 
+  ret = nvs_get_u32(coeff_NVS_handle, "flight_time", &flight_time); 
   switch (ret) {
       case ESP_OK:
           ESP_LOGD(TAG,"flight time = %ld", flight_time);
           break;
       case ESP_ERR_NVS_NOT_FOUND:
           ESP_LOGW(TAG,"flight time не определен, используем нулевое значение");
-          //ret = nvs_set_u32(NVS_handle, "flight_time", 0);
+          //ret = nvs_set_u32(coeff_NVS_handle, "flight_time", 0);
           break;
       default :
           ESP_LOGE(TAG,"Error (%s) reading!\n", esp_err_to_name(ret));
@@ -244,9 +247,14 @@ void configuration_mode_telnet(void *arg)
                     send(client_fd, r_7, sizeof(r_7), 0);
                     xTaskCreate(printing_calibration_coefficients,"printing_calibration_coefficients",16384,(void *)&client_fd,0,NULL); 
                     break;
-                 
+                
                 case '8':
                     send(client_fd, r_8, sizeof(r_8), 0);
+                    xTaskCreate(clearing_NVS, "clearing_NVS", 16384, (void *)&client_fd, 0, NULL); 
+                    break;
+                 
+                case '9':
+                    send(client_fd, r_9, sizeof(r_9), 0);
                     ESP_ERROR_CHECK(esp_wifi_stop());
                     ESP_ERROR_CHECK(esp_wifi_deinit());
                     //ESP_ERROR_CHECK(esp_netif_deinit());
@@ -254,11 +262,6 @@ void configuration_mode_telnet(void *arg)
                     vTaskResume(task_handle_init);
                     break;
                 
-//                case '9':
-//                    send(client_fd, r_9, sizeof(r_9), 0);
-//                    xTaskCreate(sending_something_during_flight,"sending_something_during_flight",16384,(void *)&client_fd,0,NULL); 
-//                    break;
-
                 case 0x1B:  //ESC
                     send(client_fd, esc, sizeof(esc), 0);
                     vTaskDelay(200/portTICK_PERIOD_MS);

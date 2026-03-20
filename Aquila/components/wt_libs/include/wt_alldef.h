@@ -5,19 +5,18 @@
 
 #define FW_VERSION          "2026-03"
 
-//#define USING_OLD_MADGWICK
-#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+//#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
+//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
-#define USING_MS5611
-#define BATTERY_COMPENSATION
+//#define USING_MS5611
+//#define BATTERY_COMPENSATION
 #define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI                                                  //при включении активируется режим обнаружения пэттерна, убедиться что символ конца строки (пэттерн) уникален в пределах пакета
 //#define MEMORY_CONSUMPTION_MESUREMENT
 #define TELNET_CONF_MODE
-#define USING_PX4FLOW
-#define PREFLIGHT_POWER_CHECKUP
+//#define USING_PX4FLOW
+//#define PREFLIGHT_POWER_CHECKUP
 //#define WIFI_INFLIGHT_TEST
 #define ACCEL_AND_ANGLES_SAFETY_MEASURES                            //активирует проверки по максимальному допустимому углу и ускорению
 #define USING_PWM_ESC_CONTROL
@@ -422,7 +421,7 @@ struct logging_data_set {
 #define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
 #define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
 #define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по методу magnetto 
-#define NUMBER_OF_ACC_INPUTS                    (100)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
+#define NUMBER_OF_ACC_INPUTS                    (20)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
 #define MAX_ANGLES_LIMIT                        (45.0)                          //макимально допустимый уровень pitch или roll в градусах, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_LIMIT                         (3.9)                             //макимально допустимый уровень ускорения в G, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_EXCEED_LIMIT_COUNTER          (3)                             //столько циклов подряд общее ускорение должно превышать порог, чтобы зафиксировать факт аварии и остановить моторы

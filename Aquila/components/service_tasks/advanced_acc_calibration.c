@@ -141,7 +141,7 @@ void advanced_acc_calibration(void *pvParameters)
 #endif
     calculation_B_and_Ainv_with_exclusion(input_data_1, A_1, B, 8192, 0, NUMBER_OF_ACC_INPUTS);
 #ifdef TELNET_CONF_MODE
-        send(*client_fd, "\r\nКорректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКорректировочные значения сдвигов (bias):\r\n"), 0);
+        send(*client_fd, "\r\nКорректировочные значения сдвигов (offset):\r\n", sizeof("\r\nКорректировочные значения сдвигов (offset):\r\n"), 0);
         pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
         send(*client_fd, message_to_print, pos, 0);
         
@@ -156,29 +156,29 @@ void advanced_acc_calibration(void *pvParameters)
 
     esp_err_t err = nvs_flash_init();   
     ESP_ERROR_CHECK( err );
-    nvs_handle_t NVS_handle;
+    nvs_handle_t coeff_NVS_handle;
 
-    err = nvs_open("storage", NVS_READWRITE, &NVS_handle);
+    err = nvs_open("coeff_storage", NVS_READWRITE, &coeff_NVS_handle);
     if (err != ESP_OK) ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
     else 
     {
-        //Записываем mag_bias[0] - mag_bias[2]
+        //Записываем mag_offset[0] - mag_offset[2]
         p_uint64 = (uint64_t*)&B[0];
-        err = nvs_set_u64(NVS_handle, "accel_1_bias[0]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_bias[1]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_bias[2]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_off[0]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_off[1]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_off[2]", *(p_uint64++));
 
         //Записываем mag_A_i[00]-mag_A_inv[33] 
         p_uint64 = (uint64_t*)&A_1[0]; 
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[00]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[01]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[02]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[10]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[11]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[12]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[20]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[21]", *(p_uint64++));
-        err = nvs_set_u64(NVS_handle, "accel_1_A_i[22]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[0]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[1]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[2]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[3]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[4]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[5]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[6]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[7]", *(p_uint64++));
+        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[8]", *(p_uint64++));
     }
     
     // вычисляем корректировочные параметры для акселерометра 2
@@ -189,7 +189,7 @@ void advanced_acc_calibration(void *pvParameters)
     calculation_B_and_Ainv_with_exclusion(input_data_2, A_1, B, 8192, 0, NUMBER_OF_ACC_INPUTS);
 
     #ifdef TELNET_CONF_MODE
-        send(*client_fd, "\r\nКорректировочные значения сдвигов (bias):\r\n", sizeof("\r\nКорректировочные значения сдвигов (bias):\r\n"), 0);
+        send(*client_fd, "\r\nКорректировочные значения сдвигов (offset):\r\n", sizeof("\r\nКорректировочные значения сдвигов (offset):\r\n"), 0);
         pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
         send(*client_fd, message_to_print, pos, 0);
         
@@ -202,30 +202,30 @@ void advanced_acc_calibration(void *pvParameters)
             }
 #endif
 
-    //Записываем accel_2_bias[0] - accel_2_bias[2]
+    //Записываем accel_2_offset[0] - accel_2_offset[2]
     p_uint64 = (uint64_t*)&B[0];
-    err = nvs_set_u64(NVS_handle, "accel_2_bias[0]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_bias[1]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_bias[2]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_off[0]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_off[1]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_off[2]", *(p_uint64++));
 
     //Записываем accel_2_A_inv[00]-mag_A_inv[33] 
     p_uint64 = (uint64_t*)&A_1[0];
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[00]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[01]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[02]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[10]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[11]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[12]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[20]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[21]", *(p_uint64++));
-    err = nvs_set_u64(NVS_handle, "accel_2_A_i[22]", *(p_uint64++));
-    printf("\n[Результат калибровки] = Ainv * ([Исх. вектор] - bias)\r\n");
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[0]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[1]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[2]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[3]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[4]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[5]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[6]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[7]", *(p_uint64++));
+    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[8]", *(p_uint64++));
+    printf("\n[Результат калибровки] = Ainv * ([Исх. вектор] - offset)\r\n");
 
     printf("Сохраняем данные в NVS ... ");
 #ifdef TELNET_CONF_MODE
         send(*client_fd, "\r\nСохраняем данные в NVS ...\r\n", sizeof("\r\nСохраняем данные в NVS ...\r\n"), 0);   
 #endif
-    err = nvs_commit(NVS_handle);
+    err = nvs_commit(coeff_NVS_handle);
     if (err == ESP_OK) 
     {
         printf("Данные сохранены\n");
@@ -240,7 +240,7 @@ void advanced_acc_calibration(void *pvParameters)
         send(*client_fd, "Ошибка сохранения данных!\r\n", sizeof("Ошибка сохранения данных!\r\n"), 0);   
 #endif
         }
-    nvs_close(NVS_handle);
+    nvs_close(coeff_NVS_handle);
   
     printf("Для перезапуска нажмите ESC\r\n");
 #ifdef TELNET_CONF_MODE
