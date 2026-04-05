@@ -26,8 +26,9 @@ void advanced_acc_calibration(void *pvParameters)
     float input_data_2[NUMBER_OF_ACC_INPUTS][3];
 
     double *A_1, *B;
+    float  *A_1_f, *B_f;
     uint16_t i;
-    uint64_t* p_uint64;
+    uint32_t* p_uint32;
 
     uint8_t sensor_data_1[20] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
     uint8_t sensor_data_2[20] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
@@ -55,13 +56,21 @@ void advanced_acc_calibration(void *pvParameters)
     send(*client_fd, "Настройка MPU#1.....\r\n", sizeof("Настройка MPU#1.....\r\n"), 0);
 #endif
     ESP_LOGI(TAG_SERVICE, "Настройка MPU#1.....");
-    if (MPU6000_init(MPU6000_1, 0x06) != ESP_OK) vTaskDelete(NULL);
+    if (MPU6000_init(MPU6000_1,
+                   IMU_SAMPLING_FREQ_HZ,
+                   IMU_LPF_CUTOFF_HZ,
+                   IMU_ACCEL_FULL_SCALE_G,
+                   IMU_GYRO_FULL_SCALE_DPS)  != ESP_OK) vTaskDelete(NULL);
 
 #ifdef TELNET_CONF_MODE
     send(*client_fd, "Настройка MPU#2.....\r\n", sizeof("Настройка MPU#2.....\r\n"), 0);
 #endif
     ESP_LOGI(TAG_SERVICE, "Настройка MPU#2.....");
-    if (MPU6000_init(MPU6000_2, 0x02) != ESP_OK) vTaskDelete(NULL);
+    if (MPU6000_init(MPU6000_2,
+                IMU_SAMPLING_FREQ_HZ,
+                IMU_LPF_CUTOFF_HZ,
+                IMU_ACCEL_FULL_SCALE_G,
+                IMU_GYRO_FULL_SCALE_DPS)  != ESP_OK) vTaskDelete(NULL);
 
 #ifdef TELNET_CONF_MODE
     send(*client_fd, "Перенастройка SPI на 20МГц.....\r\n", sizeof("Перенастройка SPI на 20МГц.....\r\n"), 0);
@@ -83,8 +92,8 @@ void advanced_acc_calibration(void *pvParameters)
         send(*client_fd, message_to_print, pos, 0);        
 #endif
         printf("Вектор #%d\n", i);
-        // обратный отсчет
-        for (uint8_t j = 5; j > 0; j--)
+// обратный отсчет чтобы успеть поставить статично
+        for (uint8_t j = 3; j > 0; j--)
         {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
 #ifdef TELNET_CONF_MODE
@@ -130,7 +139,7 @@ void advanced_acc_calibration(void *pvParameters)
 #endif            
         }
 
-    //выделяем память под матицы для расчетов для акселерометра 1
+//выделяем память под матицы для расчетов для акселерометра 1
     A_1 = (double *)malloc(3 * 3 * sizeof(double));
     B = (double *)malloc(3 * sizeof(double));
 
@@ -144,8 +153,7 @@ void advanced_acc_calibration(void *pvParameters)
         send(*client_fd, "\r\nКорректировочные значения сдвигов (offset):\r\n", sizeof("\r\nКорректировочные значения сдвигов (offset):\r\n"), 0);
         pos = sprintf(message_to_print, "%8.6lf %8.6lf %8.6lf \r\n", B[0], B[1], B[2]);
         send(*client_fd, message_to_print, pos, 0);
-        
-       
+               
         send(*client_fd, "\r\nКорректирующая матрица Ainv\r\n", sizeof("\r\nКорректирующая матрица Ainv\r\n"), 0);
             for (uint8_t i = 0; i < 3; i++)
             {
@@ -153,6 +161,12 @@ void advanced_acc_calibration(void *pvParameters)
                send(*client_fd, message_to_print, pos, 0); 
             }
 #endif
+
+//переводим матрицы во float 
+    A_1_f = (float *)malloc(3 * 3 * sizeof(float));
+    B_f = (float *)malloc(3 * sizeof(float));
+    for (uint8_t i = 0; i<9; i++) A_1_f[i] = (float)A_1[i];
+    for (uint8_t i = 0; i<3; i++) B_f[i] = (float)B[i];
 
     esp_err_t err = nvs_flash_init();   
     ESP_ERROR_CHECK( err );
@@ -162,23 +176,23 @@ void advanced_acc_calibration(void *pvParameters)
     if (err != ESP_OK) ESP_LOGE(TAG_SERVICE,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
     else 
     {
-        //Записываем mag_offset[0] - mag_offset[2]
-        p_uint64 = (uint64_t*)&B[0];
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_off[0]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_off[1]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_off[2]", *(p_uint64++));
+//Записываем accel_1_offset[0]...accel_1_offset[2]
+        p_uint32 = (uint32_t*)&B_f[0];
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_off[0]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_off[1]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_off[2]", *(p_uint32++));
 
-        //Записываем mag_A_i[00]-mag_A_inv[33] 
-        p_uint64 = (uint64_t*)&A_1[0]; 
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[0]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[1]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[2]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[3]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[4]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[5]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[6]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[7]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "accel_1_Ai[8]", *(p_uint64++));
+//Записываем accel_1_A_inv[00]...accel_1_A_inv[33] 
+        p_uint32 = (uint32_t*)&A_1_f[0]; 
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[0]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[1]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[2]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[3]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[4]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[5]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[6]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[7]", *(p_uint32++));
+        err = nvs_set_u32(coeff_NVS_handle, "accel_1_Ai[8]", *(p_uint32++));
     }
     
     // вычисляем корректировочные параметры для акселерометра 2
@@ -202,23 +216,27 @@ void advanced_acc_calibration(void *pvParameters)
             }
 #endif
 
-    //Записываем accel_2_offset[0] - accel_2_offset[2]
-    p_uint64 = (uint64_t*)&B[0];
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_off[0]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_off[1]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_off[2]", *(p_uint64++));
+//переводим матрицы во float 
+    for (uint8_t i = 0; i<9; i++) A_1_f[i] = (float)A_1[i];
+    for (uint8_t i = 0; i<3; i++) B_f[i] = (float)B[i];
 
-    //Записываем accel_2_A_inv[00]-mag_A_inv[33] 
-    p_uint64 = (uint64_t*)&A_1[0];
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[0]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[1]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[2]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[3]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[4]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[5]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[6]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[7]", *(p_uint64++));
-    err = nvs_set_u64(coeff_NVS_handle, "accel_2_Ai[8]", *(p_uint64++));
+//Записываем accel_2_offset[0]...accel_2_offset[2]
+    p_uint32 = (uint32_t*)&B_f[0];
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_off[0]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_off[1]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_off[2]", *(p_uint32++));
+
+//Записываем accel_2_A_inv[00]...accel_2_A_inv[33] 
+    p_uint32 = (uint32_t*)&A_1_f[0];
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[0]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[1]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[2]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[3]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[4]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[5]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[6]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[7]", *(p_uint32++));
+    err = nvs_set_u32(coeff_NVS_handle, "accel_2_Ai[8]", *(p_uint32++));
     printf("\n[Результат калибровки] = Ainv * ([Исх. вектор] - offset)\r\n");
 
     printf("Сохраняем данные в NVS ... ");
@@ -248,6 +266,8 @@ void advanced_acc_calibration(void *pvParameters)
 #endif
     free(A_1);
     free(B);
+    free(A_1_f);
+    free(B_f);
 
     vTaskDelete(NULL);
 }

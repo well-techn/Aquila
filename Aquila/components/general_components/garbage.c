@@ -1,3 +1,44 @@
+// #include "dsps_biquad.h"
+// #include "dsps_biquad_gen.h"
+// #include <math.h>
+
+// /**
+//  * Обновление коэффициентов режекторного фильтра
+//  * f_center - частота из FFT (Гц), bw - ширина (Гц), fs - дискретизация (1000 Гц)
+//  */
+// void update_notch_coeffs(float f_center, float bw, float fs) {
+//     // Используем встроенный генератор коэффициентов esp-dsp
+//     // Тип фильтра: DSPS_BIQUAD_NOTCH
+//     dsps_biquad_gen_notch_f32(notch_coeffs, f_center / fs, bw / fs);
+// }
+
+// /**
+//  * Основной цикл обработки гироскопа (вызывается с частотой 1кГц)
+//  */
+// void process_gyro_data(float raw_x, float raw_y, float raw_z, 
+//                        float *out_x, float *out_y, float *out_z) {
+    
+//     // dsps_biquad_f32_ae32 - это оптимизированная версия для ассемблера Xtensa
+//     // Процедура фильтрации для каждой оси:
+//     dsps_biquad_f32_ae32(&raw_x, out_x, 1, notch_coeffs, gyro_x_w);
+//     dsps_biquad_f32_ae32(&raw_y, out_y, 1, notch_coeffs, gyro_y_w);
+//     dsps_biquad_f32_ae32(&raw_z, out_z, 1, notch_coeffs, gyro_z_w);
+// }
+
+// // Пример использования при обновлении частоты из FFT
+// void on_fft_result(float peak_freq) {
+//     // Обновляем коэффициенты для всех осей сразу
+//     // Например, держим полосу 15 Гц для стабильности фазы
+//     update_notch_coeffs(peak_freq, 15.0f, 1000.0f);
+// }
+
+
+
+
+
+
+
+
 /*typedef struct
 {
 	float * pointer;

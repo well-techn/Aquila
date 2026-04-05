@@ -2,7 +2,7 @@
 #define WT_I2C_H
 
 #include <stdio.h>
-#include "i2c_master.h"
+#include "driver/i2c_master.h"
 
 void i2c_init_internal(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port);
 void i2c_init_external(uint8_t sda_pin,uint8_t scl_pin, uint8_t i2c_port);

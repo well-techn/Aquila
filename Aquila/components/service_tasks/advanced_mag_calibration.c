@@ -32,9 +32,10 @@ void advanced_mag_calibration (void *pvParameters)
   float input_data[NUMBER_OF_MAG_INPUTS][3];
 
   double *A_1, *B;
+  float *A_1_f, *B_f;
   uint16_t i = 0;
 
-  uint64_t* p_uint64;
+  uint32_t* p_uint32;
 #ifdef TELNET_CONF_MODE
     char message_to_print[100];
     uint8_t pos = 0;
@@ -98,7 +99,7 @@ void advanced_mag_calibration (void *pvParameters)
 #ifdef TELNET_CONF_MODE
       if (i % 50 == 0)
       {
-              pos = sprintf(message_to_print, "\r[***** %d%% ******]",(i * 100/NUMBER_OF_IMU_CALIBRATION_COUNTS));
+              pos = sprintf(message_to_print, "\r[***** %d%% ******]",(i * 100 / NUMBER_OF_MAG_INPUTS));
               send(*client_fd, message_to_print, pos, 0);
       } 
 #endif      
@@ -143,6 +144,12 @@ void advanced_mag_calibration (void *pvParameters)
         }
 #endif
 
+//переводим матрицы во float 
+    A_1_f = (float *)malloc(3 * 3 * sizeof(float));
+    B_f = (float *)malloc(3 * sizeof(float));
+    for (uint8_t i = 0; i<9; i++) A_1_f[i] = (float)A_1[i];
+    for (uint8_t i = 0; i<3; i++) B_f[i] = (float)B[i];
+
     esp_err_t err = nvs_flash_init();   
     ESP_ERROR_CHECK( err );
     nvs_handle_t coeff_NVS_handle;
@@ -152,22 +159,22 @@ void advanced_mag_calibration (void *pvParameters)
     else 
     {
         //Записываем mag_hard_bias[0] - mag_hard_bias[2]
-        p_uint64 = (uint64_t*)&B[0];
-        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[0]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[1]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[2]", *(p_uint64++));
+        p_uint32 = (uint32_t*)&B_f[0];
+        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[0]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[1]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_h_bias[2]", *(p_uint32++));
 
         //Записываем mag_A_i[00]-mag_A_inv[33] 
-        p_uint64 = (uint64_t*)&A_1[0]; 
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[0]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[1]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[2]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[3]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[4]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[5]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[6]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[7]", *(p_uint64++));
-        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[8]", *(p_uint64++));
+        p_uint32 = (uint32_t*)&A_1_f[0]; 
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[0]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[1]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[2]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[3]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[4]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[5]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[6]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[7]", *(p_uint32++));
+        err = nvs_set_u64(coeff_NVS_handle, "mag_Ai[8]", *(p_uint32++));
     }
     
     printf("Сохраняем данные в NVS ... ");

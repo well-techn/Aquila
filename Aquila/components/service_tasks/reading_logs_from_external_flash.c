@@ -17,7 +17,6 @@ void reading_logs_from_external_flash(void *pvParameters)
 {
   uint16_t page_address = 0;
   uint16_t column_address = 0;
-  uint8_t i = 0;
   uint8_t receiving_logs_buffer[sizeof(struct logging_data_set)]; // сюда считывается содержимое 1го пакета из flash-памяти
   uint8_t empty_timestamp_flag = 0;
   uint8_t emergency_mode_flag = 0;
@@ -27,7 +26,7 @@ void reading_logs_from_external_flash(void *pvParameters)
   char message_to_print[300]; // сюда содержимое пакета печатается через snprintf (длина с запасом)
   uint16_t next = 0;
   char end_message[] = "Считывание логов из внешней flash-памяти завершено, перезапустите систему\r\n";
-  char header_new[300];
+  char header_new[500];
 
 //формируем строку заголовка исходя из того, что включено в логи
   next += snprintf(header_new, sizeof(header_new), "time_us|");
@@ -147,6 +146,10 @@ void reading_logs_from_external_flash(void *pvParameters)
 
 #ifdef LOGGING_CYCLE_TIMES
   next += snprintf(header_new + next, sizeof(header_new), "AVG_CYCLE|MAX_CYCLE|");
+#endif
+
+#ifdef LOGGING_FFT
+  next += snprintf(header_new + next, sizeof(header_new), "FFT_PEAK|");
 #endif
 
   next += snprintf(header_new + next, sizeof(header_new), "EOL\r\n");
@@ -289,6 +292,10 @@ void reading_logs_from_external_flash(void *pvParameters)
 
 #ifdef LOGGING_CYCLE_TIMES
           next += snprintf(message_to_print + next, sizeof(message_to_print), "%lu|%lu|", p_to_set_to_log->avg_cycle_time_us, p_to_set_to_log->max_cycle_time_us);
+#endif
+
+#ifdef LOGGING_FFT
+          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->peak_freq_hz);
 #endif
 
           next += snprintf(message_to_print + next, sizeof(message_to_print), "*\r\n"); // конец строки

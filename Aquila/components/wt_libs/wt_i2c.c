@@ -1,15 +1,15 @@
 #include <stdio.h>
-#include "i2c_master.h"
+#include "driver/i2c_master.h"
 #include "wt_alldef.h"
-#include "PCA9685.h"
-#include "MCP23017.h"
-#include "INA219.h"
-#include "IST8310.h"
-#include "FL3195.h"
-#include "MS5611.h"
+//#include "PCA9685.h"
+//#include "MCP23017.h"
+//#include "INA219.h"
+//#include "IST8310.h"
+//#include "FL3195.h"
+//#include "MS5611.h"
 #include "inttypes.h"
-#include "TfminiS.h"
-#include "px4flow.h"
+//#include "TfminiS.h"
+//#include "px4flow.h"
 
 i2c_master_bus_handle_t i2c_internal_bus_handle;
 i2c_master_bus_handle_t i2c_external_bus_handle;
@@ -212,8 +212,6 @@ esp_err_t checking_address_at_the_bus(i2c_master_bus_handle_t bus_handle, uint8_
 {
     esp_err_t ret = ESP_FAIL;
     ret = i2c_master_probe(bus_handle, device_address, -1);
-    //if (ret == ESP_OK) printf ("device with address 0x%02x is discovered\n", device_address);
-    //else printf ("device with address 0x%02x is not discovered\n", device_address);
 
     return ret;
 }

@@ -134,9 +134,9 @@ void send_telemetry_via_mavlink(void * pvParameters)
         sys_status.current_battery = p_to_mavlink_data -> current_ca;
         sys_status.battery_remaining = (int8_t)(0.037 * (p_to_mavlink_data -> voltage_mv) - 366.3);      //конвертируем линейной зависимостью [9.9..12.6]В в [0 - 100]%
         
-        attitude.roll = p_to_mavlink_data -> angles[1] * M_PI / 180;
-        attitude.pitch = p_to_mavlink_data -> angles[0] * M_PI / 180;
-        attitude.yaw = p_to_mavlink_data -> angles[2] * M_PI / 180;
+        attitude.roll = p_to_mavlink_data -> angles[1] * (float)M_PI / 180.0f;
+        attitude.pitch = p_to_mavlink_data -> angles[0] * (float)M_PI / 180.0f;
+        attitude.yaw = p_to_mavlink_data -> angles[2] *(float)M_PI / 180.0f;
         //printf("%f\n", attitude.yaw);
 
         gps_raw.lat = p_to_mavlink_data -> latitude;

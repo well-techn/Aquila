@@ -10,7 +10,7 @@
 #include "inttypes.h"
 #include "driver/gpio.h"
 #include "esp_rom_sys.h"
-#include "Fusion.h"
+#include "advanced_math.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
@@ -24,121 +24,37 @@ extern char *TAG_NVS;
 
 void mag_read_and_process_data (void * pvParameters)
 {
-  float cross_axis[3][3] =  {{0,  0,  0},    
-                             {0,  0,  0},
-                             {0,  0,  0}};
-  uint8_t mag_raw_values[6] = {0,0,0,0,0,0}; 
-  int16_t magn_data[3]= {0,0,0};
-  float magn_data_axis_corrected[3]= {0,0,0};
-  double mag_hard_bias[3] = {0,0,0};   //calibration values with Magneto 1.2
+  float cross_axis[3][3] =  {0};
+  uint8_t mag_raw_values[6] = {0}; 
+  int16_t magn_data[3]= {0};
+  float magn_data_axis_corrected[3]= {0};
+  float mag_hard_bias[3] = {0};   //calibration values with Magneto 1.2
   
-  double mag_A_inv[3][3] = {{0,  0,  0},    
-                            {0,  0,  0},
-                            {0,  0,  0}};   //calibration values with Magneto 1.2
+  float mag_A_inv[9] = {0};   //calibration values with Magneto 1.2
 
-  float magn_wo_hb[3] = {0,0,0};
-  float magn_data_calibrated[3] = {0,0,0};
-
-  uint64_t temp;
-  double* p_double;
+  float magn_data_calibrated[3] = {0};
+  float magn_data_calibrated_NED[3] = {0};
+  float __attribute__((aligned(16))) calibration_temp[9] = {0};
 
   nvs_handle_t coeff_NVS_handle;
-
-//   esp_err_t err = nvs_flash_init();
-//   if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-//       // если нет места - пробуем стереть и переинициазировать, при этом сотрутся все переменные
-//       ESP_ERROR_CHECK(nvs_flash_erase());
-//       err = nvs_flash_init();
-//   }
-//   ESP_ERROR_CHECK( err );
-
-//   ESP_LOGI(TAG_NVS,"Открываем NVS... ");
-//   nvs_handle_t coeff_NVS_handle;
-//   err = nvs_open("coeff_storage", NVS_READWRITE, &coeff_NVS_handle);
-//   if (err != ESP_OK) {
-//       ESP_LOGE(TAG_NVS,"Ошибка (%s) открытия NVS!\n", esp_err_to_name(err));
-//   } else {
-//         ESP_LOGI(TAG_NVS,"NVS открыт");
 
 //инициализируем и открываем NVS  
   ESP_ERROR_CHECK(NVS_prepare(&coeff_NVS_handle, "coeff_storage"));
 
-//считываем массив hard bias магнетометра
-  nvs_read_double_array(coeff_NVS_handle, "mag_h_bias", (double*)mag_hard_bias, 3);
+//считываем из NVS массив hard bias магнетометра
+  nvs_read_float_array(coeff_NVS_handle, "mag_h_bias", mag_hard_bias, 3);
 
-//   // Начинаем считывание сохраненных переменных
-//   ESP_LOGI(TAG_NVS,"Считываем данные калибровки магнетометра из NVS ... ");
+//считываем из NVS массив Ainv магнетометра
+  nvs_read_float_array(coeff_NVS_handle, "mag_Ai", mag_A_inv, 9);
 
-//   //считываем массивы оффсетов акселерометров 1 и 2
-//   nvs_read_double_array(coeff_NVS_handle, "accel_1_off", (double*)accel_1_bias, 3);
-//   nvs_read_double_array(coeff_NVS_handle, "accel_2_off", (double*)accel_2_bias, 3);
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_h_bias[0]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_hard_bias[0] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_h_bias[1]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_hard_bias[1] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_h_bias[2]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_hard_bias[2] = *p_double;
-
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[00]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[0][0] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[01]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[0][1] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[02]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[0][2] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[10]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[1][0] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[11]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[1][1] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[12]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[1][2] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[20]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[2][0] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[21]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[2][1] = *p_double;
-
-//   err = nvs_get_u64(coeff_NVS_handle, "mag_A_i[22]", &temp); 
-//   p_double = (double*) &temp;
-//   mag_A_inv[2][2] = *p_double;
-//   }
-
-//считываем массив Ainv магнетометра
-  nvs_read_double_array(coeff_NVS_handle, "mag_Ai", (double*)mag_A_inv, 9);
-
-  //вносим калибровочные данные магнетометра в структуры фильтра Маджвика
-  const FusionVector_t hardIronOffset = {.array = {mag_hard_bias[0], mag_hard_bias[1], mag_hard_bias[2]}};  
-  const FusionMatrix_t softIronMatrix = {.array = {mag_A_inv[0][0], mag_A_inv[0][1], mag_A_inv[0][2], 
-                                                   mag_A_inv[1][0], mag_A_inv[1][1], mag_A_inv[1][2],
-                                                   mag_A_inv[2][0], mag_A_inv[2][1], mag_A_inv[2][2]}};
-
+//генерируем cross - axis поправки в соответствии с даташитом
   IST8310_generate_cross_axis_matrix(cross_axis);
 
-
   while(1) {
-    
+//при получении запроса    
     if (ulTaskNotifyTake(pdFALSE, portMAX_DELAY) != 0)
     {
+//запрашиваем и через паузу считываем данные с магнетометра
       xSemaphoreTake (semaphore_for_i2c_external,portMAX_DELAY);
       IST8310_request_data();
       xSemaphoreGive(semaphore_for_i2c_external);
@@ -146,37 +62,24 @@ void mag_read_and_process_data (void * pvParameters)
       xSemaphoreTake (semaphore_for_i2c_external,portMAX_DELAY);
       IST8310_read_data(mag_raw_values);
       xSemaphoreGive(semaphore_for_i2c_external);
-  
+//формируем показания  
       magn_data[0] = mag_raw_values[1] << 8 | mag_raw_values[0]; //X
       magn_data[1] = mag_raw_values[3] << 8 | mag_raw_values[2]; //Y
       magn_data[2] = mag_raw_values[5] << 8 | mag_raw_values[4]; //Z
-      //printf ("%d,%d,%d\n",magn_data[0], magn_data[1], magn_data[2]);
-
+//применяем cross-axis поправки 
       magn_data_axis_corrected[0] = cross_axis[0][0]*magn_data[0] + cross_axis[0][1]*magn_data[1] + cross_axis[0][2]*magn_data[2];
       magn_data_axis_corrected[1] = cross_axis[1][0]*magn_data[0] + cross_axis[1][1]*magn_data[1] + cross_axis[1][2]*magn_data[2];
       magn_data_axis_corrected[2] = cross_axis[2][0]*magn_data[0] + cross_axis[2][1]*magn_data[1] + cross_axis[2][2]*magn_data[2];
-      //printf ("%0.4f,%0.4f,%0.4f\n",magn_data_axis_corrected[0], magn_data_axis_corrected[1], magn_data_axis_corrected[2]); // for compass calibration
-
-#ifdef USING_OLD_MADGWICK
-      for (uint8_t i = 0; i < 3; i++) magn_wo_hb[i] = (float)magn_data_axis_corrected[i] - mag_hard_bias[i];
-      //printf ("%0.4f,%0.4f,%0.4f\n",magn_wo_hb[0], magn_wo_hb[1], magn_wo_hb[2]);
-
-      magn_data_calibrated[0] = mag_A_inv[0][0]*magn_wo_hb[0] + mag_A_inv[0][1]*magn_wo_hb[1] + mag_A_inv[0][2]*magn_wo_hb[2];
-      magn_data_calibrated[1] = mag_A_inv[1][0]*magn_wo_hb[0] + mag_A_inv[1][1]*magn_wo_hb[1] + mag_A_inv[1][2]*magn_wo_hb[2];
-      magn_data_calibrated[2] = mag_A_inv[2][0]*magn_wo_hb[0] + mag_A_inv[2][1]*magn_wo_hb[1] + mag_A_inv[2][2]*magn_wo_hb[2];
-#else
-//собираем данные в структуру фильтра Маджвика        
-      FusionVector_t magnetometer = {.array = {(float)magn_data_axis_corrected[0], (float)magn_data_axis_corrected[1],(float)magn_data_axis_corrected[2]}};
-//применяем soft и hard iron калибровки      
-      magnetometer = FusionModelMagnetic(magnetometer, softIronMatrix, hardIronOffset);
-//разворачиваем магнетометр в соответсвии с NED
-      magnetometer = FusionRemap(magnetometer,FusionRemapAlignmentPYPXNZ);  
-//копируем чтобы не переделывать очередь
-      magn_data_calibrated[0] = magnetometer.array[0];
-      magn_data_calibrated[1] = magnetometer.array[1];
-      magn_data_calibrated[2] = magnetometer.array[2];
-#endif
-      xQueueSend(magnetometer_queue, magn_data_calibrated, 0);
+//применяем калибровочные коэффициенты считанные с флеш
+//убираем offset и одновременно применяем Ainv, в безразмерных величинах     
+      vector_3D_calibration(magn_data_axis_corrected, mag_hard_bias, mag_A_inv, magn_data_calibrated);
+//разворачиваем магнетометр в соответствии с NED
+      magn_data_calibrated_NED[0] = magn_data_calibrated[1];                  //ось магнетометра по N
+      magn_data_calibrated_NED[1] = magn_data_calibrated[0];                  //ось магнетометра по E
+      magn_data_calibrated_NED[2] = -magn_data_calibrated[2];                 //ось магнетометра по D
+//отправляем откалиброванные развернутые данные в main_flying_cycle
+//overwrite чтобы не накапливались устаревшие значения если они не были своевременно считаны
+      xQueueOverwrite(magnetometer_queue, magn_data_calibrated_NED);
     }
   }  
 }

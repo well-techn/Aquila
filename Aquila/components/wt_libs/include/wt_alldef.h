@@ -3,14 +3,14 @@
 
 #include <inttypes.h>
 
-#define FW_VERSION          "2026-03"
-
+#define FW_VERSION          "2026-04"
+//#define USING_VQF
+#define USING_MADGWICK
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
-//#define USING_MS5611
-//#define BATTERY_COMPENSATION
+#define USING_MS5611
 #define USING_MAVLINK_TELEMETRY
 //#define NO_RSSI                                                  //при включении активируется режим обнаружения пэттерна, убедиться что символ конца строки (пэттерн) уникален в пределах пакета
 //#define MEMORY_CONSUMPTION_MESUREMENT
@@ -20,34 +20,37 @@
 //#define WIFI_INFLIGHT_TEST
 #define ACCEL_AND_ANGLES_SAFETY_MEASURES                            //активирует проверки по максимальному допустимому углу и ускорению
 #define USING_PWM_ESC_CONTROL
+//#define USING_DSHOT_ESC_CONTROL
+//#define USING_FFT
+//#define PRINT_FFT_RESULTS
 
 //набор дефайнов, определяющий какие данные будут записываться в "черный ящик" внешней флеш-памяти
-  #define LOGGING_ACCEL_1
-  #define LOGGING_ACCEL_2
-  #define LOGGING_GYRO_1
-  #define LOGGING_GYRO_2
-  //#define LOGGING_AVG_ACCEL
-  //#define LOGGING_AVG_GYRO
-  //#define LOGGING_QUATERNION
-  #define LOGGING_ANGLES
-  //#define LOGGING_YAW_SETPOINT
+  // #define LOGGING_ACCEL_1
+  // #define LOGGING_ACCEL_2
+  // #define LOGGING_GYRO_1
+  // #define LOGGING_GYRO_2
+  // #define LOGGING_AVG_ACCEL
+  // #define LOGGING_AVG_GYRO
+  // #define LOGGING_QUATERNION
+  // #define LOGGING_ANGLES
+  // #define LOGGING_YAW_SETPOINT
 
   #ifdef USING_TFMINIS_I2C
-    //#define LOGGING_LIDAR_PID
-    //#define LOGGING_LIDAR_ALTITUDE_CM
+  //  #define LOGGING_LIDAR_PID
+  //  #define LOGGING_LIDAR_ALTITUDE_CM
   #endif
   #ifdef USING_MS5611 
-    //#define LOGGING_BARO_PID
-    //#define LOGGING_BARO_ALTITUDE_CM
-    //#define LOGGING_KALMAN_ALTITUDE_CM
-    //#define LOGGING_KALMAN_VELOCITY
+    // #define LOGGING_BARO_PID
+    // #define LOGGING_BARO_ALTITUDE_CM
+    // #define LOGGING_KALMAN_ALTITUDE_CM
+    // #define LOGGING_KALMAN_VELOCITY
   #endif
   //#define LOGGING_ALTITUDE_SETPOINT_CM
-  #define LOGGING_VOLTAGE_mV
-  #define LOGGING_CURRENT_cA
-  #define LOGGING_RC_COMMANDS
-  #define LOGGING_ENGINES
-  #define LOGGING_ENGINES_FILTERED
+  // #define LOGGING_VOLTAGE_mV
+  // #define LOGGING_CURRENT_cA
+  // #define LOGGING_RC_COMMANDS
+  // #define LOGGING_ENGINES
+  // #define LOGGING_ENGINES_FILTERED
   //#define LOGGING_STATE_FLAGS
   //#define LOGGING_RSSI_LEVEL
   #ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES 
@@ -55,7 +58,7 @@
     //#define LOGGING_ACCEL_2_MAX
   #endif
   #define LOGGING_CYCLE_TIMES                                        //запускает высчитывание сколько времени занимает выполнение main_flying_cycle с сохранением максимального значения
-
+//#define LOGGING_FFT
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -66,6 +69,15 @@
 #define GPIO_CS_MPU6000_2       (15)                                //GPIO для CS IMU2
 #define IMU_CONFIG_SPI_FREQ_HZ  (1000000)                           //частота SPI при настройке MPU6000
 #define IMU_WORK_SPI_FREQ_HZ    (20000000)                          //частота SPI при чтении данных с MPU6000
+
+//настроечные параметры самого IMU
+#define IMU_SAMPLING_FREQ_HZ    (1000)                              //частота сэмплирования IMU 
+#define IMU_LPF_CUTOFF_HZ       (5)                                 //встроенный в IMU LPF     98
+#define IMU_ACCEL_FULL_SCALE_G  (4)                                 //полная шкала акселерометра (+-)
+#define IMU_ACCEL_BITS_PER_G    (65536 / (2 * IMU_ACCEL_FULL_SCALE_G))  
+#define IMU_GYRO_FULL_SCALE_DPS (250)                               //полная шкала гироскопа (+-) 
+#define IMU_GYRO_BITS_PER_DPS   (65536 / (2 * IMU_GYRO_FULL_SCALE_DPS))    
+
 
 //GPIO и параметры SPI для подключения флэш-памяти W25N
 #define GP_SPI                  (SPI2_HOST)                         //HSPI - 2, VSPI - 3
@@ -80,28 +92,46 @@
 //GPIO и параметры "внутреннего" I2C, куда подключены PCA9685, MCP23017, INA219, TFMini-S
 #define I2C_INT_SDA                       (34)                      //GPIO для SDA 
 #define I2C_INT_SCL                       (48)                      //GPIO для SCL
-#define I2C_PCA9685_FREQ_HZ               (400000)                  //скорости I2С для соответствующих компонентов
-#define I2C_MCP23017_FREQ_HZ              (400000)
-#define I2C_INA219_FREQ_HZ                (400000)
-#define I2C_TFMINIS_FREQ_HZ               (400000)
-#define I2C_PX4FLOW_FREQ_HZ               (100000)
+#define I2C_INT_PORT                      (0)                       //номер используемого порта I2C для "внутренней" шины
 #define I2C_INT_MASTER_TX_BUF_DISABLE     (0)                       //параметры для инициализации интерфейса                           
 #define I2C_INT_MASTER_RX_BUF_DISABLE     (0)                                           
 #define ACK_CHECK_EN                      (0x01)                       
 #define ACK_CHECK_DIS                     (0)                      
 #define ACK_VAL                           (0)                            
-#define NACK_VAL                          (0x01)                           
-#define I2C_INT_PORT                      (0)                       //номер используемого порта I2C для "внутренней" шины 
+#define NACK_VAL                          (0x01)    
+//скорости I2С и адреса для соответствующих компонентов
+#define I2C_PCA9685_FREQ_HZ               (400000)                  
+#define PCA9685_address                   (0x41)                    // при A0 = 1     0x82
+
+#define I2C_MCP23017_FREQ_HZ              (400000)
+#define MCP23017_ADDR                     (0x20)                    //!< Default I2C Address 0x40   7 bits or 8 bits addressing!!!
+
+#define I2C_INA219_FREQ_HZ                (400000)
+#define INA219_ADDR                       (0b01000100)              // при A1 на +3.3
+
+#define I2C_TFMINIS_FREQ_HZ               (400000)
+#define TFMINIS_I2C_ADDRESS               (0x10)
+
+#define I2C_PX4FLOW_FREQ_HZ               (100000)
+#define PX4FLOW_I2C_ADDRESS               (0x42)                     
+
 
 //GPIO и параметры "внешнего" I2C, куда подключены IST8310 и FL3195 модуля Holybro M9N
 #define I2C_EXT_SDA                       (33)                      //GPIO для SDA  
 #define I2C_EXT_SCL                       (47)                      //GPIO для SCL
+#define I2C_EXT_PORT                      (1)                       //номер используемого порта I2C для "внешней" шины
 #define I2C_EXT_MASTER_TX_BUF_DISABLE     (0)                       //параметры для инициализации интерфейса 
 #define I2C_EXT_MASTER_RX_BUF_DISABLE     (0)       
-#define I2C_IST8310_FREQ_HZ               (400000)                  //скорости I2С для соответствующих компонентов
+//скорости I2С и адреса для соответствующих компонентов
+#define I2C_IST8310_FREQ_HZ               (400000)                  
+#define IST8310_ADDR                      (0x0E)
+
 #define I2C_FL3195_FREQ_HZ                (400000)
-#define I2C_MS5611_FREQ_HZ                (400000)                                                                   
-#define I2C_EXT_PORT                      (1)                       //номер используемого порта I2C для "внешней" шины
+#define FL3195_ADDR			                  (0x54)	
+
+#define I2C_MS5611_FREQ_HZ                (400000)
+#define MS5611_ADDRESS                    (0x76)	                  // если CBS на +, адрес 0х76. Если CBS на земле адрес 0x77                                                                   
+
 
 //GPIO и параметры UART для канала связи с пультом
 #define REMOTE_CONTROL_UART                           (2)                     //номер порта
@@ -119,7 +149,7 @@
 #define RC_CONTROL_MESSAGE_HEADER                     (0x4E)                  //заголовочный байт отправляемых пультом пакетов, содержащих данные для управления, используется для кросс-проверки целостности данных
 #define RC_PID_COEFF_MESSAGE_HEADER                   (0x5E)                  //заголовочный байт отправляемых пультом пакетов, содержащих ПИД коэффициенты, используется для кросс-проверки целостности данных
 #define RC_NO_COMM_DELAY_MAIN_CYCLES                  (2000)                  //если в полете дроном не будет получен новый пакет от пульта в течение этого кол-ва циклов - считаем что связь с пультом утеряна и переходим в "автономный режим"
-#define RC_NO_COMM_THROTTLE_HOVER_VALUE               (9500)                  //значение уровня "газа" в автономном режиме            
+#define RC_NO_COMM_THROTTLE_HOVER_VALUE               (0.3)                  //значение уровня "газа" в автономном режиме            
 
 //структура для передачи данных от задачи обработки данных пульта в main_flying_cycle.
 //данные, полученные от пульта, обрабатываются в соответствующей задаче (RC_read_and_process_data), собираются в эту структуру
@@ -237,29 +267,20 @@ typedef struct {
 #define ENGINE_OUTPUT_1_PIN                     (10)                              //GPIO для выхода на ESC 1                        
 #define ENGINE_OUTPUT_2_PIN                     (11)                              //GPIO для выхода на ESC 2 
 #define ENGINE_OUTPUT_3_PIN                     (12)                              //GPIO для выхода на ESC 3
-#define TIME_TO_KEEP_RUNNING_AT_CHECK_MS        (10000)                         //длительность вращения двигателей при поочередном тестировании
+#define TIME_TO_KEEP_RUNNING_AT_CHECK_MS        (5000)                         //длительность вращения двигателей при поочередном тестировании
 #define LENGTH_OF_ESC_FILTER                    (6)                             //глубина выходного фильтра (фильтруем данные скользящим средним перед выдачей на моторы)
 
-
-#define USING_PWM_ESC_CONTROL
-#ifndef USING_PWM_ESC_CONTROL 
- #define USING_DSHOT_ESC_CONTROL
-#endif
-
-#ifdef USING_PWM_ESC_CONTROL
 //GPIO и параметры для модуля ШИМ (LEDC) для управления моторами
-  #define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT)             //разрешение таймера для управления ШИМ
-  #define ENGINE_PWM_FREQUENCY                    (400)                           //частота ШИМ сигнала, Гц
-  #define ENGINE_PWM_TIMER                        (LEDC_TIMER_0)                  //используемый таймер
-  #define ENGINE_PWM_MODE                         (LEDC_LOW_SPEED_MODE)           //режим работы ШИМ
-#endif
+#define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT)             //разрешение таймера для управления ШИМ
+#define ENGINE_PWM_FREQUENCY                    (400)                           //частота ШИМ сигнала, Гц
+#define ENGINE_PWM_TIMER                        (LEDC_TIMER_0)                  //используемый таймер
+#define ENGINE_PWM_MODE                         (LEDC_LOW_SPEED_MODE)           //режим работы ШИМ
+#define ENGINE_MIN_SIGNAL                       (6553)                          //минимальная длительности ШИМ сигнала 1мс: ((2 ^ 14) - 1) / 2,5мс (400Гц) = 6553,2  
 
-
-  #define DSHOT_ESC_RESOLUTION_HZ                  (10*1000*1000)
-  #define DSHOT_BITRATE                            (150*1000)
-  #define ENGINE_MIN_SIGNAL                       (6553)                          //минимальная длительности ШИМ сигнала 1мс: ((2 ^ 14) - 1) / 2,5мс (400Гц) = 6553,2
-
-
+//параметры DSHOT
+#define DSHOT_ESC_RESOLUTION_HZ                 (10*1000*1000)
+#define DSHOT_BITRATE                           (150*1000)
+                        
 //другие GPIO 
 #define MPU6000_1_INTERRUPT_PIN                 (21)                            //GPIO для сигнала прерывания от IMU1
 #define MPU6000_2_INTERRUPT_PIN                 (13)                            //GPIO для сигнала прерывания от IMU2 
@@ -280,8 +301,9 @@ typedef struct {
 #define MCP23017_CLEAR_OUTPUT_COMMAND           (0b00100000)                    //выcтавить выход в лог.0, номер выхода указывается в младших 4 битах
 
 //Параметры IMU и фильтра Маджвика
-#define SMPL                                    (0)                             //IMU sample rate = 1000Hz/ 1+SMPL
 #define MADGWICK_BETA                           (0.2) //0.999
+#define AHRS_TIMER_RESOLUTION_HZ                (10 * 1000 * 1000)
+#define NUMBER_OF_MADGWICK_CYCLES_WO_MAGNETOMETER (5)
 
 
 
@@ -407,6 +429,10 @@ struct logging_data_set {
   uint32_t avg_cycle_time_us;
   uint32_t max_cycle_time_us;
   #endif
+
+  #ifdef LOGGING_FFT
+  uint16_t peak_freq_hz;
+  #endif
 };
 
 
@@ -418,10 +444,10 @@ struct logging_data_set {
 #define SUSPENSION_TIMER_DELAY_SEC              (1)
 //если в течение столько мс не приходит прерывание от IMU считаем его зависшим                             
 #define IMU_SUSPENSION_TIMER_DELAY_MS           (3)                             
-#define NUMBER_OF_IMU_CALIBRATION_COUNTS        (8000)                          //кол-во усредняемых при калибровке сэмплов  
-#define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
+#define NUMBER_OF_GYRO_INPUTS                   (8000)                          //кол-во сэмплов усредняемых при калибровке гироскопа 
 #define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по методу magnetto 
-#define NUMBER_OF_ACC_INPUTS                    (20)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto 
+#define NUMBER_OF_ACC_INPUTS                    (100)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto   
+#define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
 #define MAX_ANGLES_LIMIT                        (45.0)                          //макимально допустимый уровень pitch или roll в градусах, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_LIMIT                         (3.9)                             //макимально допустимый уровень ускорения в G, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_EXCEED_LIMIT_COUNTER          (3)                             //столько циклов подряд общее ускорение должно превышать порог, чтобы зафиксировать факт аварии и остановить моторы
@@ -446,6 +472,7 @@ struct logging_data_set {
 #define PX4FLOW_READ_AND_PROCESS_DATA_STACK_SIZE      (4096)
 #define EMERGENCY_MODE_STACK_SIZE                     (4096)
 #define SENDING_SOMETHING_OVER_WIFI_STACK_SIZE        (4096)
+#define FFT_STACK_SIZE        						            (8192)
 
 //приоритеты задач
 #define MCP23017_MONITORING_AND_CONTROL_PRIORITY      (1)
@@ -466,6 +493,7 @@ struct logging_data_set {
 #define PX4FLOW_READ_AND_PROCESS_DATA_PRIORITY        (4)
 #define EMERGENCY_MODE_PRIORITY                       (1)
 #define SENDING_SOMETHING_OVER_WIFI_PRIORITY          (2)
+#define FFT_PRIORITY          						  (2)
 
 #define BATTERY_CAPACITY                              (2200) //мА*ч
 #define VERT_ACC_FILTER_F_CUT                         (8.0)  
@@ -498,6 +526,10 @@ typedef struct  {
       uint32_t longtitude;
       uint8_t voltage_dv;       //вольты * 10                                                                                                                                         //данные по высоте корректны или могут быть не корректны
     } __attribute__((packed)) data_from_emergency_beacon_to_radio_t;
+
+
+#define FFT_WINDOW_LENGTH                                (512)
+#define FFT_HOP_SIZE                                     (128) // Запускаем FFT каждые 128 новых сэмплов
 
 
 #endif

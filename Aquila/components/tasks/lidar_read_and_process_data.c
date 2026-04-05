@@ -8,21 +8,20 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
-#include "timing.h"
 #include "driver/uart.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
 #include "TfminiS.h"
 #include "filters.h"
-#include "timing.h"
+#include "timers_operations.h"
 
 
 extern SemaphoreHandle_t semaphore_for_i2c_internal;
 extern QueueHandle_t lidar_to_main_queue;
 extern char *TAG_LIDAR;
 
-#define MEDIAN_FILTER_LENGTH (7)
+#define TFMINIS_MEDIAN_FILTER_LENGTH (7)
 #define AVG_FILTER_LENGTH (10)
 
 #ifdef USING_TFMINIS_I2C
@@ -36,7 +35,7 @@ void lidar_read_and_process_data(void * pvParameters)
   uint16_t raw_strength = 0;
   data_from_lidar_to_main_struct lidar_data;
   //float initial_height = 0;
-  float median_filter_pool[MEDIAN_FILTER_LENGTH];
+  float median_filter_pool[TFMINIS_MEDIAN_FILTER_LENGTH];
   float avg_filter_pool[AVG_FILTER_LENGTH];
   float altitude_old = 0;
   uint64_t current_time = 0;
@@ -62,24 +61,20 @@ void lidar_read_and_process_data(void * pvParameters)
       {
         raw_height = (incoming_message_buffer_lidar[3] << 8) + incoming_message_buffer_lidar[2];
         raw_strength = (incoming_message_buffer_lidar[5] << 8) + incoming_message_buffer_lidar[4];
-//убираем длинные скачки с которыми не справляется медианный фильтр???? цифра в см
-        //if (((raw_height - lidar_data.altitude) > 30 ) || ((raw_height - lidar_data.altitude) < -30)) raw_height = lidar_data.altitude;
-        lidar_data.altitude = median_filter(median_filter_pool, raw_height, MEDIAN_FILTER_LENGTH);
-        current_time = get_time();
+//применяем медианный, затем moving_average фильтры (цифры в см)
+        lidar_data.altitude = median_filter(median_filter_pool, raw_height, TFMINIS_MEDIAN_FILTER_LENGTH);
         lidar_data.altitude = avg_filter_1d(avg_filter_pool, lidar_data.altitude, AVG_FILTER_LENGTH);
-//вычисляем вертикальную скорость        
+//вычисляем вертикальную скорость         
+        current_time = get_time();      
         lidar_data.vertical_velocity = ((lidar_data.altitude - altitude_old) / (current_time - last_cycle_time)) * 1000000;
         last_cycle_time = current_time;
         altitude_old = lidar_data.altitude;  
-        
-        //printf("%0.3f\n",  lidar_data.altitude);
 
         if ((raw_strength < 100) || (raw_height > 65532)) lidar_data.valid = 0;
         else lidar_data.valid = 1;
         lidar_data.strength = raw_strength;
 
-        xQueueSend(lidar_to_main_queue, (void *) &lidar_data, 0);
-         
+        xQueueSend(lidar_to_main_queue, (void *) &lidar_data, 0);   
       }  
     }
       else if (incoming_message_buffer_lidar[8] != CRC_sum) ESP_LOGW(TAG_LIDAR,"Ошибка CRC, расчетный CRC = %d, принятый %d", CRC_sum, incoming_message_buffer_lidar[8]);

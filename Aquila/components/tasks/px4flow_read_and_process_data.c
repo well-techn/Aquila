@@ -6,14 +6,14 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
-#include "timing.h"
+//#include "timing.h"
 #include "driver/uart.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
 #include "px4flow.h"
 #include "filters.h"
-#include "timing.h"
+//#include "timing.h"
 
 extern SemaphoreHandle_t semaphore_for_i2c_internal;
 extern QueueHandle_t px4flow_to_main_queue;

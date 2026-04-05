@@ -13,11 +13,6 @@ INCLUDE_DIRS
 
 REQUIRES         
         esp_common
-        freertos
-        nvs_flash
-        wt_libs
-        general_components
-        tasks
         esp_driver_i2c
         esp_driver_spi
         esp_driver_gptimer
@@ -26,4 +21,25 @@ REQUIRES
         esp_driver_ledc
         esp_driver_uart
         esp_driver_usb_serial_jtag
+        freertos
+        nvs_flash
+        
+        wt_libs
+        tasks
+
+        MPU6000
+        MS5611
+        IST8310
+        MCP23017
+        PCA9685
+        px4flow
+        PMW3901
+        INA219
+        TfminiS
+        FL3195
+        winbondW25N
+        #fusion
+        mavlink
+        math_operations
+        esc_control
 )
