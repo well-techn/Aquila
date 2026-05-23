@@ -3,37 +3,49 @@
 
 #include <inttypes.h>
 
-#define FW_VERSION          "2026-04"
+#define FW_VERSION          "2026-05"
+#define USING_RC_EMULATION
 //#define USING_VQF
 #define USING_MADGWICK
 //#define USING_MAGNETOMETER                                        //активируем использование магнетометра на модуле HOLYBRO M9N  
-#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
-#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
+//#define USING_FL3195                                              //активируем использование RGB светодиода на модуле HOLYBRO M9N/#define USING_GPS                                                 //активируем использование GPS на модуле HOLYBRO M9N 
+//#define USING_TFMINIS_I2C                                         //активируем использование лидара Benewake Tfmini-S
 //#define USING_PERFORMANCE_MESUREMENT                            //запускаем задачу, которая выводит на печать процент занимаемого процессорного времени по каждой задаче
-#define USING_MS5611
-#define USING_MAVLINK_TELEMETRY
+//#define USING_MS5611
+#define USING_OSD_TELEMETRY
 //#define NO_RSSI                                                  //при включении активируется режим обнаружения пэттерна, убедиться что символ конца строки (пэттерн) уникален в пределах пакета
 //#define MEMORY_CONSUMPTION_MESUREMENT
 #define TELNET_CONF_MODE
 //#define USING_PX4FLOW
 //#define PREFLIGHT_POWER_CHECKUP
 //#define WIFI_INFLIGHT_TEST
-#define ACCEL_AND_ANGLES_SAFETY_MEASURES                            //активирует проверки по максимальному допустимому углу и ускорению
-#define USING_PWM_ESC_CONTROL
-//#define USING_DSHOT_ESC_CONTROL
-//#define USING_FFT
+//#define ACCEL_AND_ANGLES_SAFETY_MEASURES                            //активирует проверки по максимальному допустимому углу и ускорению
+//#define USING_PWM_ESC_CONTROL
+#define USING_DSHOT_ESC_CONTROL
+#define USING_FFT
 //#define PRINT_FFT_RESULTS
 
 //набор дефайнов, определяющий какие данные будут записываться в "черный ящик" внешней флеш-памяти
   // #define LOGGING_ACCEL_1
   // #define LOGGING_ACCEL_2
-  // #define LOGGING_GYRO_1
-  // #define LOGGING_GYRO_2
-  // #define LOGGING_AVG_ACCEL
-  // #define LOGGING_AVG_GYRO
-  // #define LOGGING_QUATERNION
-  // #define LOGGING_ANGLES
-  // #define LOGGING_YAW_SETPOINT
+  //  #define LOGGING_GYRO_1
+  //  #define LOGGING_GYRO_2
+
+  // #define LOGGING_ACCEL_1_FILTERED
+  // #define LOGGING_ACCEL_2_FILTERED
+  // #define LOGGING_GYRO_1_FILTERED
+  // #define LOGGING_GYRO_2_FILTERED
+
+
+  #define LOGGING_AVG_ACCEL
+  #define LOGGING_AVG_GYRO
+
+  #define LOGGING_AVG_ACCEL_FILTERED
+  #define LOGGING_AVG_GYRO_FILTERED
+
+  #define LOGGING_QUATERNION
+  #define LOGGING_ANGLES
+  #define LOGGING_YAW_SETPOINT
 
   #ifdef USING_TFMINIS_I2C
   //  #define LOGGING_LIDAR_PID
@@ -46,19 +58,19 @@
     // #define LOGGING_KALMAN_VELOCITY
   #endif
   //#define LOGGING_ALTITUDE_SETPOINT_CM
-  // #define LOGGING_VOLTAGE_mV
-  // #define LOGGING_CURRENT_cA
-  // #define LOGGING_RC_COMMANDS
+  #define LOGGING_VOLTAGE_mV
+  #define LOGGING_CURRENT_cA
+  #define LOGGING_RC_COMMANDS
   // #define LOGGING_ENGINES
-  // #define LOGGING_ENGINES_FILTERED
-  //#define LOGGING_STATE_FLAGS
+  #define LOGGING_ENGINES_FILTERED
+  #define LOGGING_STATE_FLAGS
   //#define LOGGING_RSSI_LEVEL
   #ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES 
     //#define LOGGING_ACCEL_1_MAX
     //#define LOGGING_ACCEL_2_MAX
   #endif
   #define LOGGING_CYCLE_TIMES                                        //запускает высчитывание сколько времени занимает выполнение main_flying_cycle с сохранением максимального значения
-//#define LOGGING_FFT
+#define LOGGING_FFT
 
 //GPIO и параметры SPI для подключения IMU
 #define IMU_SPI                 (SPI3_HOST)                         //HSPI - 2, VSPI - 3
@@ -71,12 +83,16 @@
 #define IMU_WORK_SPI_FREQ_HZ    (20000000)                          //частота SPI при чтении данных с MPU6000
 
 //настроечные параметры самого IMU
-#define IMU_SAMPLING_FREQ_HZ    (1000)                              //частота сэмплирования IMU 
-#define IMU_LPF_CUTOFF_HZ       (5)                                 //встроенный в IMU LPF     98
+#define IMU_SAMPLING_FREQ_HZ    (1000)                              //частота сэмплирования IMU
+#define CYCLE_TIMESTEP_S        (0.001) 
+#define IMU_HW_LPF_CUTOFF_HZ    (5)                                 //общая настройка для калибровки
+#define IMU_1_HW_LPF_CUTOFF_HZ  (98)                                 //встроенный в IMU1 LPF     98
+#define IMU_2_HW_LPF_CUTOFF_HZ  (98)                                 //встроенный в IMU2 LPF     98
 #define IMU_ACCEL_FULL_SCALE_G  (4)                                 //полная шкала акселерометра (+-)
 #define IMU_ACCEL_BITS_PER_G    (65536 / (2 * IMU_ACCEL_FULL_SCALE_G))  
 #define IMU_GYRO_FULL_SCALE_DPS (250)                               //полная шкала гироскопа (+-) 
-#define IMU_GYRO_BITS_PER_DPS   (65536 / (2 * IMU_GYRO_FULL_SCALE_DPS))    
+#define IMU_GYRO_BITS_PER_DPS   (65536 / (2 * IMU_GYRO_FULL_SCALE_DPS))
+#define IMU_SW_LPF_CUTOFF_HZ    (40)                                //программный LPF    
 
 
 //GPIO и параметры SPI для подключения флэш-памяти W25N
@@ -86,6 +102,9 @@
 #define GP_SPI_SCLK             (40)
 #define GPIO_CS_W25N01          (41)
 #define W25N01_SPI_FREQ_HZ      (75000000)                          //частота SPI для флэш памяти для логов 
+
+#define ICM45686_SPI_FREQ_HZ    (20000000)                          //частота SPI для ICM45686
+#define GPIO_CS_ICM45686        (45)
 
 #define SPI_READ_FLAG           (0x80)                              //используется для чтения регистров
 
@@ -137,7 +156,7 @@
 #define REMOTE_CONTROL_UART                           (2)                     //номер порта
 #define RC_UART_BAUD_RATE                             (57600)                 //скорость порта для канала связи с пультом 
 #define NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC    (13)                    //длина пакета данных управления, отправляемого пультом на дрон
-#define NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC        (8)                     //длина пакета данных с ПИД коэффициентами, отправляемого пультом на дрон
+#define NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC        (11)                     //длина пакета данных с ПИД коэффициентами, отправляемого пультом на дрон
 #define NUMBER_OF_BYTES_TO_SEND_TO_RC                 (15)                    //длина пакета данных, отправляемого дроном на пульт    4
 #define RC_RX_UART_BUFF_SIZE                          (256)                   //размер буфера (256 это минимальное значение)
 #define RC_TX_UART_BUFF_SIZE                          (256)
@@ -173,9 +192,11 @@ typedef struct {
 //данные, полученные от пульта, обрабатываются в соответствующей задаче (RC_read_and_process_data), собираются в эту структуру
 // и отправляются через очередь в main_flying_cycle
 typedef struct {
-    uint16_t kp_alt_hold_coeff;
-    uint16_t ki_alt_hold_coeff;  
-    uint16_t kd_alt_hold_coeff;                                           
+    uint8_t target;
+    float kp;
+    float ki;  
+    float kd;  
+    float kff;                                          
   } pid_coeff_data_from_rc_to_main_struct;
 
 //структура для передачи данных от main_flying_cycle в задачу отправки телеметрии на пульт.
@@ -188,7 +209,7 @@ typedef struct {
     uint16_t altitude;                                                        //текущее значение высоты
   } data_from_main_to_rc_struct;
 
-#define RC_FILTER_COEFF                         (0.85)                        //коэффициент фильтрации данных с ручки газа remote_control_data.received_throttle = remote_control_data.received_throttle * RC_FILTER_COEFF + rc_throttle_old * (1 - RC_FILTER_COEFF);
+#define RC_FILTER_COEFF                         (0.5)                        //коэффициент фильтрации данных с ручки газа remote_control_data.received_throttle = remote_control_data.received_throttle * RC_FILTER_COEFF + rc_throttle_old * (1 - RC_FILTER_COEFF);
 
 //GPIO и параметры UART для работы с GPS
 #define GPS_UART                                (0)                           //номер порта
@@ -223,17 +244,17 @@ typedef struct data_from_gps_to_main_struct {
   #define ALT_PID_DIF_FILTER_LENGTH                  (7)
 #endif
 
-#ifdef USING_MAVLINK_TELEMETRY
+#ifdef USING_OSD_TELEMETRY
 //GPIO и параметры UART для работы с mavlink
-  #define MAV_UART                                (1)                         //номер порта
-  #define MAV_UART_BAUD_RATE                      (57600)                    //скорость порта
-  #define MAV_RX_UART_BUF_SIZE                    (256)                       //размер RX FIFO буфера под Mavlink UART
-  #define MAV_TX_UART_BUF_SIZE                    (512)                       //размер TX FIFO буфера под Mavlink UART
-  #define MAV_UART_TX_PIN                         (43)                        //GPIO для TX 
-  #define MAV_UART_RX_PIN                         (44)                        //GPIO для RX 
-  #define MAV_UART_RTS_PIN                        (UART_PIN_NO_CHANGE)
-  #define MAV_UART_CTS_PIN                        (UART_PIN_NO_CHANGE)
-  #define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)                        //длина очереди для обнаружения пэттернов
+  #define OSD_UART                                (1)                         //номер порта
+  #define OSD_UART_BAUD_RATE                      (115200)                    //скорость порта
+  #define OSD_RX_UART_BUF_SIZE                    (256)                       //размер RX FIFO буфера под Mavlink UART
+  #define OSD_TX_UART_BUF_SIZE                    (512)                       //размер TX FIFO буфера под Mavlink UART
+  #define OSD_UART_TX_PIN                         (43)                        //GPIO для TX 
+  #define OSD_UART_RX_PIN                         (44)                        //GPIO для RX 
+  #define OSD_UART_RTS_PIN                        (UART_PIN_NO_CHANGE)
+  #define OSD_UART_CTS_PIN                        (UART_PIN_NO_CHANGE)
+  #define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE   (10)                        //длина очереди для обнаружения пэттернов
 
 //Переменные, передаваемые в задачу Mavlink
 typedef struct {                             
@@ -268,7 +289,7 @@ typedef struct {
 #define ENGINE_OUTPUT_2_PIN                     (11)                              //GPIO для выхода на ESC 2 
 #define ENGINE_OUTPUT_3_PIN                     (12)                              //GPIO для выхода на ESC 3
 #define TIME_TO_KEEP_RUNNING_AT_CHECK_MS        (5000)                         //длительность вращения двигателей при поочередном тестировании
-#define LENGTH_OF_ESC_FILTER                    (6)                             //глубина выходного фильтра (фильтруем данные скользящим средним перед выдачей на моторы)
+#define LENGTH_OF_ESC_FILTER                    (5)                             //глубина выходного фильтра (фильтруем данные скользящим средним перед выдачей на моторы)
 
 //GPIO и параметры для модуля ШИМ (LEDC) для управления моторами
 #define ENGINE_PWM_DUTY_RESOLUTION              (LEDC_TIMER_14_BIT)             //разрешение таймера для управления ШИМ
@@ -314,11 +335,11 @@ struct logging_data_set {
   uint32_t timestamp;
 
   #ifdef LOGGING_ACCEL_1 
-    int16_t accel_1[3];
+    float accel_1[3];
   #endif
 
   #ifdef LOGGING_ACCEL_2 
-    int16_t accel_2[3];
+    float accel_2[3];
   #endif
 
   #ifdef LOGGING_ACCEL_1_MAX
@@ -330,19 +351,27 @@ struct logging_data_set {
   #endif
 
   #ifdef LOGGING_GYRO_1 
-    int16_t gyro_1[3];
+    float gyro_1[3];
   #endif
 
   #ifdef LOGGING_GYRO_2 
-    int16_t gyro_2[3];
+    float gyro_2[3];
   #endif
 
   #ifdef LOGGING_AVG_ACCEL
-    int16_t accel_avg[3];
+    float accel_avg[3];
   #endif
 
   #ifdef LOGGING_AVG_GYRO
-    int16_t gyro_avg[3];
+    float gyro_avg[3];
+  #endif
+
+  #ifdef LOGGING_AVG_GYRO_FILTERED
+    float gyro_avg_filtered[3];
+  #endif
+
+  #ifdef LOGGING_AVG_ACCEL_FILTERED
+    float accel_avg_filtered[3];
   #endif
 
   #ifdef LOGGING_QUATERNION                                                          
@@ -350,7 +379,7 @@ struct logging_data_set {
   #endif
 
   #ifdef LOGGING_ANGLES 
-    float angles[3]; //pitch, roll,yaw
+    float angles[3]; //pitch, roll, yaw
   #endif
 
   #ifdef LOGGING_YAW_SETPOINT
@@ -408,11 +437,11 @@ struct logging_data_set {
   #endif
 
   #ifdef LOGGING_ENGINES
-    uint32_t engines[4];
+    float engines[4];
   #endif
 
   #ifdef LOGGING_ENGINES_FILTERED
-    uint32_t engines_filtered[4];
+    float engines_filtered[4];
   #endif
 
   #ifdef LOGGING_STATE_FLAGS
@@ -431,7 +460,7 @@ struct logging_data_set {
   #endif
 
   #ifdef LOGGING_FFT
-  uint16_t peak_freq_hz;
+  uint16_t peak_freq_hz_x[3];
   #endif
 };
 
@@ -446,10 +475,9 @@ struct logging_data_set {
 #define IMU_SUSPENSION_TIMER_DELAY_MS           (3)                             
 #define NUMBER_OF_GYRO_INPUTS                   (8000)                          //кол-во сэмплов усредняемых при калибровке гироскопа 
 #define NUMBER_OF_MAG_INPUTS                    (500)                           //кол-во векторов для расчета калибровки магнетометра по методу magnetto 
-#define NUMBER_OF_ACC_INPUTS                    (100)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto   
-#define PID_LOOPS_RATIO                         (5)                             //соотношение между внутренним (угловая скорость) и внешним (угол) циклом PID
+#define NUMBER_OF_ACC_INPUTS                    (75)                           //кол-во векторов для расчета калибровки акселерометра по методу magnetto   
 #define MAX_ANGLES_LIMIT                        (45.0)                          //макимально допустимый уровень pitch или roll в градусах, по превышению фиксируем ошибку и/или глушим моторы
-#define MAX_ACCEL_LIMIT                         (3.9)                             //макимально допустимый уровень ускорения в G, по превышению фиксируем ошибку и/или глушим моторы
+#define MAX_ACCEL_LIMIT                         (3.5)                             //макимально допустимый уровень ускорения в G, по превышению фиксируем ошибку и/или глушим моторы
 #define MAX_ACCEL_EXCEED_LIMIT_COUNTER          (3)                             //столько циклов подряд общее ускорение должно превышать порог, чтобы зафиксировать факт аварии и остановить моторы
 #define MAX_ANGLE_EXCEED_LIMIT_COUNTER          (20)                            //столько циклов подряд угол должен превышать порог, чтобы зафиксировать факт аварии и остановить моторы
 
@@ -467,7 +495,7 @@ struct logging_data_set {
 #define MAG_READ_AND_PROCESS_DATA_STACK_SIZE          (4096)
 #define WRITING_LOGS_TO_FLASH_STACK_SIZE              (4096)
 #define PERFORMANCE_MEASUREMENT_STACK_SIZE            (8192)
-#define MAVLINK_TELEMETRY_STACK_SIZE                  (4096)
+#define OSD_TELEMETRY_STACK_SIZE                  (4096)
 #define MS5611_READ_AND_PROCESS_DATA_STACK_SIZE       (4096)
 #define PX4FLOW_READ_AND_PROCESS_DATA_STACK_SIZE      (4096)
 #define EMERGENCY_MODE_STACK_SIZE                     (4096)
@@ -478,25 +506,24 @@ struct logging_data_set {
 #define MCP23017_MONITORING_AND_CONTROL_PRIORITY      (1)
 #define PCA9685_CONTROL_PRIORITY                      (1)
 #define MAG_READ_DATA_AND_SEND_TO_MAIN_PRIORITY       (6)
-#define MAIN_FLYING_CYCLE_PRIORITY                    (24)
+#define MAIN_FLYING_CYCLE_PRIORITY                    (20)
 #define GPS_READ_AND_PROCESS_DATA_PRIORITY            (3)
 #define RC_READ_AND_PROCESS_DATA_PRIORITY             (5)
 #define SEND_DATA_TO_RC_PRIORITY                      (4)
 #define BLINKING_FLIGHT_LIGHTS_PRIORITY               (0)
 #define LIDAR_READ_AND_PROCESS_DATA_PRIORITY          (3)
 #define INA219_READ_AND_PROCESS_DATA_PRIORITY         (2) 
-#define MAG_READ_AND_PROCESS_DATA_PRIORITY            (6)
 #define WRITING_LOGS_TO_FLASH_PRIORITY                (1)
 #define PERFORMANCE_MEASUREMENT_PRIORITY              (2)
-#define MAVLINK_TELEMETRY_PRIORITY                    (0)
+#define OSD_TELEMETRY_PRIORITY                    (0)
 #define MS5611_READ_AND_PROCESS_DATA_PRIORITY         (2)
 #define PX4FLOW_READ_AND_PROCESS_DATA_PRIORITY        (4)
 #define EMERGENCY_MODE_PRIORITY                       (1)
 #define SENDING_SOMETHING_OVER_WIFI_PRIORITY          (2)
-#define FFT_PRIORITY          						  (2)
+#define FFT_PRIORITY          						            (4)
 
 #define BATTERY_CAPACITY                              (2200) //мА*ч
-#define VERT_ACC_FILTER_F_CUT                         (8.0)  
+#define VERT_ACC_FILTER_F_CUT_HZ                      (20.0)  
 
 //параметры для фильтра Калмана по высоте
 #define ACCEL_SIGMA2                                  (100)//10
@@ -530,6 +557,24 @@ typedef struct  {
 
 #define FFT_WINDOW_LENGTH                                (512)
 #define FFT_HOP_SIZE                                     (128) // Запускаем FFT каждые 128 новых сэмплов
+#define FFT_PEAKS_MIN_DIST_HZ                            (15)   //расстояние между двумя пиками амплитуд, ближе которого пики считаются одним
+#define FFT_NOTCH_FILTERS_Q                              (4)
 
+#define FREQ_SMOOTH_ALPHA 0.4f      // Плавность следования за частотой, чем меньше тем плавнее 
+#define MIN_DIST_FOR_RESET 40.0f     // Порог резкого скачка для сброса памяти
+
+
+typedef struct {
+  float x;
+  float z;
+} imu_fft_data_t;
+
+typedef struct {
+    float fft_top_frequencies[3]; 
+} fft_1_axis_result_t;
+
+typedef struct {
+    float fft_top_frequencies[3][3]; //по 3 топовые частоты для каждой из осей [Ось: 0=X, 1=Y, 2=Z][3 частоты]
+} fft_3_axis_result_t;
 
 #endif

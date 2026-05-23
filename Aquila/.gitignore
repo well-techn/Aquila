@@ -9,6 +9,7 @@ __pycache__/
 # Файлы настроек SDK 
 sdkconfig
 sdkconfig.old
+main/Kconfig_draft.projbuild__
 
 # Специфичные файлы VS Code
 .vscode/

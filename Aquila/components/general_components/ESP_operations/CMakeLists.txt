@@ -2,6 +2,7 @@ idf_component_register(SRCS
 "gpio_operations.c"
 "NVS_operations.c"
 "timers_operations.c"
+"logging_operations.c"
 
 INCLUDE_DIRS
     "." 

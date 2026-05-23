@@ -7,7 +7,7 @@
 
 
 
-extern char *TAG_MPU6000;;
+extern char *TAG_MPU6000;
 
 esp_err_t MPU6000_communication_check(spi_device_handle_t MPU_handle) {
 

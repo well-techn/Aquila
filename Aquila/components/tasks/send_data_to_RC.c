@@ -11,7 +11,7 @@
 #include "wt_alldef.h"
 #include "CRCs.h"
 
-extern  char *TAG_RC;
+extern  char *TAG_OSD;
 extern QueueHandle_t main_to_rc_queue; 
 
 

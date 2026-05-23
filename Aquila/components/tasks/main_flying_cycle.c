@@ -30,6 +30,7 @@
 #include "FL3195.h"
 #include "MS5611.h"
 #include "filters.h"
+#include "fft_aux.h"
 #include "error_code_LED_blinking.h"
 #include "pid.h"
 #include "q_operations.h"
@@ -195,8 +196,6 @@ void main_flying_cycle(void * pvParameters)
   uint8_t sensor_data_1_old[20] = {0};
   uint8_t sensor_data_2_old[20] = {0};
 
-  uint8_t test_for_equal_prev = 0;
-  uint8_t test_for_all_equal = 0;
   uint8_t counter_for_equal_prev_IMU1 = 0;
   uint8_t counter_for_equal_prev_IMU2 = 0;
   uint8_t IMU_1_data_fail = 0;
@@ -229,14 +228,14 @@ void main_flying_cycle(void * pvParameters)
   float __attribute__((aligned(16))) gyro_2_converted[3] = {0};
   float __attribute__((aligned(16))) accel_2_converted[3] = {0};
 
-  float accel_avg[3] = {0};
-  float gyro_avg[3] = {0};
-  float mag_fresh_data[3] = {0};
+  float __attribute__((aligned(16))) accel_avg[3] = {0};
+  float __attribute__((aligned(16))) gyro_avg[3] = {0};
+  float __attribute__((aligned(16))) accel_avg_filtered[3] = {0};
+  float __attribute__((aligned(16))) gyro_avg_filtered[3] = {0};
+  float __attribute__((aligned(16))) mag_fresh_data[3] = {0};
    
 
 #ifdef ACCEL_AND_ANGLES_SAFETY_MEASURES
-  float accel_1_total = 0;
-  float accel_2_total = 0;
   float accel_1_total_max = 0;
   float accel_2_total_max = 0;
   uint8_t accel_1_exceed_limit_counter = 0;
@@ -253,87 +252,94 @@ void main_flying_cycle(void * pvParameters)
 
   static float vertical_acceleration = 0;
 
-// for cascaded PID
-  float pid_pitch_angle = 0;
-  float pid_pitch_rate = 0;
-  float gyro_pitch = 0;
-  float gyro_pitch_old = 0;
+  PIDController_t pitch_pid_rate;
+    pitch_pid_rate.kp = 0.002478f; 
+    pitch_pid_rate.ki = 0.01f;  
+    pitch_pid_rate.kd = 0.00012f;
+    pitch_pid_rate.kff = 0;
+    pitch_pid_rate.prev_error = 0;
+    pitch_pid_rate.alpha = 0.75f;
+    pitch_pid_rate.alpha_ff = 0.75f;
+    pitch_pid_rate.integral_error = 0;
+    pitch_pid_rate.integral_limit = 0.152601f;
+    pitch_pid_rate.pid_limit = 0.45780f;
+    pitch_pid_rate.throttle_limit = 0.4f;
+    pitch_pid_rate.is_yaw_angle = false;
 
   PIDController_t pitch_pid_angle;
-    pitch_pid_angle.kp = 4.4;
-    pitch_pid_angle.kd = 10;
-    pitch_pid_angle.ki = 0.0004;
+    pitch_pid_angle.kp = 6.42f * 0.8f;
+    pitch_pid_angle.ki = 2.2f;
+    pitch_pid_angle.kd = 0.34f * 0.8f;
+    pitch_pid_angle.kff = 0.5f;
     pitch_pid_angle.prev_error = 0;
-    pitch_pid_angle.alpha = 0.6f;
+    pitch_pid_angle.alpha = 0.75f;
+    pitch_pid_angle.alpha_ff = 0.99f;
     pitch_pid_angle.integral_error = 0;
-    pitch_pid_angle.integral_limit = 1000.0f;
-    pitch_pid_angle.pid_limit = 2000.0f;
-    pitch_pid_angle.throttle_limit = 0.3f;
-
-  PIDController_t pitch_pid_rate;
-    pitch_pid_rate.kp = 8.8 / 6553.0f;
-    pitch_pid_rate.kd = 760  / 6553.0f;      //860
-    pitch_pid_rate.ki = 0.03  / 6553.0f;
-    pitch_pid_rate.prev_error = 0;
-    pitch_pid_rate.alpha = 0.6;
-    pitch_pid_rate.integral_error = 0;
-    pitch_pid_rate.integral_limit = 1000.0f / 6553.0f;
-    pitch_pid_rate.pid_limit = 3000.0f / 6553.0f;
-    pitch_pid_rate.throttle_limit = 0.3f;
-
-  float pid_roll_angle = 0;
-  float pid_roll_rate = 0;
-  float gyro_roll = 0;
-  float gyro_roll_old = 0;
-
-  PIDController_t roll_pid_angle;
-    roll_pid_angle.kp = 4.2;
-    roll_pid_angle.kd = 8;
-    roll_pid_angle.ki = 0.0004f;
-    roll_pid_angle.prev_error = 0;
-    roll_pid_angle.alpha = 0.6f;
-    roll_pid_angle.integral_error = 0;
-    roll_pid_angle.integral_limit = 1000.0f;
-    roll_pid_angle.pid_limit = 2000;
-    roll_pid_angle.throttle_limit = 0.3f;
+    pitch_pid_angle.integral_limit = 100.0f;
+    pitch_pid_angle.pid_limit = 250.0f;
+    pitch_pid_angle.throttle_limit = 0.4f;
+    pitch_pid_angle.is_yaw_angle = false;
 
   PIDController_t roll_pid_rate;
-    roll_pid_rate.kp = 8.8f / 6553.0f;
-    roll_pid_rate.kd = 760.0f / 6553.0f;     //860
-    roll_pid_rate.ki = 0.03f / 6553.0f;
+    roll_pid_rate.kp = 0.002478f; 
+    roll_pid_rate.ki = 0.01f;  
+    roll_pid_rate.kd = 0.00012f;
+    roll_pid_rate.kff = 0;
     roll_pid_rate.prev_error = 0;
-    roll_pid_rate.alpha = 0.6f;
+    roll_pid_rate.alpha = 0.75f;
+    roll_pid_rate.alpha_ff = 0.75f;
     roll_pid_rate.integral_error = 0;
-    roll_pid_rate.integral_limit = 1000.0f / 6553.0f;
-    roll_pid_rate.pid_limit = 3000.0f / 6553.0f;
-    roll_pid_rate.throttle_limit = 0.3f;
+    roll_pid_rate.integral_limit = 0.152601f;
+    roll_pid_rate.pid_limit = 0.45780f;
+    roll_pid_rate.throttle_limit = 0.4f;
+    roll_pid_rate.is_yaw_angle = false;
 
-  float yaw_setpoint = 0.0;
-  float Kp_yaw_angle = 3;
-  float Kd_yaw_angle = 10;
-  float Ki_yaw_angle = 0.001;
-  float integral_yaw_error_angle = 0;
-
-  float error_yaw_angle = 0;
-  float error_yaw_angle_old = 0;
-  float pid_yaw_angle = 0;
-  float pid_yaw_rate = 0;
-  float gyro_yaw = 0;
+  PIDController_t roll_pid_angle;
+    roll_pid_angle.kp = 4.29f * 0.8f;
+    roll_pid_angle.ki = 1.64f;   
+    roll_pid_angle.kd = 0.58f * 0.8f;
+    roll_pid_angle.kff = 0.93f;
+    roll_pid_angle.prev_error = 0;
+    roll_pid_angle.alpha = 0.75f;
+    roll_pid_angle.alpha_ff = 0.99f;
+    roll_pid_angle.integral_error = 0;
+    roll_pid_angle.integral_limit = 100.0f;
+    roll_pid_angle.pid_limit = 250.0f;
+    roll_pid_angle.throttle_limit = 0.4f;
+    roll_pid_angle.is_yaw_angle = false;
 
   PIDController_t yaw_pid_rate;
-    yaw_pid_rate.kp = 100.0f / 6553.0f;
+    yaw_pid_rate.kp = 0.0203f;
+    yaw_pid_rate.ki = 0.013432f;
     yaw_pid_rate.kd = 0;
-    yaw_pid_rate.ki = 0.01f / 6553.0f;
+    yaw_pid_rate.kff = 0.0005f;
     yaw_pid_rate.prev_error = 0;
     yaw_pid_rate.alpha = 0;
+    yaw_pid_rate.alpha_ff = 0.99;
     yaw_pid_rate.integral_error = 0;
-    yaw_pid_rate.integral_limit = 1000.0f / 6553.0f;
-    yaw_pid_rate.pid_limit = 3000.0f / 6553.0f;
-    yaw_pid_rate.throttle_limit = 0.3f;
+    yaw_pid_rate.integral_limit = 0.152601;
+    yaw_pid_rate.pid_limit = 0.45780f;
+    yaw_pid_rate.throttle_limit = 0.4f;
+    yaw_pid_rate.is_yaw_angle = false;
+
+  float yaw_setpoint = 0.0;
+  
+  PIDController_t yaw_pid_angle;
+    yaw_pid_angle.kp = 2.87f * 0.8f;
+    yaw_pid_angle.ki = 0.97f;  
+    yaw_pid_angle.kd = 0.1f * 0.8f;
+    yaw_pid_angle.kff = 1.3f;
+    yaw_pid_angle.prev_error = 0;
+    yaw_pid_angle.alpha = 0.75f;
+    yaw_pid_angle.alpha_ff = 0.99f;
+    yaw_pid_angle.integral_error = 0;
+    yaw_pid_angle.integral_limit = 100.0f;
+    yaw_pid_angle.pid_limit = 250.0f;
+    yaw_pid_angle.throttle_limit = 0.4f;
+    yaw_pid_angle.is_yaw_angle = true;
 
   float engine[4] = {0}; 
   float engine_filtered[4] = {0};
-
   float engines_filter_pool[4][LENGTH_OF_ESC_FILTER] = {0};
 
   data_from_rc_to_main_struct rc_fresh_data;
@@ -347,9 +353,9 @@ void main_flying_cycle(void * pvParameters)
   uint32_t remote_control_lost_comm_counter = 0;
 
   pid_coeff_data_from_rc_to_main_struct pid_fresh_data;
-    pid_fresh_data.kp_alt_hold_coeff = 0;
-    pid_fresh_data.ki_alt_hold_coeff = 0;
-    pid_fresh_data.kd_alt_hold_coeff = 0;
+    pid_fresh_data.kp = 0;
+    pid_fresh_data.ki = 0;
+    pid_fresh_data.kd = 0;
 
 #ifdef USING_GPS
  data_from_gps_to_main_struct_t gps_fresh_data;
@@ -367,18 +373,18 @@ void main_flying_cycle(void * pvParameters)
   float pid_altitude = 0;
 
   PIDController_t lidar_alt_hold_pid;
-    lidar_alt_hold_pid.kp = 4.5f / 6553.0f;  //10       //  раб значения 8, 350, 0.2
-    lidar_alt_hold_pid.kd = 200.0f / 6553.0f; //306      //
-    lidar_alt_hold_pid.ki = 0.10f / 6553.0f;  //0.4       //
+    lidar_alt_hold_pid.kp = 4.5f / 6553.0f;  
+    lidar_alt_hold_pid.kd = 200.0f / 6553.0f; 
+    lidar_alt_hold_pid.ki = 0.10f / 6553.0f;  
     lidar_alt_hold_pid.prev_error = 0;
-    lidar_alt_hold_pid.alpha = 0.75f; //0.6
+    lidar_alt_hold_pid.alpha = 0.75f; 
     lidar_alt_hold_pid.integral_error = 0;
     lidar_alt_hold_pid.integral_limit = 250.0f / 6553.0f;
-    lidar_alt_hold_pid.pid_limit = 1000.0f / 6553.0f;    //500
+    lidar_alt_hold_pid.pid_limit = 1000.0f / 6553.0f;    
     lidar_alt_hold_pid.throttle_limit = 0;
   
   PIDController_t baro_alt_hold_pid;
-    baro_alt_hold_pid.kp = 4.5f / 6553.0f;        //  раб значения 5, 175, 0.25
+    baro_alt_hold_pid.kp = 4.5f / 6553.0f;        
     baro_alt_hold_pid.kd = 200.0f / 6553.0f;       
     baro_alt_hold_pid.ki = 0.10f / 6553.0f;         
     baro_alt_hold_pid.prev_error = 0;
@@ -404,23 +410,8 @@ void main_flying_cycle(void * pvParameters)
   struct logging_data_set set_to_log = {0};
   struct logging_data_set* p_to_log_structure = &set_to_log;
 
-#ifdef USING_MAVLINK_TELEMETRY
-  mavlink_data_set_t main_to_mavlink_data;
-    main_to_mavlink_data.latitude = 111111111;     //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
-    main_to_mavlink_data.longtitude = 222222222;
-  mavlink_data_set_t* p_to_mavlink_data = &main_to_mavlink_data;
-#endif
-
-#ifdef USING_MS5611
-  float baro_altitude_cm = 0;
-#endif
-
-#ifdef USING_PX4FLOW
-  data_from_px4flow_to_main_struct_t px4flow_fresh_data;
-#endif
-
 KalmanFilter2d_t Kalm_vert;
-  Kalm_vert.dt = 0.001f;                             // интервал времени
+  Kalm_vert.dt = 0.001f;                            // интервал времени
   Kalm_vert.sigma2_accel = ACCEL_SIGMA2;            // дисперсия акселерометра, постоянная величина как характеристика акселя
   Kalm_vert.sigma2_baro = BARO_SIGMA2;              // дисперсия барометра, постоянная величина как характеристика барометра
 
@@ -435,12 +426,9 @@ KalmanFilter2d_t Kalm_vert;
   Kalm_vert.v = 0;   
 
   float q_current[4] = {1,0,0,0};
-  float accel_1_full[4] = {0};
-  float accel_1_rotated[4] = {0};
-  float accel_2_full[4] = {0};
-  float accel_2_rotated[4] = {0};
 
-  float accel_z_ave_rotated_filtered = 0;
+  float accel_avg_full[4] = {0};
+  float accel_avg_rotated[4] = {0};
 
   Butterworth_t accel_Btw_filter;
 
@@ -462,36 +450,40 @@ KalmanFilter2d_t Kalm_vert;
   nvs_handle_t coeff_NVS_handle;
   nvs_handle_t flight_time_NVS_handle;
 
-  //переменные для контроля времени выполнения одного цикла
-  uint32_t start_CPU_cycles = 0;
-  uint32_t current_cycle_us = 0;
+//переменные для контроля времени выполнения одного цикла
   float avg_cycle_us = 0;
   uint32_t max_cycle_us = 0;
 
 #ifdef USING_FFT
-//переменные для расчетв FFT
-  float gyro_samples_for_fft[FFT_HOP_SIZE] = {0};
+//переменные для расчета FFT
+  imu_fft_data_t fft_input_data = {0};
+  imu_fft_data_t samples_for_fft[FFT_HOP_SIZE] = {0};
   uint16_t samples_since_last_fft = 0;
   extern RingbufHandle_t fft_rb_handle;
-  float fft_peak_frequency = 0;
+  fft_3_axis_result_t fft_results_peak_frequency_hz = {0};
+  float new_fft_peak_frequency_hz[3][3] = {0};      //по 3 частоты для 3х осей
+  float current_fft_peak_frequency_hz[3][3] = {0};
 
 //переменные для фильтрации по результатам FFT
 //Состояния фильтра для 3-х осей (память фильтра)
-  float gyro_x_w[2] = {0, 0};
-  float gyro_y_w[2] = {0, 0};
-  float gyro_z_w[2] = {0, 0};
-
-float notch_bandwith = 10.0f;
-
-//Массив коэффициентов: {b0, b1, b2, a1, a2}
-  float notch_coeffs[5];
-
-  float gyro_2_converted_filtered[3] = {0};
-
-
+  float __attribute__((aligned(16))) accel_notch_filter_states[3][3][2] = {0}; // [Ось][Фильтр][Память (состояние)] 
+  float __attribute__((aligned(16))) gyro_notch_filter_states[3][3][2] = {0}; // [Ось][Фильтр][Память (состояние)]
+  float __attribute__((aligned(16))) accel_notch_filter_states_2[3][3][2] = {0}; // [Ось][Фильтр][Память (состояние)]
+  float __attribute__((aligned(16))) gyro_notch_filter_states_2[3][3][2] = {0}; // [Ось][Фильтр][Память (состояние)] 
+//массив коэффициентов: {b0, b1, b2, a1, a2} 3 оси 3 фильтра 5 коэффициентов
+  float __attribute__((aligned(16))) notch_coeffs[3][3][5] = {0};
+//массив коэффициентов: {b0, b1, b2, a1, a2} для единого ФНЧ
+  float __attribute__((aligned(16))) lpf_coeffs[5] = {0};//[2]
+//переменные для хранения предыдущих 2-х отсчетов биквад звена для каждой из осей
+  float __attribute__((aligned(16))) lpf_accel_filter_states[3][2] = {0}; // [Ось][Память (состояние)]
+  float __attribute__((aligned(16))) gyro_lpf_filter_states[3][2] = {0}; // [Ось][Память (состояние)]
+  float __attribute__((aligned(16))) lpf_accel_filter_states_2[3][2] = {0}; // [Ось][Память (состояние)]
+  float __attribute__((aligned(16))) gyro_lpf_filter_states_2[3][2] = {0}; // [Ось][Память (состояние)]
 
 #endif
  
+
+
 
 //*********************************************************************************************************************************************************************** 
 //*************************************************************** вспомогательные функции ************************************************************************************ 
@@ -499,46 +491,31 @@ float notch_bandwith = 10.0f;
 
 //внешний pitch по углу
 //в зависимости от ошибки по углу (текущее относительно желаемого) выдает необходимую угловую скорость   
-    pid_pitch_angle = PID_Compute(&pitch_pid_angle,rc_fresh_data.received_pitch, pitch, throttle);
+    float pid_pitch_angle = PID_Compute(&pitch_pid_angle,rc_fresh_data.received_pitch, pitch, throttle);
 //внутренний pitch по угловой скорости
 //на основании данных от внешнего цикла (желаемая угловая скорость) и данных от гироскопа (текущая) вычисляет управляющее воздействие
-    gyro_pitch = 0.1f * gyro_avg[1] + 0.9f * gyro_pitch_old;
-    gyro_pitch_old = gyro_pitch;
-    //pid_pitch_rate = PID_Compute(&pitch_pid_rate,rc_fresh_data.received_pitch, gyro_pitch, throttle);
-    pid_pitch_rate = PID_Compute(&pitch_pid_rate,pid_pitch_angle, gyro_pitch, throttle);
+    float pid_pitch_rate = PID_Compute(&pitch_pid_rate,rc_fresh_data.received_pitch*4.0f, gyro_avg_filtered[1], throttle);
+    //float pid_pitch_rate = PID_Compute(&pitch_pid_rate,pid_pitch_angle, gyro_avg_filtered[1], throttle);
 
-//внешний roll по углу   
-    pid_roll_angle = PID_Compute(&roll_pid_angle,rc_fresh_data.received_roll, roll, throttle);
+//внешний roll по углу  
+    float pid_roll_angle = PID_Compute(&roll_pid_angle,rc_fresh_data.received_roll, roll, throttle);
 //внутренний roll по угловой скорости
-    gyro_roll = 0.1f * gyro_avg[0] + 0.9f * gyro_roll_old;
-    gyro_roll_old = gyro_roll;
-    //pid_pitch_rate = PID_Compute(&roll_pid_rate,rc_fresh_data.received_roll, gyro_roll, throttle);  
-    pid_roll_rate = PID_Compute(&roll_pid_rate,pid_roll_angle, gyro_roll, throttle);
-    
+    float pid_roll_rate = PID_Compute(&roll_pid_rate,rc_fresh_data.received_roll*4.0f, gyro_avg_filtered[0], throttle);  
+    //float pid_roll_rate = PID_Compute(&roll_pid_rate,pid_roll_angle, gyro_avg_filtered[0], throttle);
+
+//начинаем работу с yaw
 //выставляем yaw_setpoint интегрируя данные от пульта
-    yaw_setpoint = yaw_setpoint + 0.0016f * rc_fresh_data.received_yaw;  //чем больше этот коэффициент тем выше скорость изменения yaw
+//setpoint устанавливается в диапазоне 0..360 в соответствии с азимутом (0 на сервер, 90 на восток, 180 на юг, 270 на запад) 
+    yaw_setpoint = yaw_setpoint + 0.001f * rc_fresh_data.received_yaw;  //чем больше этот коэффициент тем выше скорость изменения yaw
     if (yaw_setpoint >= 360) yaw_setpoint = yaw_setpoint - 360.0;
     if (yaw_setpoint < 0) yaw_setpoint = yaw_setpoint + 360.0;
-
 //внешний yaw по углу
-    if (throttle < 0.2f) yaw_setpoint = yaw;  //чтобы ошибка не накапливалась пока стоит на земле
-    error_yaw_angle = -yaw_setpoint + yaw;
-    if (error_yaw_angle <= -180.0f) error_yaw_angle = error_yaw_angle + 360.0f; 
-    if (error_yaw_angle >= 180.0f)  error_yaw_angle = error_yaw_angle - 360.0f;
-
-    integral_yaw_error_angle = integral_yaw_error_angle + Ki_yaw_angle * error_yaw_angle;
-    if (integral_yaw_error_angle > 200.0f) integral_yaw_error_angle = 200.0f;
-    if (integral_yaw_error_angle < -200.0f) integral_yaw_error_angle = -200.0f;
-
-    pid_yaw_angle = Kp_yaw_angle * error_yaw_angle + integral_yaw_error_angle + Kd_yaw_angle * (error_yaw_angle - error_yaw_angle_old);
-    if (pid_yaw_angle > 360.0f)  pid_yaw_angle = 360.0f;
-    if (pid_yaw_angle < -360.0f) pid_yaw_angle = -360.0f;
-    error_yaw_angle_old = error_yaw_angle;
-   
+    float pid_yaw_angle = PID_Compute(&yaw_pid_angle, yaw_setpoint, yaw, throttle);
 //внутренний yaw по угловой скорости
-    gyro_yaw = gyro_avg[2]; 
-    //pid_yaw_rate = PID_Compute(&yaw_pid_rate, rc_fresh_data.received_yaw, gyro_yaw, throttle);
-    pid_yaw_rate = PID_Compute(&yaw_pid_rate, pid_yaw_angle, gyro_yaw, throttle);
+    float pid_yaw_rate = PID_Compute(&yaw_pid_rate, rc_fresh_data.received_yaw, gyro_avg_filtered[2], throttle);
+    //float pid_yaw_rate = PID_Compute(&yaw_pid_rate, pid_yaw_angle, gyro_avg_filtered[2], throttle);
+    //printf("%f, %f\n", rc_fresh_data.received_yaw, gyro_avg_filtered[2]);
+    //printf("%f, %f\n", yaw_setpoint, yaw);
 
 //суммируем результаты для выдачи на моторы
     engine[0] = throttle + pid_pitch_rate + pid_roll_rate - pid_yaw_rate;
@@ -550,22 +527,14 @@ float notch_bandwith = 10.0f;
 //11.1 - номинальное напряжение 3S АКБ, 12,6 максимальное, 9,9 минимальное 
     voltage_correction_coeff = 0.9f * voltage_correction_coeff + 0.1f * (11.1f / INA219_fresh_data[0]);
 //ограничения на коэффициент сверху и снизу                  
-    if (voltage_correction_coeff < (11.1f/12.6f)) voltage_correction_coeff = 11.1f/12.6f;
-    if (voltage_correction_coeff > (11.1f/8.8f))  voltage_correction_coeff = 11.1f/8.8f;
+    if (voltage_correction_coeff < (11.1f / 12.6f)) voltage_correction_coeff = 11.1f/12.6f;
+    if (voltage_correction_coeff > (11.1f / 8.8f))  voltage_correction_coeff = 11.1f/8.8f;
 //применяем вычисленный коэффициент
-//так как тяга пропорциональна квадрату оборотов (по идее)
+//так как сила тяги пропорциональна квадрату оборотов (по идее)
     for (uint8_t i = 0; i < 4; i++) engine[i] *= sqrtf(voltage_correction_coeff);      
 //ограничения на выдаваемое значение по верхнему и нижнему порогу
     for (uint8_t i = 0; i < 4; i++) { if (engine[i] > 1.0f) engine[i] = 1.0f;}        //верхний предел
     for (uint8_t i = 0; i < 4; i++) { if (engine[i] < 0.01f) engine[i] = 0.01f;}      //нижний предел, чтобы моторы не останавливались
-  }
-
-  
-  void ESC_input_data_filter(void) {                                                                                                                     
-    engine_filtered[0] = avg_filter_1d(engines_filter_pool[0], engine[0], LENGTH_OF_ESC_FILTER);
-    engine_filtered[1] = avg_filter_1d(engines_filter_pool[1], engine[1], LENGTH_OF_ESC_FILTER);
-    engine_filtered[2] = avg_filter_1d(engines_filter_pool[2], engine[2], LENGTH_OF_ESC_FILTER);
-    engine_filtered[3] = avg_filter_1d(engines_filter_pool[3], engine[3], LENGTH_OF_ESC_FILTER);
   }
 
 //функция подготовка логов для записи во флеш память
@@ -596,12 +565,20 @@ void prepare_logs(void) {
 #endif
 
 #ifdef LOGGING_AVG_ACCEL
-  for (uint8_t i = 0; i < 3; i++) set_to_log.accel_avg[i] = (int16_t)(accel_avg[i] * IMU_ACCEL_BITS_PER_G); //ср.арифм двух скомпенсированных акселерометров
+  for (uint8_t i = 0; i < 3; i++) set_to_log.accel_avg[i] = accel_avg[i] * IMU_ACCEL_BITS_PER_G; //ср.арифм двух скомпенсированных акселерометров
 #endif
 
 #ifdef LOGGING_AVG_GYRO
-  for (uint8_t i = 0; i < 3; i++) set_to_log.gyro_avg[i] = (int16_t)(gyro_avg[i]); //ср.арифм двух скомпенсированных гироскопов в градусах в секунду   
-#endif   
+  for (uint8_t i = 0; i < 3; i++) set_to_log.gyro_avg[i] =gyro_avg[i]; //ср.арифм двух скомпенсированных гироскопов в градусах в секунду   
+#endif
+
+#ifdef LOGGING_AVG_ACCEL_FILTERED
+  for (uint8_t i = 0; i < 3; i++) set_to_log.accel_avg_filtered[i] = accel_avg_filtered[i]; //ср.арифм двух скомпенсированных акселерометров
+#endif
+
+#ifdef LOGGING_AVG_GYRO_FILTERED
+  for (uint8_t i = 0; i < 3; i++) set_to_log.gyro_avg_filtered[i] =gyro_avg_filtered[i]; //ср.арифм двух скомпенсированных гироскопов в градусах в секунду   
+#endif 
 
 #ifdef LOGGING_QUATERNION
   memcpy(set_to_log.q, q_current, sizeof(set_to_log.q));
@@ -694,32 +671,11 @@ void prepare_logs(void) {
 #endif
 
 #ifdef LOGGING_FFT
-  set_to_log.peak_freq_hz = (uint16_t)fft_peak_frequency;
+  set_to_log.peak_freq_hz_x[0] = (uint16_t)current_fft_peak_frequency_hz[0][0];
+  set_to_log.peak_freq_hz_x[1] = (uint16_t)current_fft_peak_frequency_hz[0][1];
+  set_to_log.peak_freq_hz_x[2] = (uint16_t)current_fft_peak_frequency_hz[0][2];
 #endif
 }
-
-
-//функция подготовки структуры с данными телеметрии для отправки в мавлинк
-#ifdef USING_MAVLINK_TELEMETRY 
-void prepare_mavlink_data(void) {
-#ifdef USING_GPS  
-  main_to_mavlink_data.latitude = gps_fresh_data.latitude_d;
-  main_to_mavlink_data.longtitude = gps_fresh_data.longtitude_d;
-  main_to_mavlink_data.gps_status = gps_fresh_data.status;
-#endif
-  main_to_mavlink_data.angles[0] = -pitch;    //для корректного отображения на камере нужны знаки -
-  main_to_mavlink_data.angles[1] = -roll; 
-  main_to_mavlink_data.angles[2] = -yaw;
-  main_to_mavlink_data.voltage_mv = (uint16_t)(INA219_fresh_data[0] * 1000);
-  main_to_mavlink_data.current_ca = (uint16_t)(INA219_fresh_data[1] * 100);
-#ifdef USING_TFMINIS_I2C 
-  main_to_mavlink_data.altitude_cm = (uint16_t)Kalm_vert.h;
-#endif
-  main_to_mavlink_data.rssi_level = rc_fresh_data.rssi_level;
-  main_to_mavlink_data.armed_status = rc_fresh_data.engines_start_flag;
-}
-#endif
-
 
 //*********************************************************НЕПОСРЕДСТВЕННО НАЧИНАЕТСЯ ЗАДАЧА************************************************************************** */
  
@@ -776,8 +732,11 @@ void prepare_mavlink_data(void) {
   start_time = get_time();
 
 //инициализируем фильтр Баттерворта для фильтрации показаний акселерометра
-  Butterworth_init(1000.0, VERT_ACC_FILTER_F_CUT, &accel_Btw_filter);
-
+  Butterworth_init((float)IMU_SAMPLING_FREQ_HZ, VERT_ACC_FILTER_F_CUT_HZ, &accel_Btw_filter);
+#ifdef USING_FFT
+//генерируем коэффициенты для LPF данных IMU. 0.707 - оптимальное значение
+  dsps_biquad_gen_lpf_f32(lpf_coeffs, (float)IMU_SW_LPF_CUTOFF_HZ / (float)IMU_SAMPLING_FREQ_HZ , 0.7071);
+#endif
   ESP_LOGI(TAG_FLY,"Создаем и запускаем таймер для алгоритмов AHRS.....");
   create_and_start_timer(AHRS_TIMER_RESOLUTION_HZ, &ahrs_timer);
   ESP_LOGI(TAG_FLY,"Таймер для алгоритмов создан и запущен\n");
@@ -819,8 +778,9 @@ while(1)
     if (IMU_interrupt_status != 0) 
     {
       gpio_set_level(LED_RED, 1);
-      gpio_set_level(LED_BLUE, 1);
-      start_CPU_cycles = esp_cpu_get_cycle_count();
+      gpio_set_level(LED_GREEN,1);
+
+      uint32_t start_CPU_cycles = esp_cpu_get_cycle_count();
 
       large_counter++;                //увеличиваем глобальный счетчик циклов 
 
@@ -862,11 +822,11 @@ while(1)
       }
 
 //проверяем данные с IMU1 на предмет равенства всех элементов или равенства текущего пакета предыдущему с инкрементом счетчика одинаковых пакетов
-      test_for_equal_prev = arrays_are_equal(sensor_data_1, sensor_data_1_old, 14);
+      uint8_t test_for_equal_prev = arrays_are_equal(sensor_data_1, sensor_data_1_old, 14);
       if (test_for_equal_prev == 1) counter_for_equal_prev_IMU1++;
       else counter_for_equal_prev_IMU1 = 0;
       
-      test_for_all_equal = all_array_elements_are_equal(sensor_data_1, 14);
+      uint8_t test_for_all_equal = all_array_elements_are_equal(sensor_data_1, 14);
 
 //если более 10 пакетов подряд равны между собой или весь пакет одинаковый
       if ((counter_for_equal_prev_IMU1 > 10) || (test_for_all_equal == 1)) 
@@ -958,11 +918,61 @@ while(1)
 //так как Ainv матрицы единичные для обоих гироскопов операция mul_by_scalar_3x3_matrix одна
       mul_by_scalar_3x3_matrix(gyro_1_A_inv, (1.0f / (float)IMU_GYRO_BITS_PER_DPS), calibration_temp);
       vector_3D_calibration(gyro_raw_1, gyro_1_offset, calibration_temp, gyro_1_converted);
-      vector_3D_calibration(gyro_raw_2, gyro_2_offset, calibration_temp, gyro_2_converted);  
+      vector_3D_calibration(gyro_raw_2, gyro_2_offset, calibration_temp, gyro_2_converted);
 
-//пока не готово - по результатам FFT рассчитываем динамические коэффициенты фильтра НЧ 
-#ifdef USING_FFT
-    dsps_biquad_f32_ae32(gyro_2_converted, gyro_2_converted_filtered, 3, notch_coeffs, gyro_x_w);
+   
+//находим усредненные показания акселерометров и гироскопов с учетом их размещения на плате в системе NED
+//гироскопы в градусах в секунду
+      accel_avg[0] = (accel_1_converted[1] - accel_2_converted[0]) * 0.5f;
+      accel_avg[1] = (accel_1_converted[0] + accel_2_converted[1]) * 0.5f;
+      accel_avg[2] = (accel_1_converted[2] + accel_2_converted[2]) * (-0.5f);
+
+      gyro_avg[0] = (gyro_1_converted[1] - gyro_2_converted[0]) * 0.5f;
+      gyro_avg[1] = (gyro_1_converted[0] + gyro_2_converted[1]) * 0.5f;
+      gyro_avg[2] = (gyro_1_converted[2] + gyro_2_converted[2]) * (-0.5f);
+
+      // accel_avg[0] = accel_1_converted[1];
+      // accel_avg[1] = accel_1_converted[0];
+      // accel_avg[2] = -accel_1_converted[2];
+
+      // gyro_avg[0] = gyro_1_converted[1];
+      // gyro_avg[1] = gyro_1_converted[0];
+      // gyro_avg[2] = -gyro_1_converted[2];
+
+      //printf("%+09.4f ",gyro_1_converted[1]);
+
+#ifdef USING_FFT  
+//получаем (если он есть в очереди) от задачи вычисления FFT указатель на 3 пиковые частоты для 3х осей 
+      if (xQueueReceive(fft_to_main_queue, &fft_results_peak_frequency_hz, 0) == pdPASS)
+      {
+//пытаемся сопоставить старые и новые коэффициенты и для каждой из новых пиковых частот считаем коэффициенты режекторного фильтра на -60дБ и добротность 10
+//результатом работы этой функции являются рассчитанные коэффициенты notch_coeffs для каждой из 3х выделенных частот для каждой оси 
+        update_filter_system_states_and_coeffs_3_axis(fft_results_peak_frequency_hz.fft_top_frequencies, current_fft_peak_frequency_hz, 
+                              notch_coeffs, accel_notch_filter_states, gyro_notch_filter_states, accel_notch_filter_states_2, gyro_notch_filter_states_2, 
+                              (float)IMU_SAMPLING_FREQ_HZ);                      
+      }
+//прогоняем усредненные показания акселерометра последовательно через 3 индивидуальных notch и 1 LP фильтр
+      apply_series_of_filters_to_imu_data_3_axis(accel_avg, accel_avg_filtered, notch_coeffs, 
+                            lpf_coeffs, accel_notch_filter_states, lpf_accel_filter_states);
+//еще раз для увеличение степени фильтрации
+      apply_series_of_filters_to_imu_data_3_axis(accel_avg_filtered, accel_avg_filtered, notch_coeffs, 
+                            lpf_coeffs, accel_notch_filter_states_2, lpf_accel_filter_states_2);
+
+//то же самое для гироскопа
+      apply_series_of_filters_to_imu_data_3_axis(gyro_avg, gyro_avg_filtered, notch_coeffs, 
+                                    lpf_coeffs, gyro_notch_filter_states, gyro_lpf_filter_states);
+      apply_series_of_filters_to_imu_data_3_axis(gyro_avg_filtered, gyro_avg_filtered, notch_coeffs, 
+                                    lpf_coeffs, gyro_notch_filter_states_2, gyro_lpf_filter_states_2);
+      
+      //if ((large_counter%3)==0) printf("%0.3f, %0.3f, %0.3f, %0.3f\n", throttle, fft_results_peak_frequency_hz.fft_top_frequencies[0][1], fft_results_peak_frequency_hz.fft_top_frequencies[0][2], fft_results_peak_frequency_hz.fft_top_frequencies[0][3]);
+      //printf("%0.3f, %0.3f\n", gyro_avg_filtered[0], -gyro_2_converted[0]);
+      //printf("%f, %f\n", pitch, roll);
+
+      #else
+//если FFT анализ на борту не используется просто копируем обычные переменные в "фильтрованные" 
+//чтобы не менять аргументы функции расчета углов
+      memcpy(gyro_avg_filtered, gyro_avg, 3 * sizeof(float));        
+      memcpy(accel_avg_filtered, accel_avg, 3 * sizeof(float));
 #endif
 
 //если используем магнетометр считываем данные из очереди (если они пришли) и сразу отправляем запрос на подготовку новой партии
@@ -977,75 +987,61 @@ float* pointer_to_fresh_mag_data = NULL;
       }       
 #endif
 
-//находим усредненные показания акселерометров и гироскопов с учетом их размещения на плате в системе NED
-//гироскопы в градусах в секунду
-      accel_avg[0] = (accel_1_converted[1] - accel_2_converted[0]) * 0.5f;
-      accel_avg[1] = (accel_1_converted[0] + accel_2_converted[1]) * 0.5f;
-      accel_avg[2] = (accel_1_converted[2] + accel_2_converted[2]) * (-0.5f);
-
-      gyro_avg[0] = (gyro_1_converted[1] - gyro_2_converted[0]) * 0.5f;
-      gyro_avg[1] = (gyro_1_converted[0] + gyro_2_converted[1]) * 0.5f;
-      gyro_avg[2] = (gyro_1_converted[2] + gyro_2_converted[2]) * (-0.5f);
-
 //вычисляем время с прошлой итерации
       ESP_ERROR_CHECK(gptimer_get_raw_count(ahrs_timer, &timer_value));
       ESP_ERROR_CHECK(gptimer_set_raw_count(ahrs_timer, 0));
       float deltaTime = (float)timer_value / (float)AHRS_TIMER_RESOLUTION_HZ;
-
+ 
 //подаем все собратные данные в алгоритм AHRS (Маджвик или VQF в зависимости от выбранного #define'ом)
 //в зависимости от указателя на данные магнетометра (NULL или нет) ahrs_update сам выбирает запускать алгоритм с магнетометром или без
 //алгоритм с магнетометром запускается только тогда, когда данные от магнетометра реально получены
 //гироскопы подаются в градусах в секунду, конвертируются по необходимости в радианы внутри функции
-      ahrs_update(accel_avg, gyro_avg, pointer_to_fresh_mag_data, deltaTime, q_current);
+      ahrs_update(accel_avg_filtered, gyro_avg_filtered, pointer_to_fresh_mag_data, deltaTime, q_current);
 
 //преобразуем кватернион в углы
       Convert_Q_to_degrees_fast(q_current[0], q_current[1], q_current[2], q_current[3], &pitch, &roll, &yaw);
-//далее идут действия по вычислению вектора ускорения в вертикальной плоскости, 
-//для чего разворачиваем векторы Z акселерометров имеющимся кватернионом текущей ориентации
-//копируем текущий кватернион
-      q_current[0] = -q_current[0];     //хз почему минус, по-другому не работает, возможно из-за направления оси
-
-//составляем 4-х компонентный кватернион из вектора гравитации 1 в G в системе NED в соответствие с раcположением IMU 
-      accel_1_full[0] = 0;
-      accel_1_full[1] = -accel_1_converted[1];
-      accel_1_full[2] = -accel_1_converted[0];
-      accel_1_full[3] = accel_1_converted[2];
-//разворачиваем показания акселерометра 1
-      vector_back_rotation(accel_1_full, q_current, accel_1_rotated);
-//составляем 4-х компонентный кватернион из вектора гравитации 2 в G в системе NED в соответствие с раcположением IMU 
-      accel_2_full[0] = 0;
-      accel_2_full[1] = accel_2_converted[0];
-      accel_2_full[2] = -accel_2_converted[1];
-      accel_2_full[3] = accel_2_converted[2];
-//разворачиваем показания акселерометра 2
-      vector_back_rotation(accel_2_full, q_current, accel_2_rotated);
-//вычисляем средний между 2х акселерометров результат и вычитаем G
-//вектор ускорения с минус, так как исходный в NED, то есть вниз положительное
-      vertical_acceleration = ((accel_1_rotated[3] + accel_2_rotated[3]) / 2.0f) - 1.0;
-
-//фильтруем показания вертикального ускорения ФНЧ 
-      accel_z_ave_rotated_filtered = Butterworth_filter(vertical_acceleration, &accel_Btw_filter);
-//        accel_z_ave_rotated_filtered -= 0.00737; //ручная докалибровка
-
 //компенсация магнитного склонения
-      yaw -= 9.4;
+//      yaw -= 9.4;
+//преобразуем yaw из диапазона (-180..180) в (0..360), чтобы отображался как азимут
+//инвертируем знак чтобы азимут отсчитывался по часовой 
+       yaw = -yaw;
+      if (yaw < 0) yaw += 360.0f;
 //применяем к углам триммирующие поправки, получаемые от пульта управления(величина меняется от -7 до 7, коэффициент регулирует чувствительность)
 //если, например, коэффициент 0.5, то диапазон регулировки от -3.5 до +3.5 градусов
       pitch += rc_fresh_data.trim_pitch * 0.5;
       roll -= rc_fresh_data.trim_roll * 0.5;
-        
+
+//далее идут действия по вычислению вектора ускорения в вертикальной плоскости, 
+//для чего разворачиваем усредненный вектор Z акселерометров имеющимся кватернионом ориентации
+//составляем 4-х компонентный кватернион из вектора гравитации 1 в G в системе NED в соответствие с раcположением IMU 
+      accel_avg_full[0] = 0;
+      accel_avg_full[1] = accel_avg[0];
+      accel_avg_full[2] = accel_avg[1];
+      accel_avg_full[3] = accel_avg[2];
+//разворачиваем текущим кватернионом показания усредненного акселерометра
+      vector_rotation_from_local_to_global(accel_avg_full, q_current, accel_avg_rotated);
+//вычисляем вертикальное ускорение (положительное направление вверх)
+      vertical_acceleration = -(accel_avg_rotated[3] + 1.0f);
+
+//фильтруем показания вертикального ускорения ФНЧ 
+      float accel_z_ave_rotated_filtered = Butterworth_filter(vertical_acceleration, &accel_Btw_filter);
+      //if ((large_counter % 10) == 0) printf("%0.3f, %0.3f\n", vertical_acceleration, accel_z_ave_rotated_filtered);
+//        accel_z_ave_rotated_filtered -= 0.00737; //ручная докалибровка
+
+
+//на этом этапе текущее положение дрона (углы наклона) опеделены, начинаем работу с остальными системами      
 //производим запрос данных от INA219 (раз в X циклов, то есть (1000/X) в секунду)
 //по результатам считывания корректируем уровень газа, поэтому очень медленно нельзя 
       if ((large_counter % 25) == 0) xTaskNotifyGive(task_handle_INA219_read_and_process_data);      
 
 //даем команду считать показания лидара
 #ifdef USING_TFMINIS_I2C       
-      if (((large_counter + 5) % 25) == 0) xTaskNotifyGive(task_handle_lidar_read_and_process_data);
+      if (((large_counter + 11) % 25) == 0) xTaskNotifyGive(task_handle_lidar_read_and_process_data);
 #endif
 
 //даем команду считать показания барометра
 #ifdef USING_MS5611
-      if (((large_counter + 23) % 25) == 0) xTaskNotifyGive(task_handle_MS5611_read_and_process_data); 
+      if (((large_counter + 17) % 25) == 0) xTaskNotifyGive(task_handle_MS5611_read_and_process_data); 
 #endif
 
 //получаем свежие данные из очереди от пульта управления. Если данные успешно получены 
@@ -1056,9 +1052,11 @@ float* pointer_to_fresh_mag_data = NULL;
       if (xQueueReceive(remote_control_to_main_queue, &rc_fresh_data, 0)) 
       {
         remote_control_lost_comm_counter = 0;
+        gpio_set_level(LED_BLUE,0);
         if (INA219_fresh_data[0] < 10.3) xTaskNotify(task_handle_blinking_flight_lights,2,eSetValueWithOverwrite);
         else if (INA219_fresh_data[0] < 9.5) xTaskNotify(task_handle_blinking_flight_lights,3,eSetValueWithOverwrite);
         else xTaskNotify(task_handle_blinking_flight_lights,1,eSetValueWithOverwrite);
+        gpio_set_level(LED_BLUE,1);
       }
 //в противном случае инкрементируем счетчик, определяющий допустимое время без связи с пультом     
       else remote_control_lost_comm_counter++;
@@ -1090,6 +1088,7 @@ float* pointer_to_fresh_mag_data = NULL;
 
 //получаем свежие данные из очереди от px4flow
 #ifdef USING_PX4FLOW
+      data_from_px4flow_to_main_struct_t px4flow_fresh_data;
       if (xQueueReceive(px4flow_to_main_queue, &px4flow_fresh_data, 0)) 
         {
           //if (large_counter % 100 == 0) printf("%0.2f, %0.2f, %d\n",px4flow_fresh_data.optical_x, px4flow_fresh_data.optical_y, px4flow_fresh_data.quality);
@@ -1119,6 +1118,7 @@ float* pointer_to_fresh_mag_data = NULL;
 
 //на основе данных от акселерометра (развернутый отфильтрованный усредненный вектор гравитации) и барометра вычисляем фильтром Калмана текущую высоту
 #ifdef USING_MS5611
+      float baro_altitude_cm;
       if (large_counter > 8000) //задержка так как до 8000 считается урседненное давление в точке старта
       {
         Kalman_2d_predict((accel_z_ave_rotated_filtered) * 981, &Kalm_vert);  //в сантиметрах
@@ -1137,12 +1137,25 @@ float* pointer_to_fresh_mag_data = NULL;
 //получаем из очереди от пульта новые ПИД коэффициенты если они пришли
       if (xQueueReceive(remote_control_to_main_pid_queue, &pid_fresh_data, 0)) 
       {
-        //printf("получ Kp: %d, Ki: %d, Kd %d\n", pid_fresh_data.kp_alt_hold_coeff, pid_fresh_data.ki_alt_hold_coeff, pid_fresh_data.kd_alt_hold_coeff);
-//копируем их в локальные (избыточный временный шаг)          
-        lidar_alt_hold_pid.kp = (float)pid_fresh_data.kp_alt_hold_coeff / 10.0;
-        lidar_alt_hold_pid.ki = (float)pid_fresh_data.ki_alt_hold_coeff / 1000.0;
-        lidar_alt_hold_pid.kd = (float)pid_fresh_data.kd_alt_hold_coeff;
-        //printf("обраб Kp: %0.3f, Ki: %0.3f, Kd %0.3f\n", lidar_alt_hold_pid.kp, lidar_alt_hold_pid.ki, lidar_alt_hold_pid.kd);           
+        PIDController_t *target_pid = NULL;
+//определем для какого ПИДа пришли коэффициенты
+        switch (pid_fresh_data.target)
+        {
+        case 1:  target_pid = &pitch_pid_rate; break;
+        case 2:  target_pid = &pitch_pid_angle; break;
+        case 3:  target_pid = &roll_pid_rate; break;
+        case 4:  target_pid = &roll_pid_angle; break;
+        case 5:  target_pid = &yaw_pid_rate; break;
+        case 6:  target_pid = &yaw_pid_angle; break;
+        case 7:  target_pid = &lidar_alt_hold_pid; break;
+        case 8:  target_pid = &baro_alt_hold_pid; break;
+        default: break;
+        }
+//если нашли для какого копируем 4 float-поля от kp до kff
+        if (target_pid != NULL) memcpy(&(target_pid->kp), &(pid_fresh_data.kp), sizeof(float) * 4);
+
+        //yaw_pid_rate.kff = pid_fresh_data.kff;
+        //printf("%f, Ki: %f, Kd %f\n", yaw_pid_angle.kp, yaw_pid_angle.ki, yaw_pid_angle.kd);           
       }
 
 //в этой точке собрано текущее состояние и есть данные от пульта, диктующие желаемое положение и режим полета. Можно переходить к вычислению управляющих воздействий
@@ -1240,7 +1253,7 @@ float* pointer_to_fresh_mag_data = NULL;
         pitch_pid_angle.prev_error = roll_pid_angle.prev_error = 0;
         pitch_pid_rate.integral_error = roll_pid_rate.integral_error = yaw_pid_rate.integral_error = 0;
         pitch_pid_rate.prev_error = roll_pid_rate.prev_error = yaw_pid_rate.prev_error = 0;
-        integral_yaw_error_angle = error_yaw_angle_old = 0;
+        yaw_pid_angle.integral_error = yaw_pid_angle.prev_error = 0;
         engine[0] = engine[1] = engine[2] = engine[3] = 0;
         lidar_altitude_hold_mode_enabled = 0;
         baro_altitude_hold_mode_enabled = 0;
@@ -1253,7 +1266,10 @@ float* pointer_to_fresh_mag_data = NULL;
         }           
       }
 //фильтруем вычисленные ПИД-регуляторами данные        
-      ESC_input_data_filter();
+      engine_filtered[0] = avg_filter_1d(engines_filter_pool[0], engine[0], LENGTH_OF_ESC_FILTER);
+      engine_filtered[1] = avg_filter_1d(engines_filter_pool[1], engine[1], LENGTH_OF_ESC_FILTER);
+      engine_filtered[2] = avg_filter_1d(engines_filter_pool[2], engine[2], LENGTH_OF_ESC_FILTER);
+      engine_filtered[3] = avg_filter_1d(engines_filter_pool[3], engine[3], LENGTH_OF_ESC_FILTER);
 //отправляем данные на двигатели      
       esc_control_update(engine_filtered);
 //на этом цикл от считывания данных от IMU до выдачи сигналов на двигатели фактически закончен
@@ -1268,19 +1284,37 @@ float* pointer_to_fresh_mag_data = NULL;
       xQueueOverwrite(main_to_rc_queue, (void *) &data_to_send_to_rc);         
 */
 //подготавливаем данные для записи в логи и записываем по flash раз в 50 циклов
-if (rc_fresh_data.engines_start_flag)
-{
-      if ((large_counter % 50) == 0) 
-      {       
-        prepare_logs();
-        xQueueSend(W25N01_queue, &p_to_log_structure, 0);
-      }
-    }        
-//2 раза в секунду отправляем данные по UART на minimOSD
-#ifdef USING_MAVLINK_TELEMETRY
+       if (rc_fresh_data.engines_start_flag)
+       {
+        if ((large_counter % 50) == 0) 
+        {       
+          prepare_logs();
+          xQueueSend(W25N01_queue, &p_to_log_structure, 0);
+        }
+       }        
+//2 раза в секунду собираем интересующие данные в структуру и отправляем данные по UART на minimOSD
+#ifdef USING_OSD_TELEMETRY
       if ((large_counter % 500) == 0) 
-      {       
-        prepare_mavlink_data();
+      {
+        mavlink_data_set_t main_to_mavlink_data;
+        main_to_mavlink_data.latitude = 111111111;     //стартовые значения, чтобы не было рандомных цифр при отсутствии GPS
+        main_to_mavlink_data.longtitude = 222222222;
+        mavlink_data_set_t* p_to_mavlink_data = &main_to_mavlink_data;       
+       #ifdef USING_GPS  
+        main_to_mavlink_data.latitude = gps_fresh_data.latitude_d;
+        main_to_mavlink_data.longtitude = gps_fresh_data.longtitude_d;
+        main_to_mavlink_data.gps_status = gps_fresh_data.status;
+      #endif
+        main_to_mavlink_data.angles[0] = -pitch;    //для корректного отображения на камере нужны знаки -
+        main_to_mavlink_data.angles[1] = -roll; 
+        main_to_mavlink_data.angles[2] = -yaw;
+        main_to_mavlink_data.voltage_mv = (uint16_t)(INA219_fresh_data[0] * 1000);
+        main_to_mavlink_data.current_ca = (uint16_t)(INA219_fresh_data[1] * 100);
+      #ifdef USING_TFMINIS_I2C 
+        main_to_mavlink_data.altitude_cm = (uint16_t)Kalm_vert.h;
+      #endif
+        main_to_mavlink_data.rssi_level = rc_fresh_data.rssi_level;
+        main_to_mavlink_data.armed_status = rc_fresh_data.engines_start_flag;
         xQueueSend(main_to_mavlink_queue, &p_to_mavlink_data, 0);
       }
 #endif
@@ -1300,8 +1334,8 @@ if (rc_fresh_data.engines_start_flag)
       if (current_state == FLIGHT_STATE)
       {
 //находим полные вектора ускорений (в g)
-        accel_1_total = sqrtf(accel_1_converted[0] * accel_1_converted[0] + accel_1_converted[1] * accel_1_converted[1]  + accel_1_converted[2] * accel_1_converted[2]);
-        accel_2_total = sqrtf(accel_2_converted[0] * accel_2_converted[0] + accel_2_converted[1] * accel_2_converted[1]  + accel_2_converted[2] * accel_2_converted[2]);
+        float accel_1_total = sqrtf(accel_1_converted[0] * accel_1_converted[0] + accel_1_converted[1] * accel_1_converted[1]  + accel_1_converted[2] * accel_1_converted[2]);
+        float accel_2_total = sqrtf(accel_2_converted[0] * accel_2_converted[0] + accel_2_converted[1] * accel_2_converted[1]  + accel_2_converted[2] * accel_2_converted[2]);
 
         //сравниваем с заданным порогом по очереди для обоих акселерометров
         if (accel_1_total > accel_1_total_max) accel_1_total_max = accel_1_total; //наблюдаем максиальный уровень для логирования
@@ -1352,42 +1386,39 @@ if (rc_fresh_data.engines_start_flag)
       }  
 #endif
 
-        IMU_interrupt_status = 0;
-
 #ifdef LOGGING_CYCLE_TIMES
 //вычисляем количество циклов CPU и среднее значение для логгирования
 //в данном случае esp_rom_get_cpu_ticks_per_us() вернет 240
-        current_cycle_us = (esp_cpu_get_cycle_count() - start_CPU_cycles) / esp_rom_get_cpu_ticks_per_us();
+        uint32_t current_cycle_us = (esp_cpu_get_cycle_count() - start_CPU_cycles) / esp_rom_get_cpu_ticks_per_us();
         avg_cycle_us = avg_cycle_us + ((float)current_cycle_us - avg_cycle_us) / (float)large_counter;
         if (current_cycle_us > max_cycle_us) max_cycle_us = current_cycle_us;
 #endif
 
 //собираем в кольцевой буфер 128 сэмплов и оповещаем задачу FFT что можно забирать и обрабатывать эти данные
 #ifdef USING_FFT
-//отправляем в буфер свежий сэмпл выбранной оси какого-то гироскопа или акселерометра (какую ось выбирать?)
-          gyro_samples_for_fft[samples_since_last_fft++] = accel_1_converted[0];
-//если навколено нужное кол-во - отправляем в кольцевой буфер
+//собираем в структуру свежие данные по X и Z
+          fft_input_data.x = gyro_avg[0];          
+          fft_input_data.z = gyro_avg[2];
+//Отправляем их в массив-временный буфер         
+          samples_for_fft[samples_since_last_fft++] = fft_input_data;
+//если накоплено нужное кол-во - отправляем весь массив в кольцевой буфер
           if (samples_since_last_fft >= FFT_HOP_SIZE)
           {
-            if (xRingbufferSend(fft_rb_handle, gyro_samples_for_fft, sizeof(float) * FFT_HOP_SIZE, 0) != pdTRUE) 
+            if (xRingbufferSend(fft_rb_handle, samples_for_fft, sizeof(imu_fft_data_t) * FFT_HOP_SIZE, 0) != pdTRUE) 
             {
               ESP_LOGI(TAG_FLY, "Буфер FFT заполнен, сэмпл игнорируется!"); 
             }
             samples_since_last_fft = 0;
+//оповещаем задачу расчета fft что можно начинать обработку
             xTaskNotifyGive(task_handle_fft);
-          }
-//получаем обратно от FFT вычисленную пиковую частоту          
-          if (xQueueReceive(fft_to_main_queue, &fft_peak_frequency, 0) == pdPASS)
-          {
-            //printf("%f\n",fft_peak_frequency);
-            dsps_biquad_gen_notch_f32(notch_coeffs, fft_peak_frequency / (float)IMU_SAMPLING_FREQ_HZ, 1.0, notch_bandwith / (float)IMU_SAMPLING_FREQ_HZ);
           }
 #endif
 
 //сбрасываем таймер общего зависания, по сработке которого аварийно останавливаем двигатели и входим в emergency режим       
         ESP_ERROR_CHECK(gptimer_set_raw_count(general_suspension_timer, 0));
+        IMU_interrupt_status = 0;
         gpio_set_level(LED_RED, 0);
-        gpio_set_level(LED_BLUE, 0);
+        gpio_set_level(LED_GREEN, 0);
         
 //if (large_counter > 2000) {while(1) {vTaskDelay(10);}}
 
@@ -1403,9 +1434,24 @@ if (rc_fresh_data.engines_start_flag)
 //if ((large_counter % 50) == 0) printf("%0.4f\n", vertical_acceleration); // баро высота в cm
 //if (large_counter<1000) printf("%lu, %0.2f, %lu\n", current_cycle_us, avg_cycle_us, max_cycle_us);
 //if ((large_counter % 1000) == 0) printf("%lu, %lu, %lu\n", current_cycle_us,(uint32_t)avg_cycle_us, max_cycle_us);
+// if ((large_counter % 1000) == 0) printf("%0.5f, %0.5f, %0.5f, %0.5f, %0.5f\n", 
+//   notch_coeffs_1[0],notch_coeffs_1[1],notch_coeffs_1[2],notch_coeffs_1[3],notch_coeffs_1[4]);
 
 //if ((large_counter % 1000) == 0) printf("%0.2f, %lu, %d\n", engine[0], (uint32_t)engine_filtered[0], dshot_signal[0].throttle);
 
+//строка для спектрограмм
+//printf("%+09.4f %+09.4f\n", gyro_avg[1], gyro_avg_filtered[1]);
+
+//ниже строка для PID tuning матлаба
+//if ((large_counter % 10) == 0) printf(" %+09.4f %+09.4f\n", pid_pitch_rate, gyro_avg_filtered[1]);
+
+
+//if ((large_counter % 10) == 0) send_binary_telemetry(rc_fresh_data.received_pitch * 4.0f, gyro_avg_filtered[1], pid_pitch_rate);
+
+
+ //if ((large_counter % 10) == 0) printf("%0.3f, %0.3f\n", rc_fresh_data.received_pitch, pitch);
+ //if ((large_counter % 100) == 0) printf("%0.2f, %0.2f, %0.2f, %0.2f\n", engine_filtered[0], engine_filtered[1], engine_filtered[2], engine_filtered[3]);
+ //if ((large_counter % 2000) == 0) printf("ИТОГ Kp: %f, Ki: %f, Kd %f\n", pitch_pid_rate.kp, pitch_pid_rate.ki, pitch_pid_rate.kd);
     } 
   }
 }

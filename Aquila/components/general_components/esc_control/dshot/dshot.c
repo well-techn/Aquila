@@ -64,7 +64,6 @@ void dshot_esc_control_update(float* engines_signal)
         dshot_signal[i].throttle = (uint16_t)(engines_signal[i] * 1999.0f + 48.0f);
         if (dshot_signal[i].throttle > 2047) dshot_signal[i].throttle = 2047;
         }
-        //rmt_transmit(esc_dshot_tx_channel[i], my_fast_dshot_encoder[i], &dshot_signal[i], sizeof(dshot_signal[i]), &esc_dshot_tx_config);
         ESP_ERROR_CHECK(rmt_transmit(esc_dshot_tx_channel[i], esc_dshot_encoder[i], &dshot_signal[i], sizeof(dshot_signal[i]), &esc_dshot_tx_config));
     }
 }

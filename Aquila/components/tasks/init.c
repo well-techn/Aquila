@@ -39,6 +39,7 @@
 #include "performance_monitor.h"
 #include "INA219_read_and_process_data.h"
 #include "send_telemetry_via_mavlink.h"
+#include "send_telemetry_via_MSP.h"
 #include "main_flying_cycle.h"
 #include "configuration_mode.h"
 #include "configuration_mode_telnet.h"
@@ -48,6 +49,8 @@
 #include "sending_something_over_wifi.h"
 #include "fft.h"
 #include "esc_control_provider.h"
+#include "RC_emulation.h"
+#include "ICM45686.h"
 
 const char *TAG_INIT = "INIT";
 const char *TAG_FLY = "FLY";
@@ -64,15 +67,17 @@ const char *TAG_INA219 = "INA219";
 const char *TAG_IST8310 = "IST8310";
 const char *TAG_FL3195 = "RGB_LED";
 const char *TAG_MS5611 = "MS5611";
-const char *TAG_MAV = "MAV";
+const char *TAG_OSD = "MAV";
 const char *TAG_PX4FLOW = "PX4FLOW";
 const char *TAG_FFT = "FFT";
+const char  *TAG_ICM45686 = "ICM45686";
 
 
 //spi handles
 extern spi_device_handle_t W25N01;
 extern spi_device_handle_t MPU6000_1;
 extern spi_device_handle_t MPU6000_2;
+extern spi_device_handle_t ICM45686;
 
 //i2c handles
 extern i2c_master_bus_handle_t i2c_internal_bus_handle;
@@ -143,8 +148,8 @@ StackType_t writing_logs_to_flash_stack[WRITING_LOGS_TO_FLASH_STACK_SIZE];
 StaticTask_t performance_measurement_TCB_buffer;
 StackType_t performance_measurement_stack[PERFORMANCE_MEASUREMENT_STACK_SIZE];
 
-StaticTask_t mavlink_telemetry_TCB_buffer;
-StackType_t mavlink_telemetry_stack[MAVLINK_TELEMETRY_STACK_SIZE];
+StaticTask_t osd_telemetry_TCB_buffer;
+StackType_t osd_telemetry_stack[OSD_TELEMETRY_STACK_SIZE];
 
 StaticTask_t MS5611_read_and_process_data_TCB_buffer;
 StackType_t MS5611_read_and_process_data_stack[MS5611_READ_AND_PROCESS_DATA_STACK_SIZE];
@@ -160,6 +165,9 @@ StackType_t sending_something_over_wifi_stack[SENDING_SOMETHING_OVER_WIFI_STACK_
 
 StaticTask_t fft_TCB_buffer;
 StackType_t fft_stack[FFT_STACK_SIZE];
+
+StaticTask_t RC_emulation_TCB_buffer;
+StackType_t RC_emulation_stack[4096];
 
 //задачи
 TaskHandle_t task_handle_blinking_flight_lights = NULL;
@@ -179,7 +187,8 @@ TaskHandle_t task_handle_px4flow_read_and_process_data = NULL;
 TaskHandle_t task_handle_emergency_mode = NULL;
 TaskHandle_t task_handle_sending_something_over_wifi = NULL;
 TaskHandle_t task_handle_RC_read_and_process_data = NULL;
-TaskHandle_t  task_handle_fft = NULL;
+TaskHandle_t task_handle_fft = NULL;
+TaskHandle_t task_handle_RC_emulation = NULL;
 
 RingbufHandle_t fft_rb_handle = NULL;
 
@@ -238,12 +247,14 @@ static void configure_IOs()
 void init(void * pvParameters)
 {
   static uint8_t error_code = 0;
+  static uint8_t command_to_enable_sounder = 0b01000001;
+  static uint8_t command_to_disable_sounder = 0b00100001;
 
   esp_log_level_set(TAG_INIT,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FLY,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_GPS,ESP_LOG_ERROR);  //WARN ERROR
   esp_log_level_set(TAG_NVS,ESP_LOG_INFO);   //WARN ERROR
-  esp_log_level_set(TAG_RC,ESP_LOG_ERROR);    //WARN ERROR
+  esp_log_level_set(TAG_OSD,ESP_LOG_ERROR);    //WARN ERROR
   esp_log_level_set(TAG_PMW,ESP_LOG_WARN);   //WARN ERROR
   esp_log_level_set(TAG_W25N,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_MPU6000,ESP_LOG_INFO);  //WARN ERROR
@@ -253,9 +264,10 @@ void init(void * pvParameters)
   esp_log_level_set(TAG_INA219,ESP_LOG_WARN);  //WARN ERROR
   esp_log_level_set(TAG_IST8310,ESP_LOG_INFO);  //WARN ERROR
   esp_log_level_set(TAG_FL3195,ESP_LOG_WARN); 
-  esp_log_level_set(TAG_MAV,ESP_LOG_INFO);
+  esp_log_level_set(TAG_OSD,ESP_LOG_INFO);
   esp_log_level_set(TAG_MS5611,ESP_LOG_INFO);
   esp_log_level_set(TAG_FFT,ESP_LOG_INFO);
+  esp_log_level_set(TAG_ICM45686,ESP_LOG_INFO);
  #ifdef TELNET_CONF_MODE
   esp_log_level_set("wifi",ESP_LOG_WARN);
   esp_log_level_set("wifi_init",ESP_LOG_WARN);
@@ -281,7 +293,14 @@ void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Оба SPI настроены\n");
 
 //Задержка чтобы успели загрузиться все микросхемы
-  vTaskDelay(50/portTICK_PERIOD_MS);
+  vTaskDelay(100/portTICK_PERIOD_MS);
+
+//   ESP_LOGI(TAG_INIT,"Проверка связи с ICM45686.....");
+// while(1)
+// {
+//   ICM45686_communication_check(ICM45686);
+//   vTaskDelay(1000/portTICK_PERIOD_MS);
+// }
 
   ESP_LOGI(TAG_INIT,"Проверка связи с MCP23017.....");
   if (MCP23017_communication_check() != ESP_OK) {
@@ -326,26 +345,27 @@ void init(void * pvParameters)
     vTaskSuspend(NULL); //останавливаем init
   }
 //только в режиме PWM - калибровка ESC
+//если стоит перемычка DI2 - запускаем калибровку ESC
   #ifdef USING_PWM_ESC_CONTROL 
-  if (!(MCP23017_get_inputs_state() & 0b00000100))                                      //если стоит перемычка DI2 - запускаем калибровку ESC
+  if (!(MCP23017_get_inputs_state() & 0b00000100))                                      
     { 
       ESP_LOGW(TAG_INIT,"Установлена перемычка DI2, начинаем калибровку ESCs.....");
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_MIN_SIGNAL *2));        //выдаем на все каналы максимальный уровень сигнала
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_MIN_SIGNAL * 2));        //выдаем на все каналы максимальный уровень сигнала
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_MIN_SIGNAL *2));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_MIN_SIGNAL * 2));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 1));
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 2, ENGINE_MIN_SIGNAL *2));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 2, ENGINE_MIN_SIGNAL * 2));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 2));
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_MIN_SIGNAL *2));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_MIN_SIGNAL * 2));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
       vTaskDelay(3000/portTICK_PERIOD_MS);                                               //держим его 3 секунды
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_MIN_SIGNAL ));           //выдаем на все каналы минимальный уровень сигнала
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_MIN_SIGNAL));           //выдаем на все каналы минимальный уровень сигнала
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 0));
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_MIN_SIGNAL ));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 1, ENGINE_MIN_SIGNAL));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 1));
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 2, ENGINE_MIN_SIGNAL ));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 2, ENGINE_MIN_SIGNAL));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 2));
-      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_MIN_SIGNAL ));
+      ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 3, ENGINE_MIN_SIGNAL));
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
       vTaskDelay(3000/portTICK_PERIOD_MS);                                                //держим его 3 секунды
       ESP_ERROR_CHECK(ledc_set_duty(ENGINE_PWM_MODE, 0, ENGINE_MIN_SIGNAL +1));          //выдаем на все каналы минимальный уровень сигнала + 1 (не обязательное действие)
@@ -358,9 +378,11 @@ void init(void * pvParameters)
       ESP_ERROR_CHECK(ledc_update_duty(ENGINE_PWM_MODE, 3));
       
       ESP_LOGI(TAG_INIT,"Калибровка ESC завершена, снимите перемычку и перезапустите систему.");
+      vTaskSuspend(NULL); //останавливаем init
       
       while (1) 
-      { gpio_set_level(LED_RED, 1);
+      { 
+        gpio_set_level(LED_RED, 1);
         vTaskDelay(500/portTICK_PERIOD_MS); 
         gpio_set_level(LED_RED, 0);
         vTaskDelay(500/portTICK_PERIOD_MS);
@@ -471,7 +493,7 @@ void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Настройка MPU#1.....");
   if (MPU6000_init(MPU6000_1,
                    IMU_SAMPLING_FREQ_HZ,
-                   IMU_LPF_CUTOFF_HZ,
+                   IMU_1_HW_LPF_CUTOFF_HZ,
                    IMU_ACCEL_FULL_SCALE_G,
                    IMU_GYRO_FULL_SCALE_DPS)  != ESP_OK) {
     error_code = 17;
@@ -497,7 +519,7 @@ void init(void * pvParameters)
   ESP_LOGI(TAG_INIT,"Настройка MPU#2.....");
   if (MPU6000_init(MPU6000_2,
                    IMU_SAMPLING_FREQ_HZ,
-                   IMU_LPF_CUTOFF_HZ,
+                   IMU_2_HW_LPF_CUTOFF_HZ,
                    IMU_ACCEL_FULL_SCALE_G,
                    IMU_GYRO_FULL_SCALE_DPS) != ESP_OK) {
     error_code = 19;
@@ -676,7 +698,7 @@ if (tfminis_communication_check() != ESP_OK) {
   }
     else ESP_LOGI(TAG_INIT,"Очередь для передачи данных от INA219 в main_flying_cycle успешно создана");
 
-#ifdef USING_MAVLINK_TELEMETRY
+#ifdef USING_OSD_TELEMETRY
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от  main_flying_cycle в Mavlink.....");
   main_to_mavlink_queue = xQueueCreate(5, sizeof(struct mavlink_data_set *));
   if (  main_to_mavlink_queue == NULL) {
@@ -714,7 +736,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_FFT
   ESP_LOGI(TAG_INIT,"Создаем очередь для передачи данных от FFT в main_flying_cycle.....");
-  fft_to_main_queue = xQueueCreate(5, sizeof(float));
+  fft_to_main_queue = xQueueCreate(5, sizeof(fft_3_axis_result_t));
   if (fft_to_main_queue == NULL) {
     ESP_LOGE(TAG_INIT,"Очередь для передачи данных от FFT в main_flying_cycle не создана");
     error_code = 1;
@@ -932,7 +954,7 @@ if (tfminis_communication_check() != ESP_OK) {
 
 #ifdef USING_FFT
   ESP_LOGI(TAG_INIT,"Создаем кольцевой буфер для fft.....");  
-  size_t fft_ringbuf_size = FFT_HOP_SIZE  * 3 * sizeof(float);   //с запасом на 3 пачки данных
+  size_t fft_ringbuf_size = FFT_HOP_SIZE  * 3 * sizeof(imu_fft_data_t);   //с запасом на 3 пачки данных
   fft_rb_handle = xRingbufferCreate(fft_ringbuf_size, RINGBUF_TYPE_BYTEBUF);
   if (fft_rb_handle!= NULL)  
     ESP_LOGI(TAG_INIT,"Кольцевой буфер для fft успешно создан\n");
@@ -984,9 +1006,9 @@ if (tfminis_communication_check() != ESP_OK) {
 
   vTaskDelay(50/portTICK_PERIOD_MS); 
 
-  #ifdef USING_MAVLINK_TELEMETRY
+  #ifdef USING_OSD_TELEMETRY
   ESP_LOGI(TAG_INIT,"Создаем задачу отправки телеметрии по mavink (send_telemetry_via_mavlink).....");
-  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_mavlink,"send_telemetry_via_mavlink", MAVLINK_TELEMETRY_STACK_SIZE,NULL,MAVLINK_TELEMETRY_PRIORITY,mavlink_telemetry_stack, &mavlink_telemetry_TCB_buffer,0);
+  task_handle_mavlink_telemetry = xTaskCreateStaticPinnedToCore(send_telemetry_via_MSP,"send_telemetry_via_MSP", OSD_TELEMETRY_STACK_SIZE,NULL,OSD_TELEMETRY_PRIORITY,osd_telemetry_stack, &osd_telemetry_TCB_buffer,0);
   if (task_handle_mavlink_telemetry != NULL) 
     {
       ESP_LOGI(TAG_INIT,"Задача отправки телеметрии по mavink успешно создана на ядре 0\n");
@@ -1008,6 +1030,30 @@ if (tfminis_communication_check() != ESP_OK) {
     }
   else {
     ESP_LOGE(TAG_INIT,"Задача отправки данных по WiFi не создана");
+    error_code = 2;
+    xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
+    while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 
+  }       
+#endif
+
+#ifdef USING_RC_EMULATION
+for (uint8_t i = 5; i>0; i--)
+{
+  //ESP_LOGE(TAG_INIT,"СОЗДАЕМ ЗАДАЧУ ЭМУЛЯЦИИ КОМАНД ПУЛЬТА через %d секунд", i);
+  vTaskDelay(500/portTICK_PERIOD_MS);
+  xQueueSend(MCP23017_queue,&command_to_enable_sounder, 0);
+  vTaskDelay(500/portTICK_PERIOD_MS);
+  xQueueSend(MCP23017_queue,&command_to_disable_sounder, 0);
+} 
+  
+  ESP_LOGI(TAG_INIT,"Создаем задачу для эмуляции команд с пульта управления (RC_emulation).....");
+  task_handle_RC_emulation = xTaskCreateStaticPinnedToCore(RC_emulation,"RC_emulation", 4096, NULL, 2, RC_emulation_stack, &RC_emulation_TCB_buffer, 0);
+  if (task_handle_RC_emulation != NULL) 
+    {
+      ESP_LOGI(TAG_INIT,"Задача для эмуляции команд с пульта управления успешно создана на ядре 0\n");
+    }
+  else {
+    ESP_LOGE(TAG_INIT,"Задача для эмуляции команд с пульта управления не создана");
     error_code = 2;
     xTaskCreate(error_code_LED_blinking,"error_code_LED_blinking",2048,(void *)&error_code,0,NULL);
     while(1) {vTaskDelay(1000/portTICK_PERIOD_MS);} 

@@ -39,6 +39,7 @@
 // стандартные библиотеки
 #include "freertos/FreeRTOS.h"
 #include "driver/gpio.h"
+#include "sdkconfig.h"
 
 // собственные библиотеки
 #include "wt_alldef.h"

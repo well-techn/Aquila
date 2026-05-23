@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "wt_alldef.h"
 
 // среднее арифметическое из массива
 float avg_filter_1d(float* array, float new_data_point, uint8_t filter_length)
@@ -19,7 +20,7 @@ float avg_filter_1d(float* array, float new_data_point, uint8_t filter_length)
 
 
 // Медианный фильтр с быстрой сортировкой (deepseek)
-void swap(float* a, float* b) {
+inline void swap(float* a, float* b) {
     float temp = *a;
     *a = *b;
     *b = temp;
@@ -175,3 +176,4 @@ uint8_t all_array_elements_are_equal(const uint8_t* array, uint8_t length)
     }
     return 1;
 }
+

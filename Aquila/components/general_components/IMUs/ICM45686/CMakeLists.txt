@@ -1,9 +1,5 @@
 idf_component_register(SRCS 
-"advanced_math.c"
-"CRCs.c"
-"filters.c"
-"q_operations.c"
-"fft_aux.c"
+"ICM45686.c"
 
 INCLUDE_DIRS
     "." 
@@ -12,6 +8,5 @@ REQUIRES
     wt_libs
     esp_driver_spi
     esp_driver_gpio
-    esp-dsp
 )
    

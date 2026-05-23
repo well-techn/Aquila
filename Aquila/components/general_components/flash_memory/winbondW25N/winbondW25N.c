@@ -37,7 +37,7 @@ esp_err_t W25N_read_JEDEC_ID(void) {
     err = ESP_OK;
     ESP_LOGI(TAG_W25N,"Проверка JEDEC пройдена");
   } 
-  else ESP_LOGE(TAG_W25N,"Проверка JEDEC не пройдена, считаны значения %02x, %02x, %02x\n",buf[0],buf[1],buf[2]);
+  else ESP_LOGE(TAG_W25N,"Проверка JEDEC не пройдена, считаны значения %02X, %02X, %02X\n", buf[0], buf[1], buf[2]);
   
   return err;
 }

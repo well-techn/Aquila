@@ -4,7 +4,8 @@
 void quaternion_conjugation(float* q, float* result);
 void quaternion_sum(float* q, float* p, float* result);
 void quaternions_multiplication(float* q1, float* q2, float* result);
-void vector_back_rotation(float* vector, float* q, float* result);
+void vector_rotation_from_global_to_local(float* vector, float* q, float* result);
+void vector_rotation_from_local_to_global(float* vector, float* q, float* result);
 void quaternion_difference(float* q_current, float* q_desired, float* q_diff);
 void quat_from_angle_and_axis(float angle, float* axis, float* q);
 void angle_and_axis_from_quat(float* q, float* angle, float* axis);

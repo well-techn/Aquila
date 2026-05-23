@@ -9,17 +9,17 @@
 #include "mavlink_wt.h"
 #include "mavlink_crc.h"
 
-extern  char *TAG_MAV;
+extern  char *TAG_OSD;
 extern QueueHandle_t mav_queue_for_events;
 extern QueueHandle_t main_to_mavlink_queue;
 
-#ifdef USING_MAVLINK_TELEMETRY
+#ifdef USING_OSD_TELEMETRY
 
 void mavlink_uart_config(void)
 {
     int intr_alloc_flags = 0;
     uart_config_t uart_config = {
-        .baud_rate = MAV_UART_BAUD_RATE,
+        .baud_rate = OSD_UART_BAUD_RATE,
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
@@ -27,10 +27,10 @@ void mavlink_uart_config(void)
         .source_clk = UART_SCLK_DEFAULT,
     };
 
-    ESP_ERROR_CHECK(uart_driver_install(MAV_UART, MAV_RX_UART_BUF_SIZE, MAV_TX_UART_BUF_SIZE, MAV_UART_PATTERN_DETECTION_QUEUE_SIZE, &mav_queue_for_events, intr_alloc_flags)); 
-    ESP_ERROR_CHECK(uart_param_config(MAV_UART, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(MAV_UART, MAV_UART_TX_PIN, MAV_UART_RX_PIN, MAV_UART_RTS_PIN, MAV_UART_CTS_PIN));
-    uart_flush(MAV_UART);                                                                           //сбрасываем буфер
+    ESP_ERROR_CHECK(uart_driver_install(OSD_UART, OSD_RX_UART_BUF_SIZE, OSD_TX_UART_BUF_SIZE , OSD_UART_PATTERN_DETECTION_QUEUE_SIZE, &mav_queue_for_events, intr_alloc_flags)); 
+    ESP_ERROR_CHECK(uart_param_config(OSD_UART, &uart_config));
+    ESP_ERROR_CHECK(uart_set_pin(OSD_UART, OSD_UART_TX_PIN, OSD_UART_RX_PIN, OSD_UART_RTS_PIN, OSD_UART_CTS_PIN));
+    uart_flush(OSD_UART);                                                                           //сбрасываем буфер
 }
 
 //Задача отправки телеметрии по mavlink. 
@@ -49,9 +49,9 @@ void send_telemetry_via_mavlink(void * pvParameters)
   static mavlink_vfr_hud_t vfr_hud;
   uint8_t seq = 0;
 
-  ESP_LOGI(TAG_MAV, "Настраиваем UART для Mavlink......");
+  ESP_LOGI(TAG_OSD, "Настраиваем UART для Mavlink......");
   mavlink_uart_config();
-  ESP_LOGI(TAG_MAV, "UART для Mavlink настроен");
+  ESP_LOGI(TAG_OSD, "UART для Mavlink настроен");
 
   //инициализируем постоянные компоненты каждого из типов заголовков
   //для hearbeat
@@ -158,32 +158,32 @@ void send_telemetry_via_mavlink(void * pvParameters)
 
 //Отправляем в UART требуемые сообщения        
         prepare_heartbeat(&heartbeat, &seq);
-        uart_write_bytes(MAV_UART, &heartbeat, sizeof(mavlink_heartbeat_t));
+        uart_write_bytes(OSD_UART, &heartbeat, sizeof(mavlink_heartbeat_t));
         //for (int i = 0; i<sizeof(mavlink_heartbeat_t);i++) printf ("%02x ", (uint8_t) *((uint8_t*)&heartbeat + i));
 
         prepare_status(&sys_status, &seq);
-        uart_write_bytes(MAV_UART, &sys_status, sizeof(mavlink_sys_status_t));
+        uart_write_bytes(OSD_UART, &sys_status, sizeof(mavlink_sys_status_t));
 
         prepare_attitude(&attitude, &seq);
-        uart_write_bytes(MAV_UART, &attitude, sizeof(mavlink_attitude_t));  
+        uart_write_bytes(OSD_UART, &attitude, sizeof(mavlink_attitude_t));  
 
         prepare_gps_raw(&gps_raw, &seq);
-        uart_write_bytes(MAV_UART, &gps_raw, sizeof(mavlink_gps_raw_int_t));
+        uart_write_bytes(OSD_UART, &gps_raw, sizeof(mavlink_gps_raw_int_t));
 
         prepare_rc_channels(&rc_channels, &seq);
-        uart_write_bytes(MAV_UART, &rc_channels, sizeof(mavlink_rc_channels_raw_t));
+        uart_write_bytes(OSD_UART, &rc_channels, sizeof(mavlink_rc_channels_raw_t));
 
         prepare_vfr_hud(&vfr_hud, &seq);
-        uart_write_bytes(MAV_UART, &vfr_hud, sizeof(mavlink_vfr_hud_t));
+        uart_write_bytes(OSD_UART, &vfr_hud, sizeof(mavlink_vfr_hud_t));
 
         prepare_gps(&gps, &seq);
-        uart_write_bytes(MAV_UART, &gps, sizeof(mavlink_global_position_int_t)); 
+        uart_write_bytes(OSD_UART, &gps, sizeof(mavlink_global_position_int_t)); 
 /*        
         prepare_rssi( &rssi, &seq);
-        uart_write_bytes(MAV_UART, &rssi, sizeof(mavlink_radio_status_t));
+        uart_write_bytes(OSD_UART, &rssi, sizeof(mavlink_radio_status_t));
         
         prepare_battery(&battery, &seq);
-        uart_write_bytes(MAV_UART, &battery, sizeof(mavlink_battery_status_t));
+        uart_write_bytes(OSD_UART, &battery, sizeof(mavlink_battery_status_t));
 */ 
     }
   }

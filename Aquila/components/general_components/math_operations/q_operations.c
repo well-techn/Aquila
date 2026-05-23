@@ -38,13 +38,23 @@ void quaternions_multiplication(float* q1, float* q2, float* result)
 }
 
 // Vновый = (q*) * (Vстарый) * (q)
-void vector_back_rotation(float* vector, float* q, float* result)
+void vector_rotation_from_global_to_local(float* vector, float* q, float* result)
 {
  float q_conj[4];
  float q_temp[4];
  quaternion_conjugation(q, q_conj);
  quaternions_multiplication(q_conj,vector,q_temp);
  quaternions_multiplication(q_temp,q,result);
+}
+
+// Vновый = (q) * (Vстарый) * (q*)
+void vector_rotation_from_local_to_global(float* vector, float* q, float* result)
+{
+ float q_conj[4];
+ float q_temp[4];
+ quaternion_conjugation(q, q_conj);
+ quaternions_multiplication(q,vector,q_temp);
+ quaternions_multiplication(q_temp,q_conj,result);
 }
 
 void quaternion_difference(float* q_current, float* q_desired, float* q_diff)

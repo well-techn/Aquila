@@ -27,7 +27,7 @@ extern char *TAG_LIDAR;
 #ifdef USING_TFMINIS_I2C
 void lidar_read_and_process_data(void * pvParameters)
 {
-  uint8_t incoming_message_buffer_lidar[NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR];
+  uint8_t incoming_message_buffer_lidar[NUMBER_OF_BYTES_TO_RECEIVE_FROM_LIDAR] = {0};
   uint16_t i = 0;
   uint8_t CRC_sum = 0;
   uint16_t raw_height = 0;
@@ -47,12 +47,12 @@ void lidar_read_and_process_data(void * pvParameters)
     {
       ESP_LOGD(TAG_LIDAR,"Отправляем запрос на получение данных");
       xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY); 
-      tfs_request_data();
+      ESP_ERROR_CHECK(tfs_request_data());
       //xSemaphoreGive(semaphore_for_i2c_internal);                                 //тут должна быть задержка 1ms но вроде работает и без нее
       //vTaskDelay(1/portTICK_PERIOD_MS);     //esp_rom_delay_us(uint32_t us)       //It is recommended to wait for 1ms and then read the result after sending commands.
       //ESP_LOGD(TAG_LIDAR,"Считываем результат");
       //xSemaphoreTake(semaphore_for_i2c_internal,portMAX_DELAY);  
-      tfs_read_result(incoming_message_buffer_lidar);
+      ESP_ERROR_CHECK(tfs_read_result(incoming_message_buffer_lidar));
       xSemaphoreGive(semaphore_for_i2c_internal);
       CRC_sum = 0;
       for (i=0;i<8;i++) CRC_sum += incoming_message_buffer_lidar[i];

@@ -26,7 +26,7 @@
     <tok fileIndex="0" linenr="12" column="2" str="//#define USING_PERFORMANCE_MESUREMENT                            //xxxxxxxxxxxxxxxxxx xxxxxxxxxxxx, xxxxxxxxxxxxxx xxxxxxxxxxxxxx xxxx xxxxxxxxxxxx xxxxxxxxxxxxxx xxxxxxxxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxxxxxxxxxxxx xxxxxxxxxxxxxx xxxx xxxxxxxxxxxx xxxxxxxxxxxx"/>
     <tok fileIndex="0" linenr="13" column="1" str="// #define USING_MS5611"/>
     <tok fileIndex="0" linenr="14" column="1" str="// #define BATTERY_COMPENSATION"/>
-    <tok fileIndex="0" linenr="15" column="1" str="// #define USING_MAVLINK_TELEMETRY"/>
+    <tok fileIndex="0" linenr="15" column="1" str="// #define USING_OSD_TELEMETRY"/>
     <tok fileIndex="0" linenr="16" column="1" str="// #define NO_RSSI                                                  //xxxxxx xxxxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxxxxxxxxxx xxxxxxxxxx xxxxxxxxxxxxxxxxxxxxxx xxxxxxxxxxxxxxxx, xxxxxxxxxxxxxxxxxx xxxxxx xxxxxxxxxxxx xxxxxxxxxx xxxxxxxxxxxx (xxxxxxxxxxxxxx) xxxxxxxxxxxxxxxx xx xxxxxxxxxxxxxxxx xxxxxxxxxxxx"/>
     <tok fileIndex="0" linenr="17" column="1" str="// #define MEMORY_CONSUMPTION_MESUREMENT"/>
     <tok fileIndex="0" linenr="18" column="1" str="// #define TELNET_CONF_MODE"/>
@@ -157,7 +157,7 @@
     <tok fileIndex="0" linenr="75" column="69" str="//xxxxxxxxxxxxxx xxxxxxxxxxxxxxxxxxxxxxxxxx IMU "/>
     <tok fileIndex="0" linenr="76" column="1" str="#"/>
     <tok fileIndex="0" linenr="76" column="2" str="define"/>
-    <tok fileIndex="0" linenr="76" column="9" str="IMU_LPF_CUTOFF_HZ"/>
+    <tok fileIndex="0" linenr="76" column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
     <tok fileIndex="0" linenr="76" column="33" str="("/>
     <tok fileIndex="0" linenr="76" column="34" str="5"/>
     <tok fileIndex="0" linenr="76" column="35" str=")"/>
@@ -790,18 +790,18 @@
     <tok fileIndex="0" linenr="226" column="2" str="endif"/>
     <tok fileIndex="0" linenr="228" column="1" str="#"/>
     <tok fileIndex="0" linenr="228" column="2" str="ifdef"/>
-    <tok fileIndex="0" linenr="228" column="8" str="USING_MAVLINK_TELEMETRY"/>
+    <tok fileIndex="0" linenr="228" column="8" str="USING_OSD_TELEMETRY"/>
     <tok fileIndex="0" linenr="229" column="1" str="//GPIO xx xxxxxxxxxxxxxxxxxx UART xxxxxx xxxxxxxxxxxx xx mavlink"/>
     <tok fileIndex="0" linenr="230" column="3" str="#"/>
     <tok fileIndex="0" linenr="230" column="4" str="define"/>
-    <tok fileIndex="0" linenr="230" column="11" str="MAV_UART"/>
+    <tok fileIndex="0" linenr="230" column="11" str="OSD_UART"/>
     <tok fileIndex="0" linenr="230" column="51" str="("/>
     <tok fileIndex="0" linenr="230" column="52" str="1"/>
     <tok fileIndex="0" linenr="230" column="53" str=")"/>
     <tok fileIndex="0" linenr="230" column="79" str="//xxxxxxxxxx xxxxxxxxxx"/>
     <tok fileIndex="0" linenr="231" column="3" str="#"/>
     <tok fileIndex="0" linenr="231" column="4" str="define"/>
-    <tok fileIndex="0" linenr="231" column="11" str="MAV_UART_BAUD_RATE"/>
+    <tok fileIndex="0" linenr="231" column="11" str="OSD_UART_BAUD_RATE"/>
     <tok fileIndex="0" linenr="231" column="51" str="("/>
     <tok fileIndex="0" linenr="231" column="52" str="57600"/>
     <tok fileIndex="0" linenr="231" column="57" str=")"/>
@@ -815,40 +815,40 @@
     <tok fileIndex="0" linenr="232" column="79" str="//xxxxxxxxxxxx RX FIFO xxxxxxxxxxxx xxxxxx Mavlink UART"/>
     <tok fileIndex="0" linenr="233" column="3" str="#"/>
     <tok fileIndex="0" linenr="233" column="4" str="define"/>
-    <tok fileIndex="0" linenr="233" column="11" str="MAV_TX_UART_BUF_SIZE"/>
+    <tok fileIndex="0" linenr="233" column="11" str="OSD_TX_UART_BUF_SIZE "/>
     <tok fileIndex="0" linenr="233" column="51" str="("/>
     <tok fileIndex="0" linenr="233" column="52" str="512"/>
     <tok fileIndex="0" linenr="233" column="55" str=")"/>
     <tok fileIndex="0" linenr="233" column="79" str="//xxxxxxxxxxxx TX FIFO xxxxxxxxxxxx xxxxxx Mavlink UART"/>
     <tok fileIndex="0" linenr="234" column="3" str="#"/>
     <tok fileIndex="0" linenr="234" column="4" str="define"/>
-    <tok fileIndex="0" linenr="234" column="11" str="MAV_UART_TX_PIN"/>
+    <tok fileIndex="0" linenr="234" column="11" str="OSD_UART_TX_PIN"/>
     <tok fileIndex="0" linenr="234" column="51" str="("/>
     <tok fileIndex="0" linenr="234" column="52" str="43"/>
     <tok fileIndex="0" linenr="234" column="54" str=")"/>
     <tok fileIndex="0" linenr="234" column="79" str="//GPIO xxxxxx TX "/>
     <tok fileIndex="0" linenr="235" column="3" str="#"/>
     <tok fileIndex="0" linenr="235" column="4" str="define"/>
-    <tok fileIndex="0" linenr="235" column="11" str="MAV_UART_RX_PIN"/>
+    <tok fileIndex="0" linenr="235" column="11" str="OSD_UART_RX_PIN"/>
     <tok fileIndex="0" linenr="235" column="51" str="("/>
     <tok fileIndex="0" linenr="235" column="52" str="44"/>
     <tok fileIndex="0" linenr="235" column="54" str=")"/>
     <tok fileIndex="0" linenr="235" column="79" str="//GPIO xxxxxx RX "/>
     <tok fileIndex="0" linenr="236" column="3" str="#"/>
     <tok fileIndex="0" linenr="236" column="4" str="define"/>
-    <tok fileIndex="0" linenr="236" column="11" str="MAV_UART_RTS_PIN"/>
+    <tok fileIndex="0" linenr="236" column="11" str="OSD_UART_RTS_PIN"/>
     <tok fileIndex="0" linenr="236" column="51" str="("/>
     <tok fileIndex="0" linenr="236" column="52" str="UART_PIN_NO_CHANGE"/>
     <tok fileIndex="0" linenr="236" column="70" str=")"/>
     <tok fileIndex="0" linenr="237" column="3" str="#"/>
     <tok fileIndex="0" linenr="237" column="4" str="define"/>
-    <tok fileIndex="0" linenr="237" column="11" str="MAV_UART_CTS_PIN"/>
+    <tok fileIndex="0" linenr="237" column="11" str="OSD_UART_CTS_PIN"/>
     <tok fileIndex="0" linenr="237" column="51" str="("/>
     <tok fileIndex="0" linenr="237" column="52" str="UART_PIN_NO_CHANGE"/>
     <tok fileIndex="0" linenr="237" column="70" str=")"/>
     <tok fileIndex="0" linenr="238" column="3" str="#"/>
     <tok fileIndex="0" linenr="238" column="4" str="define"/>
-    <tok fileIndex="0" linenr="238" column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+    <tok fileIndex="0" linenr="238" column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
     <tok fileIndex="0" linenr="238" column="51" str="("/>
     <tok fileIndex="0" linenr="238" column="52" str="10"/>
     <tok fileIndex="0" linenr="238" column="54" str=")"/>
@@ -1612,7 +1612,7 @@
     <tok fileIndex="0" linenr="471" column="60" str=")"/>
     <tok fileIndex="0" linenr="472" column="1" str="#"/>
     <tok fileIndex="0" linenr="472" column="2" str="define"/>
-    <tok fileIndex="0" linenr="472" column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+    <tok fileIndex="0" linenr="472" column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
     <tok fileIndex="0" linenr="472" column="55" str="("/>
     <tok fileIndex="0" linenr="472" column="56" str="4096"/>
     <tok fileIndex="0" linenr="472" column="60" str=")"/>
@@ -1727,7 +1727,7 @@
     <tok fileIndex="0" linenr="492" column="57" str=")"/>
     <tok fileIndex="0" linenr="493" column="1" str="#"/>
     <tok fileIndex="0" linenr="493" column="2" str="define"/>
-    <tok fileIndex="0" linenr="493" column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+    <tok fileIndex="0" linenr="493" column="9" str="OSD_TELEMETRY_PRIORITY"/>
     <tok fileIndex="0" linenr="493" column="55" str="("/>
     <tok fileIndex="0" linenr="493" column="56" str="0"/>
     <tok fileIndex="0" linenr="493" column="57" str=")"/>
@@ -1770,7 +1770,7 @@
     <tok fileIndex="0" linenr="500" column="62" str="//xxxx*xx"/>
     <tok fileIndex="0" linenr="501" column="1" str="#"/>
     <tok fileIndex="0" linenr="501" column="2" str="define"/>
-    <tok fileIndex="0" linenr="501" column="9" str="VERT_ACC_FILTER_F_CUT"/>
+    <tok fileIndex="0" linenr="501" column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
     <tok fileIndex="0" linenr="501" column="55" str="("/>
     <tok fileIndex="0" linenr="501" column="57" str="8.0"/>
     <tok fileIndex="0" linenr="501" column="59" str=")"/>
@@ -2068,10 +2068,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -2657,28 +2657,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -2686,50 +2686,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -3448,10 +3448,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -3600,10 +3600,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -3656,10 +3656,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -4309,10 +4309,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -4898,28 +4898,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -4927,50 +4927,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -5689,10 +5689,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -5841,10 +5841,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -5897,10 +5897,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -6550,10 +6550,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -7139,28 +7139,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -7168,50 +7168,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -7930,10 +7930,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -8082,10 +8082,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -8138,10 +8138,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -8805,10 +8805,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -9394,28 +9394,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -9423,50 +9423,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -10185,10 +10185,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -10337,10 +10337,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -10393,10 +10393,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -11051,10 +11051,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -11640,28 +11640,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -11669,50 +11669,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -12431,10 +12431,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -12583,10 +12583,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -12639,10 +12639,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -13306,10 +13306,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -13895,28 +13895,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -13924,50 +13924,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -14686,10 +14686,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -14838,10 +14838,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -14894,10 +14894,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -15552,10 +15552,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -16141,28 +16141,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -16170,50 +16170,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -16932,10 +16932,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -17084,10 +17084,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -17140,10 +17140,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -17801,10 +17801,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -18390,28 +18390,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -18419,50 +18419,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -19181,10 +19181,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -19333,10 +19333,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -19389,10 +19389,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -20056,10 +20056,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -20645,28 +20645,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -20674,50 +20674,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -21436,10 +21436,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -21588,10 +21588,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -21644,10 +21644,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -22311,10 +22311,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -22900,28 +22900,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -22929,50 +22929,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -23691,10 +23691,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -23843,10 +23843,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -23899,10 +23899,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -24566,10 +24566,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -25155,28 +25155,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -25184,50 +25184,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -25946,10 +25946,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -26098,10 +26098,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -26154,10 +26154,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>
@@ -26815,10 +26815,10 @@
       <token column="34" str="1000"/>
       <token column="38" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_LPF_CUTOFF_HZ (5)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="76" str="#define IMU_HW_LPF_CUTOFF_HZ (5)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="IMU_LPF_CUTOFF_HZ"/>
+      <token column="9" str="IMU_HW_LPF_CUTOFF_HZ"/>
       <token column="33" str="("/>
       <token column="34" str="5"/>
       <token column="35" str=")"/>
@@ -27404,28 +27404,28 @@
       <token column="1" str="#"/>
       <token column="2" str="endif"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_MAVLINK_TELEMETRY">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="228" str="#ifdef USING_OSD_TELEMETRY">
       <token column="1" str="#"/>
       <token column="2" str="ifdef"/>
-      <token column="8" str="USING_MAVLINK_TELEMETRY"/>
+      <token column="8" str="USING_OSD_TELEMETRY"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define MAV_UART (1)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="230" str="#define OSD_UART (1)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART"/>
+      <token column="11" str="OSD_UART"/>
       <token column="51" str="("/>
       <token column="52" str="1"/>
       <token column="53" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define MAV_UART_BAUD_RATE (57600)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="231" str="#define OSD_UART_BAUD_RATE (57600)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_BAUD_RATE"/>
+      <token column="11" str="OSD_UART_BAUD_RATE"/>
       <token column="51" str="("/>
       <token column="52" str="57600"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define MAV_RX_UART_BUF_SIZE (256)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="232" str="#define OSD_RX_UART_BUF_SIZE (256)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
       <token column="11" str="MAV_RX_UART_BUF_SIZE"/>
@@ -27433,50 +27433,50 @@
       <token column="52" str="256"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define MAV_TX_UART_BUF_SIZE (512)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="233" str="#define OSD_TX_UART_BUF_SIZE  (512)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_TX_UART_BUF_SIZE"/>
+      <token column="11" str="OSD_TX_UART_BUF_SIZE "/>
       <token column="51" str="("/>
       <token column="52" str="512"/>
       <token column="55" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define MAV_UART_TX_PIN (43)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="234" str="#define OSD_UART_TX_PIN (43)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_TX_PIN"/>
+      <token column="11" str="OSD_UART_TX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="43"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define MAV_UART_RX_PIN (44)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="235" str="#define OSD_UART_RX_PIN (44)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RX_PIN"/>
+      <token column="11" str="OSD_UART_RX_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="44"/>
       <token column="54" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define MAV_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="236" str="#define OSD_UART_RTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_RTS_PIN"/>
+      <token column="11" str="OSD_UART_RTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define MAV_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="237" str="#define OSD_UART_CTS_PIN (UART_PIN_NO_CHANGE)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_CTS_PIN"/>
+      <token column="11" str="OSD_UART_CTS_PIN"/>
       <token column="51" str="("/>
       <token column="52" str="UART_PIN_NO_CHANGE"/>
       <token column="70" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define MAV_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="238" str="#define OSD_UART_PATTERN_DETECTION_QUEUE_SIZE (10)">
       <token column="3" str="#"/>
       <token column="4" str="define"/>
-      <token column="11" str="MAV_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
+      <token column="11" str="OSD_UART_PATTERN_DETECTION_QUEUE_SIZE"/>
       <token column="51" str="("/>
       <token column="52" str="10"/>
       <token column="54" str=")"/>
@@ -28195,10 +28195,10 @@
       <token column="56" str="8192"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define MAVLINK_TELEMETRY_STACK_SIZE (4096)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="472" str="#define OSD_TELEMETRY_STACK_SIZE (4096)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_STACK_SIZE"/>
+      <token column="9" str="OSD_TELEMETRY_STACK_SIZE"/>
       <token column="55" str="("/>
       <token column="56" str="4096"/>
       <token column="60" str=")"/>
@@ -28347,10 +28347,10 @@
       <token column="56" str="2"/>
       <token column="57" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define MAVLINK_TELEMETRY_PRIORITY (0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="493" str="#define OSD_TELEMETRY_PRIORITY (0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="MAVLINK_TELEMETRY_PRIORITY"/>
+      <token column="9" str="OSD_TELEMETRY_PRIORITY"/>
       <token column="55" str="("/>
       <token column="56" str="0"/>
       <token column="57" str=")"/>
@@ -28403,10 +28403,10 @@
       <token column="56" str="2200"/>
       <token column="60" str=")"/>
     </directive>
-    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT ( 8.0)">
+    <directive file="c:/Users/VVE/YandexDisk/GitRepo/Aquila/components/wt_libs/include/wt_alldef.h" linenr="501" str="#define VERT_ACC_FILTER_F_CUT_HZ ( 8.0)">
       <token column="1" str="#"/>
       <token column="2" str="define"/>
-      <token column="9" str="VERT_ACC_FILTER_F_CUT"/>
+      <token column="9" str="VERT_ACC_FILTER_F_CUT_HZ"/>
       <token column="55" str="("/>
       <token column="57" str="8.0"/>
       <token column="59" str=")"/>

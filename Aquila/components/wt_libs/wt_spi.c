@@ -2,13 +2,15 @@
 #include "wt_alldef.h"
 
 spi_device_handle_t SD_card; 
-spi_device_handle_t W25N01; //104MHz max
-spi_device_handle_t PMW3901;  //2MHz max
-spi_device_handle_t MPU6000_1; //1MHz for all, 20MHz for data and interrupt
-spi_device_handle_t MPU6000_2;
+spi_device_handle_t W25N01;   //104МГц max
+spi_device_handle_t PMW3901;  //2МГц max
+spi_device_handle_t MPU6000_1; //1МГц для всех, 20МГц для данных и прерываний
+spi_device_handle_t MPU6000_2; 
+spi_device_handle_t ICM45686; //20МГц, до 24МГц
 
 void SPI_init()
 {
+//настройки SPI для двух IMU
   spi_bus_config_t IMUs_SPI_buscfg = {
       .mosi_io_num=IMU_SPI_MOSI,
       .miso_io_num=IMU_SPI_MISO,
@@ -40,6 +42,7 @@ void SPI_init()
  };
  ESP_ERROR_CHECK(spi_bus_add_device(IMU_SPI, &devcfg_MPU6000_2, &MPU6000_2));
 
+//настройки SPI для внешней флеш-памяти и опционально остального
  spi_bus_config_t GP_SPI_buscfg = {
     .mosi_io_num=GP_SPI_MOSI,
     .miso_io_num=GP_SPI_MISO,
@@ -59,6 +62,16 @@ void SPI_init()
     .input_delay_ns = 0
  };
  ESP_ERROR_CHECK(spi_bus_add_device(GP_SPI, &devcfg_W25N01, &W25N01));
+
+  spi_device_interface_config_t devcfgICM45686 = {
+    .clock_speed_hz = ICM45686_SPI_FREQ_HZ,
+    .duty_cycle_pos=128,                                    //Duty cycle of positive clock, in 1/256th increments (128 = 50%/50% duty). Setting this to 0 (=not setting it) is equivalent to setting this to 128.
+    .mode=3,                                                //SPI mode, representing a pair of (CPOL, CPHA) configuration
+    .spics_io_num=GPIO_CS_ICM45686,
+    .cs_ena_posttrans=3,                                    //Keep the CS low 3 cycles after transaction
+    .queue_size=3,
+    .input_delay_ns = 0
+ };
 }
 
 void SPI_change_MPUs_speed() 
@@ -162,8 +175,6 @@ void SPI_write_bytes(spi_device_handle_t spi_handle,
       .dummy_bits = number_of_dummy_bits
     }; 
   ESP_ERROR_CHECK(spi_device_polling_transmit(spi_handle, (spi_transaction_t *)&e));
-
-
 }
 
 void SPI_read_bytes(spi_device_handle_t spi_handle, 

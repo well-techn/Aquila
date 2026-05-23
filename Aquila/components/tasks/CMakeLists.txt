@@ -5,6 +5,7 @@ idf_component_register(SRCS
 "./mag_read_and_process_data.c"
 "./gps_read_and_process_data.c"
 "./RC_read_and_process_data.c"
+"./RC_emulation.c"
 "./send_data_to_RC.c"
 "./lidar_read_and_process_data.c"
 "./MCP23017_monitoring_and_control.c"
@@ -14,6 +15,7 @@ idf_component_register(SRCS
 "./performance_monitor.c"
 "./INA219_read_and_process_data.c"
 "./send_telemetry_via_mavlink.c"
+"./send_telemetry_via_MSP.c"
 "./init.c"
 "./main_flying_cycle.c"
 "./px4flow_read_and_process_data.c"
@@ -57,6 +59,7 @@ REQUIRES
         wt_libs
         service_tasks
         MPU6000
+        ICM45686
         MS5611
         IST8310
         MCP23017

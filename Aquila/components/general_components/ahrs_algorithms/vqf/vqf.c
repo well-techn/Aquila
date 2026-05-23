@@ -104,7 +104,7 @@ static vqf_state_t state;
 
 static void init_params(void)
 {
-    params.tauAcc = 3.0f;
+    params.tauAcc = 10.0f;                   //отвечает за степень доверия к акселерометру. Чем выше знаение, тем меньше верит (от 0,1 до 20)
     params.tauMag = 9.0f;
     params.motionBiasEstEnabled = true;
     params.restBiasEstEnabled = true;
@@ -748,54 +748,6 @@ void updateMag(const vqf_real_t mag[3])
     }
 }
 
-//void update(const vqf_real_t gyr[3], const vqf_real_t acc[3])
-//{
-//    updateGyr(gyr);
-//    updateAcc(acc);
-//}
-//
-//void update(const vqf_real_t gyr[3], const vqf_real_t acc[3], const vqf_real_t mag[3])
-//{
-//    updateGyr(gyr);
-//    updateAcc(acc);
-//    updateMag(mag);
-//}
-
-// void updateBatch(const vqf_real_t gyr[], const vqf_real_t acc[], const vqf_real_t mag[], size_t N,
-//                       vqf_real_t out6D[], vqf_real_t out9D[], vqf_real_t outDelta[], vqf_real_t outBias[],
-//                       vqf_real_t outBiasSigma[], bool outRest[], bool outMagDist[])
-// {
-//     for (size_t i = 0; i < N; i++) {
-//         if (mag) {
-//             update(gyr+3*i, acc+3*i, mag+3*i);
-//         } else {
-//             update(gyr+3*i, acc+3*i);
-//         }
-//         if (out6D) {
-//             getQuat6D(out6D+4*i);
-//         }
-//         if (out9D) {
-//             getQuat9D(out9D+4*i);
-//         }
-//         if (outDelta) {
-//             outDelta[i] = state.delta;
-//         }
-//         if (outBias) {
-//             memcpy(outBias+3*i, state.bias, sizeof(state.bias));
-//             // std::copy(state.bias, state.bias+3, outBias+3*i);
-//         }
-//         if (outBiasSigma) {
-//             outBiasSigma[i] = getBiasEstimate({0,0,0});
-//         }
-//         if (outRest) {
-//             outRest[i] = state.restDetected;
-//         }
-//         if (outMagDist) {
-//             outMagDist[i] = state.magDistDetected;
-//         }
-//     }
-// }
-
 void getQuat3D(vqf_real_t out[4])
 {
     memcpy(out, state.gyrQuat, sizeof(state.gyrQuat));
@@ -887,9 +839,7 @@ void setMotionBiasEstEnabled(bool enabled)
     }
     params.motionBiasEstEnabled = enabled;
     vqf_fill_double(state.motionBiasEstRLpState, 9*2, NaN);
-    // std::fill(state.motionBiasEstRLpState, state.motionBiasEstRLpState + 9*2, NaN);
     vqf_fill_double(state.motionBiasEstBiasLpState, 2*2, NaN);
-    // std::fill(state.motionBiasEstBiasLpState, state.motionBiasEstBiasLpState + 2*2, NaN);
 }
 
 void setRestBiasEstEnabled(bool enabled)
@@ -901,16 +851,11 @@ void setRestBiasEstEnabled(bool enabled)
     state.restDetected = false;
 
     vqf_fill_real(state.restLastSquaredDeviations, 3, 0.0);
-    // std::fill(state.restLastSquaredDeviations, state.restLastSquaredDeviations + 3, 0.0);
     state.restT = 0.0;
     vqf_fill_real(state.restLastGyrLp, 3, 0.0);
-    // std::fill(state.restLastGyrLp, state.restLastGyrLp + 3, 0.0);
     vqf_fill_double(state.restGyrLpState, 3*2, NaN);
-    // std::fill(state.restGyrLpState, state.restGyrLpState + 3*2, NaN);
     vqf_fill_real(state.restLastAccLp, 3, 0.0);
-    // std::fill(state.restLastAccLp, state.restLastAccLp + 3, 0.0);
     vqf_fill_double(state.restAccLpState, 3*2, NaN);
-    // std::fill(state.restAccLpState, state.restAccLpState + 3*2, NaN);
 }
 
 void setMagDistRejectionEnabled(bool enabled)

@@ -8,8 +8,9 @@
 // собственные библиотеки
 #include "wt_alldef.h"
 #include "winbondW25N.h"
+#include "logging_operations.h"
 
-extern const char *TAG_W25N;
+//extern const char *TAG_W25N;
 
 // Задача считывания данных из внешней flash. Активируется только если обнаруживается установленная перемычка "считать логи."
 // Получает данные с памяти и выдает их по telnet по установленному wifi соединению
@@ -22,161 +23,159 @@ void reading_logs_from_external_flash(void *pvParameters)
   uint8_t emergency_mode_flag = 0;
   struct logging_data_set *p_to_set_to_log;
 
-  int16_t *client_fd = pvParameters;
-  char message_to_print[300]; // сюда содержимое пакета печатается через snprintf (длина с запасом)
+  //char message_to_print[300]; // сюда содержимое пакета печатается через snprintf (длина с запасом)
   uint16_t next = 0;
-  char end_message[] = "Считывание логов из внешней flash-памяти завершено, перезапустите систему\r\n";
-  char header_new[500];
+  char message_to_print[500];
+
+  int16_t client_fd = (pvParameters) ? *(int16_t *)pvParameters : -1;
 
 //формируем строку заголовка исходя из того, что включено в логи
-  next += snprintf(header_new, sizeof(header_new), "time_us|");
+  next += snprintf(message_to_print, sizeof(message_to_print), "time_us|");
 #ifdef LOGGING_ACCEL_1 
-  next += snprintf(header_new + next, sizeof(header_new), "ax_raw_1|");
-  next += snprintf(header_new + next, sizeof(header_new), "ay_raw_1|");
-  next += snprintf(header_new + next, sizeof(header_new), "az_raw_1|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "ax_raw_1|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "ay_raw_1|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "az_raw_1|");
 #endif
 
 #ifdef LOGGING_ACCEL_2 
-  next += snprintf(header_new + next, sizeof(header_new), "ax_raw_2|");
-  next += snprintf(header_new + next, sizeof(header_new), "ay_raw_2|");
-  next += snprintf(header_new + next, sizeof(header_new), "az_raw_2|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "ax_raw_2|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "ay_raw_2|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "az_raw_2|");
 #endif
 
 #ifdef LOGGING_ACCEL_1_MAX
-  next += snprintf(header_new + next, sizeof(header_new), "accel_1_max|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "accel_1_max|");
 #endif
 
 #ifdef LOGGING_ACCEL_2_MAX
-  next += snprintf(header_new + next, sizeof(header_new), "accel_2_max|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "accel_2_max|");
 #endif
 
 #ifdef LOGGING_GYRO_1
-  next += snprintf(header_new + next, sizeof(header_new), "gx_raw_1|");
-  next += snprintf(header_new + next, sizeof(header_new), "gy_raw_1|");
-  next += snprintf(header_new + next, sizeof(header_new), "gz_raw_1|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gx_raw_1|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gy_raw_1|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gz_raw_1|");
 #endif
 
 #ifdef LOGGING_GYRO_2 
-  next += snprintf(header_new + next, sizeof(header_new), "gx_raw_2|");
-  next += snprintf(header_new + next, sizeof(header_new), "gy_raw_2|");
-  next += snprintf(header_new + next, sizeof(header_new), "gz_raw_2|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gx_raw_2|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gy_raw_2|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gz_raw_2|");
 #endif
 
 #ifdef LOGGING_AVG_ACCEL
-  next += snprintf(header_new + next, sizeof(header_new), "ax_avg|");
-  next += snprintf(header_new + next, sizeof(header_new), "ay_avg|");
-  next += snprintf(header_new + next, sizeof(header_new), "az_avg|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "ax_avg|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "ay_avg|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "az_avg|");
 #endif
 
 #ifdef LOGGING_AVG_GYRO
-  next += snprintf(header_new + next, sizeof(header_new), "gx_avg|");
-  next += snprintf(header_new + next, sizeof(header_new), "gy_avg|");
-  next += snprintf(header_new + next, sizeof(header_new), "gz_avg|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gx_avg|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gy_avg|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "gz_avg|");
 #endif
 
 #ifdef LOGGING_QUATERNION 
-  next += snprintf(header_new + next, sizeof(header_new), "q0|q1|q2|q3|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "q0|q1|q2|q3|");
 #endif
 
 #ifdef LOGGING_ANGLES 
-  next += snprintf(header_new + next, sizeof(header_new), "pitch|roll|yaw|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "pitch|roll|yaw|");
 #endif
 
 #ifdef LOGGING_YAW_SETPOINT
-    next += snprintf(header_new + next, sizeof(header_new), "yaw_sp|");
+    next += snprintf(message_to_print + next, sizeof(message_to_print), "yaw_sp|");
 #endif
 
 #ifdef LOGGING_LIDAR_PID
-  next += snprintf(header_new + next, sizeof(header_new), "lid_er|lid_P|lid_I|lid_D|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "lid_er|lid_P|lid_I|lid_D|");
 #endif
 
 #ifdef LOGGING_LIDAR_ALTITUDE_CM
-  next += snprintf(header_new + next, sizeof(header_new), "lid_h|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "lid_h|");
 #endif
 
 #ifdef LOGGING_BARO_PID
-  next += snprintf(header_new + next, sizeof(header_new), "baro_er|baro_P|baro_I|baro_D|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "baro_er|baro_P|baro_I|baro_D|");
 #endif
 
 #ifdef LOGGING_BARO_ALTITUDE_CM
-  next += snprintf(header_new + next, sizeof(header_new), "baro_h|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "baro_h|");
 #endif
 
 #ifdef LOGGING_KALMAN_ALTITUDE_CM
-  next += snprintf(header_new + next, sizeof(header_new), "Kalman_h|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "Kalman_h|");
 #endif
 
 #ifdef LOGGING_KALMAN_VELOCITY_CM
-  next += snprintf(header_new + next, sizeof(header_new), "Kalman_v|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "Kalman_v|");
 #endif
 
 #ifdef LOGGING_ALTITUDE_SETPOINT_CM
-  next += snprintf(header_new + next, sizeof(header_new), "alt_set|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "alt_set|");
 #endif
 
 #ifdef LOGGING_VOLTAGE_mV
-  next += snprintf(header_new + next, sizeof(header_new), "V_mV|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "V_mV|");
 #endif
 
 #ifdef LOGGING_CURRENT_cA
-  next += snprintf(header_new + next, sizeof(header_new), "I_cA|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "I_cA|");
 #endif
 
 #ifdef LOGGING_RC_COMMANDS
-  next += snprintf(header_new + next, sizeof(header_new), "thr_c|pitch_c|roll_c|yaw_c|mode_c|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "thr_c|pitch_c|roll_c|yaw_c|mode_c|");
 #endif
 
 #ifdef LOGGING_ENGINES
-  next += snprintf(header_new + next, sizeof(header_new), "e1|e2|e3|e4|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "e1|e2|e3|e4|");
 #endif
 
 #ifdef LOGGING_ENGINES_FILTERED
-  next += snprintf(header_new + next, sizeof(header_new), "e1_f|e2_f|e3_f|e4_f|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "e1_f|e2_f|e3_f|e4_f|");
 #endif
 
 #ifdef LOGGING_STATE_FLAGS
-  next += snprintf(header_new + next, sizeof(header_new), "state_flags|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "state_flags|");
 #endif
 
-  next += snprintf(header_new + next, sizeof(header_new), "error_flags|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "error_flags|");
 
 #ifdef LOGGING_RSSI_LEVEL
-  next += snprintf(header_new + next, sizeof(header_new), "RSSI|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "RSSI|");
 #endif
 
 #ifdef LOGGING_CYCLE_TIMES
-  next += snprintf(header_new + next, sizeof(header_new), "AVG_CYCLE|MAX_CYCLE|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "avg_cycle|max_cycle|");
 #endif
 
 #ifdef LOGGING_FFT
-  next += snprintf(header_new + next, sizeof(header_new), "FFT_PEAK|");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "fft_peak_x_1|fft_peak_x_2|fft_peak_x_3|");
 #endif
 
-  next += snprintf(header_new + next, sizeof(header_new), "EOL\r\n");
+  next += snprintf(message_to_print + next, sizeof(message_to_print), "EOL\r\n");
   next = 0;
 
   while (1)
   {
-    // печатаем строку заголовков
-    printf("%s", header_new);
-#ifdef TELNET_CONF_MODE
-    send(*client_fd, header_new, strlen(header_new), 0);
-#endif
+//печатаем строку заголовков
+  print_service_message(client_fd, "%s\r\n", message_to_print);
+
 //пока не дошли до конца памяти (65365 страниц на микросхеме памяти), не нашли конец данных и не обнаружили флаг аварийной записи
     while ((page_address < 65535) && (empty_timestamp_flag == 0) && (emergency_mode_flag == 0)) 
     {
-// копируем содержимое страницы в буфер микросхемы      
+//копируем содержимое страницы в буфер микросхемы      
       W25N_page_data_read(page_address); 
       column_address = 0;
-// пока в буфере помещается целый пакет данных
+//пока в буфере помещается целый пакет данных
       while ((column_address < (2048 - sizeof(struct logging_data_set))) && (empty_timestamp_flag == 0) && (emergency_mode_flag == 0)) 
       {
-// считываем первый пакет из буфера микросхемы себе         
+//считываем первый пакет из буфера микросхемы себе     
         W25N_read(column_address, receiving_logs_buffer, sizeof(struct logging_data_set)); 
 
         p_to_set_to_log = (struct logging_data_set *)receiving_logs_buffer;
 //если достигли конца записанных данных (в такое число считывается таймстэмп если ячейкм не запроганы (все FF))
-        if (p_to_set_to_log->timestamp == 4294967295) empty_timestamp_flag = 1; 
+        if (p_to_set_to_log->timestamp == 4294967295) {empty_timestamp_flag = 1; printf("t ");}
 //в случае если не достигли конца записанных в микруху данных 
 //и не обнаружили флаг экстренной записи начинаем переводить числа в печатный вид при помощи snprintf
 //второе условие нужно для того, чтобы после аварийно записанного пакета не дублировались данные с предыдущей страницы
@@ -185,11 +184,11 @@ void reading_logs_from_external_flash(void *pvParameters)
         {
           next += snprintf(message_to_print, sizeof(message_to_print), "%lu|", p_to_set_to_log->timestamp);
 #ifdef LOGGING_ACCEL_1
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_1[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.0f|", p_to_set_to_log->accel_1[i]);
 #endif
 
 #ifdef LOGGING_ACCEL_2
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_2[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.0f|", p_to_set_to_log->accel_2[i]);
 #endif
 
 #ifdef LOGGING_ACCEL_1_MAX
@@ -201,27 +200,27 @@ void reading_logs_from_external_flash(void *pvParameters)
 #endif
 
 #ifdef LOGGING_GYRO_1
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->gyro_1[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.0f|", p_to_set_to_log->gyro_1[i]);
 #endif
 
 #ifdef LOGGING_GYRO_2
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->gyro_2[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.0f|", p_to_set_to_log->gyro_2[i]);
 #endif
 
 #ifdef LOGGING_AVG_ACCEL
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->accel_avg[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->accel_avg[i]);
 #endif
 
 #ifdef LOGGING_AVG_GYRO
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->gyro_avg[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->gyro_avg[i]);
 #endif
           
 #ifdef LOGGING_QUATERNION
-          for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%f|", p_to_set_to_log->q[i]);
+          for (uint8_t i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%f|", p_to_set_to_log->q[i]);
 #endif
           
 #ifdef LOGGING_ANGLES
-          for (i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->angles[i]);
+          for (uint8_t i = 0; i < 3; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.2f|", p_to_set_to_log->angles[i]);
 #endif
 
 #ifdef LOGGING_YAW_SETPOINT
@@ -273,11 +272,11 @@ void reading_logs_from_external_flash(void *pvParameters)
 #endif
 
 #ifdef LOGGING_ENGINES
-          for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%ld|", p_to_set_to_log->engines[i]);
+          for (uint8_t i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.4f|", p_to_set_to_log->engines[i]);
 #endif
 
 #ifdef LOGGING_ENGINES_FILTERED
-          for (i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%ld|", p_to_set_to_log->engines_filtered[i]);
+          for (uint8_t i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%0.4f|", p_to_set_to_log->engines_filtered[i]);
 #endif
 
 #ifdef LOGGING_STATE_FLAGS
@@ -295,16 +294,13 @@ void reading_logs_from_external_flash(void *pvParameters)
 #endif
 
 #ifdef LOGGING_FFT
-          next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->peak_freq_hz);
+          for (uint8_t i = 0; i < 4; i++) next += snprintf(message_to_print + next, sizeof(message_to_print), "%d|", p_to_set_to_log->peak_freq_hz_x[i]);
 #endif
 
           next += snprintf(message_to_print + next, sizeof(message_to_print), "*\r\n"); // конец строки
 
-// Печаем или отправляем сформированную строку в telnet
-#ifdef TELNET_CONF_MODE
-          send(*client_fd, message_to_print, next, 0);
-#endif
-          printf("%s", message_to_print);
+// Печаем или отправляем сформированную строку
+          print_service_message(client_fd, "%s", message_to_print);
           next = 0;
 //переход на следующий пакет в буфере микросхемы
           column_address += sizeof(struct logging_data_set);
@@ -314,10 +310,7 @@ void reading_logs_from_external_flash(void *pvParameters)
       }
       page_address++; // переход к считыванию следующей страницы памяти
     }
-    ESP_LOGI(TAG_W25N, "Считывание логов из внешней flash-памяти завершено, перезапустите систему");
-#ifdef TELNET_CONF_MODE
-    send(*client_fd, end_message, strlen(end_message), 0);
-#endif
+    print_service_message(client_fd, "Считывание логов из внешней flash-памяти завершено, ESC для перезапуска или повторите выбор меню\r\n");
 
     while (1) // после как закончили считывать моргаем
     {

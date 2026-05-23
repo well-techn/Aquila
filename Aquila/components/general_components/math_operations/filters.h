@@ -26,6 +26,7 @@ typedef struct {
 } Butterworth_t;
 
 float avg_filter_1d(float* array, float new_data_point, uint8_t filter_length);
+void swap(float* a, float* b);
 float median_filter (float* i_arr, float new_element, int window_size);
 void Kalman_2d_predict(float acceleration, KalmanFilter2d_t* this);
 void Kalman_2d_update(float baro_height, KalmanFilter2d_t* this);

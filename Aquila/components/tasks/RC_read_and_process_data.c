@@ -4,6 +4,7 @@
 #include "driver/uart.h"
 #include "driver/gpio.h"
 #include "math.h"
+#include "sdkconfig.h"
 
 //собственные библиотеки
 #include "wt_alldef.h"
@@ -80,9 +81,11 @@ void RC_read_and_process_data(void * pvParameters)
   uint8_t engines_start_flag_delay = 0;
 
   pid_coeff_data_from_rc_to_main_struct pid_coeff_data;
-    pid_coeff_data.kp_alt_hold_coeff = 0;
-    pid_coeff_data.ki_alt_hold_coeff = 0;
-    pid_coeff_data.kd_alt_hold_coeff = 0;
+    pid_coeff_data.target = 0;
+    pid_coeff_data.kp = 0;
+    pid_coeff_data.ki = 0;
+    pid_coeff_data.kd = 0;
+    pid_coeff_data.kff = 0;
 
   
   ESP_LOGI(TAG_RC,"Настраиваем UART для пульта управления.....");
@@ -114,7 +117,7 @@ void RC_read_and_process_data(void * pvParameters)
         case UART_DATA:                                 
                   
           ESP_ERROR_CHECK(uart_get_buffered_data_len(REMOTE_CONTROL_UART, (size_t*)&pos));  //запрашиваем сколько байт получено
-          ESP_LOGD(TAG_RC, "Получено %d байт по data", pos);
+          //ESP_LOGE(TAG_RC, "Получено %d байт по data", pos);
 //если не совпадает по кол-ву ни с одним ожидаемым пакетом то в мусор
           if ((pos != (NUMBER_OF_CONTROL_BYTES_TO_RECEIVE_FROM_RC + 1)) && (pos != (NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC + 1)))                              //если не столько сколько должно быть
           {
@@ -128,7 +131,7 @@ void RC_read_and_process_data(void * pvParameters)
             ESP_LOGD(TAG_RC, "Всего получено %d байт", read_len);   
 
 #endif            
-            ESP_LOG_BUFFER_HEX(TAG_RC, incoming_message_buffer_remote, read_len);
+            //ESP_LOG_BUFFER_HEX(TAG_RC, incoming_message_buffer_remote, read_len);
 
 //проверяем пакет на целостность по заголовку и контрольной сумме
             if ((incoming_message_buffer_remote[0] == RC_CONTROL_MESSAGE_HEADER) 
@@ -147,26 +150,26 @@ void RC_read_and_process_data(void * pvParameters)
               received_yaw = ((incoming_message_buffer_remote[7] << 8) | incoming_message_buffer_remote[8]);
               remote_control_data.mode = ~incoming_message_buffer_remote[10];
 //начинаем приводить их к желаемому виду
-//кривая газа преобразует входной диапазон [0..4095] в [0..1] но нелинейно, а S-образно (см. exel) 
+//кривая газа преобразует входной диапазон [0.2..4095] в [0..1] но нелинейно, а S-образно (см. exel) 
               remote_control_data.received_throttle = (float)received_throttle / 4095.0f;
-              remote_control_data.received_throttle = remote_control_data.received_throttle - 3.0f * remote_control_data.received_throttle * (remote_control_data.received_throttle - 0.9f) * (1 - remote_control_data.received_throttle);
+              remote_control_data.received_throttle = 0.2f + (1 - 0.2f)*(remote_control_data.received_throttle - 2.3f * remote_control_data.received_throttle * (remote_control_data.received_throttle - 0.9f) * (1 - remote_control_data.received_throttle));
 //для pitch - roll преобразуем сигнал [0..4095] в желаемый угол наклона
               if ((received_pitch > 360)&&( received_pitch < 1800)) remote_control_data.received_pitch = 0.02083333f*(float)received_pitch - 37.5f;
                 else if ((received_pitch > 2245) && (received_pitch < 3741)) remote_control_data.received_pitch  = 0.02005348*(float)received_pitch - 45.020053f;
-                else if (received_pitch >= 3741) remote_control_data.received_pitch  = 30.0;  //градусы наклона
-                else if (received_pitch <= 360) remote_control_data.received_pitch  = -30.0;
+                else if (received_pitch >= 3741) remote_control_data.received_pitch  = 30.0f;  //градусы наклона
+                else if (received_pitch <= 360) remote_control_data.received_pitch  = -30.0f;
                 else remote_control_data.received_pitch = 0;
            
               if ((received_roll > 360)&&( received_roll < 1800)) remote_control_data.received_roll = -0.02083333f*(float)received_roll + 37.5f;              
                 else if ((received_roll > 2245) && (received_roll < 3741)) remote_control_data.received_roll = -0.02005348*(float)received_roll + 45.020053f; 
-                else if (received_roll >= 3741) remote_control_data.received_roll = -30.0;  //градусы наклона
-                else if (received_roll <= 360) remote_control_data.received_roll = 30.0;
+                else if (received_roll >= 3741) remote_control_data.received_roll = -30.0f;  //градусы наклона
+                else if (received_roll <= 360) remote_control_data.received_roll = 30.0f;
                 else remote_control_data.received_roll = 0;
 //для yaw преобразуем сигнал [0..4095] в желаемую угловую скорость (в две стороны от центра)
-              if ((received_yaw > 150)&&( received_yaw < 1898)) remote_control_data.received_yaw = -0.1029748f * (float)received_yaw + 195.446224;
-                else if ((received_yaw < 3946)&&( received_yaw > 2198)) remote_control_data.received_yaw = -0.1029748f * (float)received_yaw + 226.338673;
-                else if (received_yaw >= 3946) remote_control_data.received_yaw = -180.0f;     //градусы в секунду
-                else if (received_yaw <= 150) remote_control_data.received_yaw = 180.0f;
+              if ((received_yaw > 150)&&( received_yaw < 1898)) remote_control_data.received_yaw = 0.1430f * (float)received_yaw - 271.4531;
+                else if ((received_yaw < 3946)&&( received_yaw > 2198)) remote_control_data.received_yaw = 0.1430f * (float)received_yaw - 314.3593;
+                else if (received_yaw >= 3946) remote_control_data.received_yaw = -250.0f;     //градусы в секунду
+                else if (received_yaw <= 150) remote_control_data.received_yaw = 250.0f;
                 else remote_control_data.received_yaw = 0;
 
 //слегка подфильтровываем значения от джойстиков
@@ -198,7 +201,7 @@ void RC_read_and_process_data(void * pvParameters)
               else remote_control_data.trim_roll = incoming_message_buffer_remote[9] & 0b00001111;
 
 //если ручка газа удерживается (на протяжении 15 посылок) в нижнем положении и включен тумблер "старт двигателей" установить флаг engines_start_flag        
-              if ((remote_control_data.received_throttle < 0.02f) && (remote_control_data.mode & 0x0001))
+              if ((remote_control_data.received_throttle < 0.23f) && (remote_control_data.mode & 0x0001))
               {
                 engines_start_flag_delay++;
                 if (engines_start_flag_delay > 15)
@@ -263,15 +266,20 @@ void RC_read_and_process_data(void * pvParameters)
             else if ((incoming_message_buffer_remote[0] == RC_PID_COEFF_MESSAGE_HEADER) 
             && (incoming_message_buffer_remote[NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC - 1] == dallas_crc8(incoming_message_buffer_remote, NUMBER_OF_PID_BYTES_TO_RECEIVE_FROM_RC - 1)))
             {
-              ESP_LOGD(TAG_RC, "Получен пакет данных с ПИД-коэффициентами с корректной CRC");
-//собираем полученные данные с ПИД-коэффициентами в структуру
-              pid_coeff_data.kp_alt_hold_coeff = (incoming_message_buffer_remote[1] << 8) | incoming_message_buffer_remote[2];
-              pid_coeff_data.ki_alt_hold_coeff = (incoming_message_buffer_remote[3] << 8) | incoming_message_buffer_remote[4];
-              pid_coeff_data.kd_alt_hold_coeff = (incoming_message_buffer_remote[5] << 8) | incoming_message_buffer_remote[6];
-//отправляем эту структуру в очередь
+              
+              //ESP_LOGE(TAG_RC, "Получен пакет данных с ПИД-коэффициентами с корректной CRC");
+// //собираем полученные данные с ПИД-коэффициентами в структуру
+              pid_coeff_data.target = incoming_message_buffer_remote[1]; 
+              pid_coeff_data.kp = ((incoming_message_buffer_remote[2] << 8) | incoming_message_buffer_remote[3]) / 1000.0f;
+              pid_coeff_data.ki = ((incoming_message_buffer_remote[4] << 8) | incoming_message_buffer_remote[5]) / 1000.0f;
+              pid_coeff_data.kd = ((incoming_message_buffer_remote[6] << 8) | incoming_message_buffer_remote[7]) / 1000.0f;
+              pid_coeff_data.kff = ((incoming_message_buffer_remote[8] << 8) | incoming_message_buffer_remote[9]) / 1000.0f;
+//               //printf("%f, %f, %f, %f\n", pid_coeff_data.kp, pid_coeff_data.ki, pid_coeff_data.kd, pid_coeff_data.kff);
+//               //ESP_LOGE(TAG_RC, "%f, %f, %f, %f\n", pid_coeff_data.kp, pid_coeff_data.ki, pid_coeff_data.kd, pid_coeff_data.kff);
+// //отправляем эту структуру в очередь
               xQueueSend(remote_control_to_main_pid_queue, (void *) &pid_coeff_data, 0);  
             }
-            
+           
             else 
             { 
               ESP_LOGW(TAG_RC, "Ошибка по заголовку или контрольной сумме");

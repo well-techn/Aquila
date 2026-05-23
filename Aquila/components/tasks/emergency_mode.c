@@ -79,13 +79,14 @@ while(1)
     if (caused_error_code != 0)
     {
         printf("Входим в аварийный режим с кодом ошибки %ld\n", caused_error_code);
-//аварийно останавливаем моторы
+//аварийно останавливаем моторы (при Dshot отключение происходим автоматически при остановке main_flying_cycle)
+#ifdef USING_PWM_ESC_CONTROL
         ledc_timer_pause(LEDC_LOW_SPEED_MODE, LEDC_TIMER_0);  //аварийно останавливаем моторы
         gpio_set_level(ENGINE_OUTPUT_0_PIN, 0);
         gpio_set_level(ENGINE_OUTPUT_1_PIN, 0);
         gpio_set_level(ENGINE_OUTPUT_2_PIN, 0);
         gpio_set_level(ENGINE_OUTPUT_3_PIN, 0);
-                
+#endif                
 //отключаем прерывания по IMU      
         gpio_config_t INT_1 = {
         .pin_bit_mask = 1ULL << MPU6000_1_INTERRUPT_PIN,
@@ -136,7 +137,7 @@ if ((caused_error_code == 0x01 << 13) || (caused_error_code == 0x01 << 14))
 //возвращаем UART на оригинальную скорость
         remote_control_uart_emergency_reconfig(RC_UART_BAUD_RATE);
 
-//теперь модуль настроен на эфирную скорость 2400 и готов штатно отправлять пакеты в эфир        
+//теперь модуль настроен на эфирную скорость 2400 и готов штатно отправлять пакеты в эфир на аварийный приемник      
         while(1) 
             {
 #ifdef USING_GPS                
